@@ -1,17 +1,20 @@
 #!/usr/bin/env python
 """Fast single-asset Sentinel trainer for autoresearch iterations.
 
-Designed to complete in ~2-3 minutes. Outputs structured JSON results
-to stdout for agent parsing. Exit code 0 = success, 1 = crash.
+Reads experiment config from autoresearch/knobs.json (never hardcoded).
+Outputs structured JSON results to stdout for agent parsing.
+Exit code 0 = success, 1 = crash.
 
 Usage:
     uv run scripts/train_sentinel_fast.py --asset BTC --timeframe 5m
-    uv run scripts/train_sentinel_fast.py --asset ETH --timeframe 15m --trials 30
+    uv run scripts/train_sentinel_fast.py --asset ETH --timeframe 15m --trials 60
+    uv run scripts/train_sentinel_fast.py --asset BTC --timeframe 5m --mode verify
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import sys
@@ -29,6 +32,7 @@ from qm.backtest.metrics.calibration import brier_score, expected_calibration_er
 from qm.backtest.validation.walk_forward import WalkForwardSplitter
 from qm.core.types import Asset, Timeframe
 from qm.data.storage.parquet import ParquetStore
+from qm.features.cross_asset import CrossAssetPipeline
 from qm.features.pipeline import FeaturePipeline
 from qm.features.selection import select_features
 from qm.model.calibration.calibrator import IsotonicCalibrator
@@ -42,58 +46,28 @@ logging.basicConfig(
 )
 logger = logging.getLogger("train_fast")
 
-# ══════════════════════════════════════════════════════════════════════
-# RESEARCH KNOBS — the agent edits this section
-# ══════════════════════════════════════════════════════════════════════
+CONFIG_PATH = Path("autoresearch/knobs.json")
 
-EXCLUDE_FEATURES: set[str] = {"return_1", "log_return_1", "gap"}
 
-FEATURE_SELECTION = {
-    "missing_threshold": 0.5,
-    "min_target_corr": 0.005,
-    "max_pairwise_corr": 0.90,
-    "min_features_fallback": 5,
-}
+def load_knobs() -> dict:
+    """Load research knobs from config file."""
+    with open(CONFIG_PATH) as f:
+        return json.load(f)
 
-HPO_SEARCH_SPACE = {
-    "n_estimators": (50, 1000),
-    "learning_rate": (0.005, 0.1),
-    "max_depth": (2, 8),
-    "num_leaves": (7, 127),
-    "min_child_samples": (50, 500),
-    "subsample": (0.5, 1.0),
-    "colsample_bytree": (0.3, 1.0),
-    "reg_alpha": (1e-8, 10.0),
-    "reg_lambda": (1e-8, 10.0),
-    "min_split_gain": (0.0, 1.0),
-}
 
-WALK_FORWARD = {
-    "n_splits": 5,
-    "purge_period": 24,
-    "embargo_period": 12,
-}
-
-BACKTEST = {
-    "fee_bps": 0.0,
-    "spread": 0.02,
-    "min_edge": 0.01,
-    "kelly_fraction": 0.25,
-    "initial_bankroll": 10_000.0,
-}
-
-# ══════════════════════════════════════════════════════════════════════
-# END RESEARCH KNOBS
-# ══════════════════════════════════════════════════════════════════════
+def config_hash() -> str:
+    """MD5 hash of current knobs.json for result correlation."""
+    return hashlib.md5(CONFIG_PATH.read_bytes()).hexdigest()[:8]
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Fast Sentinel trainer")
     p.add_argument("--asset", required=True, choices=["BTC", "ETH", "SOL", "XRP"])
     p.add_argument("--timeframe", default="5m", choices=["5m", "15m", "1h"])
-    p.add_argument("--trials", type=int, default=20, help="Optuna trials (default 20 for speed)")
+    p.add_argument("--trials", type=int, default=40, help="Optuna trials (default 40)")
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--timeout", type=int, default=300, help="Wall-clock budget in seconds")
+    p.add_argument("--timeout", type=int, default=420, help="Wall-clock budget in seconds")
+    p.add_argument("--mode", default="fast", choices=["fast", "verify"])
     return p.parse_args()
 
 
@@ -103,26 +77,45 @@ def run(args: argparse.Namespace) -> dict:
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     t0 = time.time()
+    cfg_hash = config_hash()
+
+    # ── Load knobs from config ────────────────────────────────────
+    knobs = load_knobs()
+    EXCLUDE_FEATURES = set(knobs["exclude_features"])
+    FEATURE_SELECTION = knobs["feature_selection"]
+    HPO_SEARCH_SPACE = {k: tuple(v) for k, v in knobs["hpo_search_space"].items()}
+    WALK_FORWARD = knobs["walk_forward"]
+    BACKTEST = knobs["backtest"]
 
     asset = Asset[args.asset]
     tf_map = {"5m": Timeframe.M5, "15m": Timeframe.M15, "1h": Timeframe.H1}
     tf = tf_map[args.timeframe]
 
-    # ── Load data ────────────────────────────────────────────────
+    # ── Mode-dependent trial/timeout ──────────────────────────────
+    if args.mode == "verify":
+        n_trials = max(args.trials, 100)
+        hpo_timeout = max(args.timeout - 90, 120)
+    else:
+        n_trials = args.trials
+        hpo_timeout = max(args.timeout - 60, 60)
+
+    # ── Load data + cross-asset features ──────────────────────────
     store = ParquetStore(base_dir=Path("data/raw/ohlcv"))
-    bars = store.read_bars(asset, tf)
-    if bars.is_empty():
+    pipeline = FeaturePipeline()
+    cross_pipeline = CrossAssetPipeline(store, tf, pipeline=pipeline)
+
+    featured = cross_pipeline.compute(asset)
+    if featured.is_empty():
         return {"status": "error", "reason": "no data"}
 
-    # ── Features ─────────────────────────────────────────────────
-    pipeline = FeaturePipeline()
-    featured = pipeline.compute(bars)
-    feature_names = [f for f in pipeline.feature_names if f not in EXCLUDE_FEATURES]
+    # Defensive: only use feature names that exist as columns
+    all_names = cross_pipeline.feature_names(asset)
+    feature_names = [f for f in all_names if f not in EXCLUDE_FEATURES and f in featured.columns]
 
     target = BinaryDirectionTarget(horizon_bars=1).compute(featured)
     featured = featured.with_columns(target)
 
-    clean = featured.slice(pipeline.max_lookback).drop_nulls(subset=["target"])
+    clean = featured.slice(cross_pipeline.max_lookback).drop_nulls(subset=["target"])
 
     # 80/20 temporal split
     split = int(len(clean) * 0.80)
@@ -138,7 +131,7 @@ def run(args: argparse.Namespace) -> dict:
         min_target_corr=fs["min_target_corr"],
         max_pairwise_corr=fs["max_pairwise_corr"],
     )
-    if len(selected) < fs["min_features_fallback"]:
+    if len(selected) < fs.get("min_features_fallback", 5):
         selected = feature_names
     logger.info("Selected %d/%d features", len(selected), len(feature_names))
 
@@ -197,10 +190,9 @@ def run(args: argparse.Namespace) -> dict:
         return float(np.mean(briers))
 
     study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=args.seed))
-    hpo_timeout = max(args.timeout - 60, 60)  # reserve 60s for retrain+calibrate+evaluate
-    study.optimize(objective, n_trials=args.trials, n_jobs=1, timeout=hpo_timeout)
+    study.optimize(objective, n_trials=n_trials, n_jobs=1, timeout=hpo_timeout)
 
-    logger.info("Best HPO Brier: %.6f (%d trials)", study.best_value, args.trials)
+    logger.info("Best HPO Brier: %.6f (%d/%d trials, %s mode)", study.best_value, len(study.trials), n_trials, args.mode)
 
     # ── Retrain best ─────────────────────────────────────────────
     bp = study.best_params.copy()
@@ -254,6 +246,8 @@ def run(args: argparse.Namespace) -> dict:
 
     return {
         "status": "ok",
+        "mode": args.mode,
+        "config_hash": cfg_hash,
         "asset": args.asset,
         "timeframe": args.timeframe,
         "elapsed_s": round(elapsed, 1),
@@ -262,7 +256,7 @@ def run(args: argparse.Namespace) -> dict:
         "n_features": len(selected),
         "base_rate": round(base_rate, 4),
         "hpo_brier": round(study.best_value, 6),
-        "hpo_trials": args.trials,
+        "hpo_trials": len(study.trials),
         "oos_accuracy": round(acc, 4),
         "oos_brier": round(brier, 6),
         "oos_ece": round(ece, 4),

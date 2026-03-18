@@ -10,51 +10,87 @@ Minimize OOS Brier score on the Sentinel model while maintaining:
 **OOS Brier score** — lower is better. A result is KEPT only if Brier improves
 AND constraints are not violated.
 
-## What You May Change
-Edit ONLY the "RESEARCH KNOBS" section in `scripts/train_sentinel_fast.py`:
+## Config-Driven Architecture
 
-- `EXCLUDE_FEATURES` — which features to drop
-- `FEATURE_SELECTION` — thresholds for feature selection
-- `HPO_SEARCH_SPACE` — bounds for Optuna hyperparameter search
-- `WALK_FORWARD` — cross-validation configuration
-- `BACKTEST` — backtest parameters (fee, spread, min_edge, kelly)
+Experiment config lives in `autoresearch/knobs.json` (NOT in Python source).
+The training script `scripts/train_sentinel_fast.py` is **read-only** — no agent edits it.
 
-## What You Must NOT Change
+### Config File Protocol
+
+| File | Purpose |
+|------|---------|
+| `knobs.json` | Current experiment config — researcher edits this |
+| `best_knobs.json` | Last KEEP'd config — copied on KEEP |
+
+**KEEP flow:** `cp knobs.json → best_knobs.json`
+**DISCARD flow:** `cp best_knobs.json → knobs.json`
+**CRASH flow:** same as DISCARD
+
+No `git checkout`, no `git reset`, no Python file editing.
+
+### Knobs You May Change
+
+All fields in `autoresearch/knobs.json`:
+- `exclude_features` — which features to drop
+- `feature_selection` — thresholds (missing, target corr, pairwise corr)
+- `hpo_search_space` — Optuna parameter bounds (all ranges as `[lo, hi]`)
+- `walk_forward` — cross-validation config (splits, purge, embargo)
+- `backtest` — simulation params (fees, spread, min_edge, kelly)
+
+### What You Must NOT Change
 - Target definition (close[t+1] >= open[t+1])
 - Train/test split ratio (80/20 temporal)
-- The data loading or feature computation pipeline
-- Code outside the RESEARCH KNOBS section
-- `prepare.py` or any `src/qm/` module
+- The training script code
+- Any `src/qm/` module
 
-## Strategy Suggestions
-1. Start with feature selection — try different correlation thresholds
-2. Narrow HPO ranges based on what past experiments found optimal
-3. Try different regularization regimes (high reg vs low reg)
-4. Adjust walk-forward splits (more splits = more robust but slower)
-5. Experiment with min_edge and kelly_fraction for backtest profitability
-6. Try excluding features that show up as low-importance consistently
+## Multi-Agent System
 
-## Anti-Patterns to Avoid
-- Don't make multiple changes at once — isolate variables
-- Don't widen search spaces without reason — narrow toward known-good regions
-- Don't reduce regularization without evidence of underfitting
-- Don't chase backtest PnL at the expense of Brier/ECE
+Three agents operate on this research loop:
+
+| Agent | Model | Cadence | Role | Writes to |
+|-------|-------|---------|------|-----------|
+| `sentinel-researcher` | sonnet | every 8 min | Run experiments, KEEP/DISCARD | knobs.json, best_knobs.json, results.tsv |
+| `sentinel-strategist` | sonnet | every ~5 iterations | Tactical analysis, priority queue | strategy.md |
+| `sentinel-auditor` | opus | every ~20 iterations | Deep analysis, macro directives | audit.md |
+
+**All loops run in ONE session** (serial execution prevents git conflicts).
+
+### Communication Protocol
+
+1. Strategist reads results.tsv → writes `strategy.md` with priority queue + blacklist
+2. Auditor reads results.tsv + strategy.md → writes `audit.md` with CONTINUE/RESET/SWITCH/ESCALATE/WIDEN
+3. Researcher reads strategy.md + audit.md → follows directives, falls back to autonomous mode if stale
+
+### File Ownership (strict — prevents conflicts)
+
+| File | Written by | Read by |
+|------|-----------|---------|
+| knobs.json | researcher | all |
+| best_knobs.json | researcher | researcher |
+| results.tsv | researcher | all |
+| strategy.md | strategist | researcher |
+| audit.md | auditor | researcher, strategist |
+| researcher_ack.txt | researcher | strategist, auditor |
+| last_run.log | training script | strategist |
 
 ## Operational Constraints
 
-### Bash Timeout
-Always set `timeout: 360000` (6 minutes) on the Bash call that runs training.
-The default 120s timeout WILL kill the training mid-run.
+### Bash Timeouts
+- Fast mode: `timeout: 480000` (8 min) — for 40-trial runs
+- Verify mode: `timeout: 600000` (10 min) — for 100-trial verification runs
 
-### Crash Recovery
-If the previous iteration left dirty git state:
-1. `git checkout -- scripts/train_sentinel_fast.py`
-2. Check `autoresearch/last_run.log` for the crash reason
-3. If the crash was from a bad RESEARCH KNOBS edit, revert to known-good values
-4. Log the CRASH to results.tsv before trying a new hypothesis
+### Verification Protocol
+When a KEEP improves Brier by >2% relative, immediately re-run with `--mode verify --trials 100`.
+If verify confirms improvement → KEEP-VERIFIED. If it regresses → VERIFY-FAILED (revert).
 
 ### Stagnation Escape
-If 3+ consecutive DISCARDs with similar strategies:
-- Pivot to a completely different knob category
-- Try the opposite direction (e.g., if tightening didn't help, try loosening)
-- Consider reverting to baseline and trying a fresh approach
+- 3+ consecutive DISCARDs on same category → try different category
+- 5+ consecutive DISCARDs overall → random large perturbation
+- 15+ iterations on one asset → switch to next asset
+
+## Anti-Patterns
+- Don't make multiple changes at once — isolate variables
+- Don't widen search spaces without reason (unless auditor says WIDEN)
+- Don't reduce regularization without evidence of underfitting
+- Don't chase backtest PnL at the expense of Brier/ECE
+- Don't repeat experiments that are on the strategist's blacklist
