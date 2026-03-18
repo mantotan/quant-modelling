@@ -4,6 +4,12 @@ Three-stage filter:
 1. Remove features with >50% missing values
 2. Remove features with <0.01 absolute correlation with target
 3. Remove features with >0.95 pairwise correlation (keep higher target corr)
+
+Protected prefixes: features whose names start with any protected prefix
+survive Stage 2 (low target correlation) and Stage 3 (collinearity
+pruning). This prevents alpha features (funding, liquidation, regime,
+interaction) from being dropped — they have weak marginal correlation
+but contribute via non-linear interactions that LightGBM can discover.
 """
 
 from __future__ import annotations
@@ -16,12 +22,18 @@ import polars as pl
 logger = logging.getLogger(__name__)
 
 
+def _is_protected(name: str, prefixes: list[str]) -> bool:
+    """Check if a feature name matches any protected prefix."""
+    return any(name.startswith(p) for p in prefixes)
+
+
 def select_features(
     features: pl.DataFrame,
     target: pl.Series,
     missing_threshold: float = 0.5,
     min_target_corr: float = 0.01,
     max_pairwise_corr: float = 0.95,
+    protected_prefixes: list[str] | None = None,
 ) -> list[str]:
     """Select features using a three-stage filter.
 
@@ -31,12 +43,22 @@ def select_features(
         missing_threshold: Max fraction of nulls allowed.
         min_target_corr: Minimum absolute correlation with target.
         max_pairwise_corr: Maximum pairwise correlation between features.
+        protected_prefixes: Feature name prefixes that are immune to
+            Stage 2 (low correlation) and Stage 3 (collinearity) removal.
+            Alpha features (e.g., ``["funding_", "liquidation_",
+            "regime_", "leverage_"]``) have weak marginal correlation
+            but contribute via non-linear interactions.
 
     Returns:
         List of selected feature column names.
     """
+    prefixes = protected_prefixes or []
     feature_cols = features.columns
-    logger.info(f"Starting feature selection with {len(feature_cols)} features")
+    n_protected = sum(1 for c in feature_cols if _is_protected(c, prefixes))
+    logger.info(
+        "Starting feature selection with %d features (%d protected)",
+        len(feature_cols), n_protected,
+    )
 
     # Stage 1: Remove high-missing features
     null_fracs = {
@@ -62,9 +84,19 @@ def select_features(
         corr = np.corrcoef(col_np[mask], target_np[mask])[0, 1]
         target_corrs[col] = abs(corr) if not np.isnan(corr) else 0.0
 
-    stage2 = [col for col in stage1 if target_corrs[col] >= min_target_corr]
+    stage2 = [
+        col for col in stage1
+        if target_corrs[col] >= min_target_corr or _is_protected(col, prefixes)
+    ]
     dropped_2 = len(stage1) - len(stage2)
-    logger.info(f"Stage 2: dropped {dropped_2} features (target corr < {min_target_corr})")
+    n_saved_2 = sum(
+        1 for col in stage2
+        if _is_protected(col, prefixes) and target_corrs[col] < min_target_corr
+    )
+    logger.info(
+        "Stage 2: dropped %d features (target corr < %s), %d protected saved",
+        dropped_2, min_target_corr, n_saved_2,
+    )
 
     if len(stage2) <= 1:
         return stage2
@@ -89,15 +121,28 @@ def select_features(
             if stage2[j] in to_remove:
                 continue
             if abs(corr_matrix[i, j]) > max_pairwise_corr:
-                # Remove the one with lower target correlation
-                if target_corrs[stage2[i]] >= target_corrs[stage2[j]]:
+                # Never remove protected features from collinearity pruning
+                i_prot = _is_protected(stage2[i], prefixes)
+                j_prot = _is_protected(stage2[j], prefixes)
+                if i_prot and j_prot:
+                    continue  # both protected — keep both
+                if i_prot:
+                    to_remove.add(stage2[j])
+                elif j_prot:
+                    to_remove.add(stage2[i])
+                elif target_corrs[stage2[i]] >= target_corrs[stage2[j]]:
                     to_remove.add(stage2[j])
                 else:
                     to_remove.add(stage2[i])
 
     stage3 = [col for col in stage2 if col not in to_remove]
     dropped_3 = len(stage2) - len(stage3)
-    logger.info(f"Stage 3: dropped {dropped_3} features (pairwise corr > {max_pairwise_corr})")
-    logger.info(f"Selected {len(stage3)} features from {len(feature_cols)} original")
+    logger.info(
+        "Stage 3: dropped %d features (pairwise corr > %s)",
+        dropped_3, max_pairwise_corr,
+    )
+    logger.info(
+        "Selected %d features from %d original", len(stage3), len(feature_cols),
+    )
 
     return stage3
