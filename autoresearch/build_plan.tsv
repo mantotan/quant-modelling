@@ -1,5 +1,5 @@
 id	phase	work_unit	description	dependencies	status
-1	1A	alpha_store_infra	Add alpha_stores dict + join_asof to CrossAssetPipeline + tests		PENDING
+1	1A	alpha_store_infra	Add alpha_stores dict + join_asof to CrossAssetPipeline + tests		DONE
 2	1A	funding_downloader	BinanceFundingRateDownloader + download script + tests		PENDING
 3	1A	funding_features	FundingFeatures group (6 features) + tests	1,2	PENDING
 4	1B	liquidation_features	LiquidationFeatures group (4 features) + tests	1	PENDING
