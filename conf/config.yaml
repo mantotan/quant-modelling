@@ -1,0 +1,10 @@
+defaults:
+  - env: dev
+  - exchanges: binance
+  - polymarket: clob
+  - data: timescaledb
+  - features: registry
+  - model: lightgbm
+  - backtest: engine
+  - execution: risk
+  - monitoring: prometheus

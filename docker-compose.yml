@@ -1,0 +1,37 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"  # localhost only — never expose to 0.0.0.0
+    environment:
+      POSTGRES_USER: qm
+      POSTGRES_PASSWORD: qm
+      POSTGRES_DB: qm
+    volumes:
+      - timescale_data:/home/postgres/pgdata/data
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb"]
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./conf/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin  # change in production
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  timescale_data:
+  prometheus_data:
+  grafana_data:

@@ -1,0 +1,88 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# uv
+.python-version
+
+# Secrets — NEVER commit
+.env
+.env.local
+.env.production
+*.key
+*.pem
+
+# Data — large files, gitignored
+data/
+*.parquet
+*.arrow
+*.feather
+*.h5
+*.hdf5
+
+# Model artifacts
+*.pkl
+*.pickle
+*.joblib
+*.onnx
+*.treelite
+*.dll
+*.so
+
+# DuckDB
+*.duckdb
+*.duckdb.wal
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_metadata/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Rust build artifacts
+target/
+crates/qm-fast/target/
+
+# Logs
+*.log
+logs/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# mypy
+.mypy_cache/
+
+# ruff
+.ruff_cache/
+
+# pytest
+.pytest_cache/
+
+# Grafana/Prometheus local data
+prometheus_data/
+grafana_data/

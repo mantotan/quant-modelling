@@ -1,0 +1,137 @@
+[project]
+name = "qm"
+version = "0.1.0"
+description = "ML/Quant system for crypto Polymarket prediction"
+requires-python = ">=3.11"
+dependencies = [
+    # Core
+    "polars>=1.0",
+    "numpy>=1.26",
+    "duckdb>=1.0",
+
+    # Exchange data
+    "ccxt>=4.0",
+
+    # ML
+    "lightgbm>=4.0",
+    "optuna>=3.0",
+    "scikit-learn>=1.4",
+    "treelite>=4.0",
+
+    # Polymarket
+    "py-clob-client>=0.15",
+
+    # Calibration / stats
+    "scipy>=1.12",
+
+    # Database
+    "asyncpg>=0.29",
+    "alembic>=1.13",
+    "sqlalchemy>=2.0",
+
+    # Config
+    "hydra-core>=1.3",
+    "omegaconf>=2.3",
+    "python-dotenv>=1.0",
+
+    # Secrets
+    "keyring>=25.0",
+
+    # Scheduling
+    "apscheduler>=3.10",
+
+    # Monitoring
+    "prometheus-client>=0.20",
+    "structlog>=24.0",
+
+    # Networking
+    "aiohttp>=3.9",
+    "websockets>=12.0",
+    "orjson>=3.9",
+
+    # Time
+    "ntplib>=0.4",
+
+    # Blockchain
+    "web3>=6.0",
+    "eth-account>=0.11",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "pytest-benchmark>=4.0",
+    "aioresponses>=0.7",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+]
+gpu = [
+    "torch>=2.2",
+]
+
+[project.scripts]
+qm = "qm.cli.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qm"]
+
+# ── Ruff ──────────────────────────────────────────────
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["qm"]
+
+# ── Mypy ──────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+plugins = []
+
+[[tool.mypy.overrides]]
+module = [
+    "ccxt.*",
+    "lightgbm.*",
+    "optuna.*",
+    "treelite.*",
+    "duckdb.*",
+    "hydra.*",
+    "omegaconf.*",
+    "apscheduler.*",
+    "ntplib.*",
+    "py_clob_client.*",
+]
+ignore_missing_imports = true
+
+# ── Pytest ────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: requires Docker services (TimescaleDB)",
+    "benchmark: performance benchmark tests",
+]
