@@ -11,7 +11,7 @@ id	phase	work_unit	description	dependencies	status
 10	2B	vol_kelly	Vol-scaled Kelly sizing + tests	5	DONE
 11	2C	sanity_checker	BacktestSanityChecker + tighten acceptance criteria + tests		DONE
 12	3A	options_iv	DeribitIVDownloader + OptionsIVFeatures (5 features) + tests	1	DONE
-13	3B	polymarket_fix	Fix recorder TODOs + PolymarketMicroFeatures (4 features) + tests	1	PENDING
+13	3B	polymarket_fix	Fix recorder TODOs + PolymarketMicroFeatures (4 features) + tests	1	DONE
 14	4A	pipeline_registration	Register all new groups in pipeline.py	3,4,5,7,12,13	PENDING
 15	4A	enriched_knobs	Create enriched knobs.json schema	14	PENDING
 16	4B	training_script_update	Update train_pulse_fast.py to support enriched knobs	15	PENDING
