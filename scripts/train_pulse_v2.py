@@ -92,12 +92,22 @@ def main() -> None:
     market_sim = MarketOddsSimulator(efficiency=args.efficiency, timeframe=timeframe)
     gen = RealTickDataGenerator(timeframe=timeframe, seed=args.seed)
 
-    t0 = time.time()
-    dataset = gen.generate(bars_df, trades_store, history_features, market_sim)
-    logger.info(
-        "Training data: %d samples from %d bars in %.1fs (REAL TICKS)",
-        len(dataset.y), len(np.unique(dataset.bar_indices)), time.time() - t0,
-    )
+    # Check for cached dataset first
+    cache_path = Path(args.model_dir) / f"{asset.value}_{timeframe.value}" / "dataset.npz"
+    if cache_path.exists():
+        from qm.model.targets.intrabar import IntraBarDataset
+        dataset = IntraBarDataset.load(cache_path)
+        logger.info("Loaded cached dataset: %d samples from %s", len(dataset.y), cache_path)
+    else:
+        t0 = time.time()
+        dataset = gen.generate(bars_df, trades_store, history_features, market_sim)
+        logger.info(
+            "Training data: %d samples from %d bars in %.1fs (REAL TICKS)",
+            len(dataset.y), len(np.unique(dataset.bar_indices)), time.time() - t0,
+        )
+        # Cache for reuse by ensemble script
+        dataset.save(cache_path)
+        logger.info("Cached dataset to %s", cache_path)
 
     if len(dataset.y) < 5000:
         logger.error("Not enough samples (%d). Download more trade data.", len(dataset.y))

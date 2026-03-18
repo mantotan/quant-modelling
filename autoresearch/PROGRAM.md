@@ -1,7 +1,7 @@
-# Sentinel Autoresearch Program
+# Pulse Autoresearch Program
 
 ## Objective
-Minimize OOS Brier score on the Sentinel model while maintaining:
+Minimize OOS Brier score on the Pulse intra-bar model while maintaining:
 - ECE < 0.05
 - Backtest PnL > 0
 - No data snooping (never look at test set to decide what to change)
@@ -13,7 +13,7 @@ AND constraints are not violated.
 ## Config-Driven Architecture
 
 Experiment config lives in `autoresearch/knobs.json` (NOT in Python source).
-The training script `scripts/train_sentinel_fast.py` is **read-only** — no agent edits it.
+The training script `scripts/train_pulse_fast.py` is **read-only** — no agent edits it.
 
 ### Config File Protocol
 
@@ -31,17 +31,27 @@ No `git checkout`, no `git reset`, no Python file editing.
 ### Knobs You May Change
 
 All fields in `autoresearch/knobs.json`:
-- `exclude_features` — which features to drop
-- `feature_selection` — thresholds (missing, target corr, pairwise corr)
+- `cached_features` — which of 15 historical features to include (tick features 0-7 always included by the script)
+- `time_pcts` — which intra-bar sampling points to use (subset of [0.003, 0.01, 0.05, 0.10, 0.20, 0.40, 0.60, 0.80])
 - `hpo_search_space` — Optuna parameter bounds (all ranges as `[lo, hi]`)
-- `walk_forward` — cross-validation config (splits, purge, embargo)
-- `backtest` — simulation params (fees, spread, min_edge, kelly)
+- `walk_forward` — cross-validation config (splits, purge, embargo, train/test bars)
+- `backtest` — simulation params (spread, min_edge, max_trades_per_bar, max_daily_trades)
 
 ### What You Must NOT Change
-- Target definition (close[t+1] >= open[t+1])
-- Train/test split ratio (80/20 temporal)
+- `model` field (always "pulse")
+- `market_sim.efficiency` — baked into the cached dataset, runtime changes have NO effect
+- `backtest.fee_bps` — must stay 0 (maker-only strategy, no taker fees)
+- `backtest.impact_bps` — must stay 0 (limit orders, no market impact)
+- Target definition (close >= open for the current bar)
+- Train/test split ratio (80/20 temporal at bar level)
 - The training script code
 - Any `src/qm/` module
+- The cached dataset (.npz) — do NOT regenerate per iteration
+
+### Pulse-Specific Rules
+- **Tick features (indices 0-7) are ALWAYS included** — they are the core signal. Never suggest removing them.
+- **min_child_samples must be >= 100** — Pulse has 8 correlated samples per bar; lower values cause overfitting.
+- Walk-forward splits operate at **bar level**, not sample level. The script handles this automatically.
 
 ## Multi-Agent System
 
@@ -49,7 +59,7 @@ Three agents operate on this research loop:
 
 | Agent | Model | Cadence | Role | Writes to |
 |-------|-------|---------|------|-----------|
-| `sentinel-researcher` | sonnet | every 8 min | Run experiments, KEEP/DISCARD | knobs.json, best_knobs.json, results.tsv |
+| `sentinel-researcher` | sonnet | every ~5 min | Run experiments, KEEP/DISCARD | knobs.json, best_knobs.json, results.tsv |
 | `sentinel-strategist` | sonnet | every ~5 iterations | Tactical analysis, priority queue | strategy.md |
 | `sentinel-auditor` | opus | every ~20 iterations | Deep analysis, macro directives | audit.md |
 
@@ -91,6 +101,13 @@ If verify confirms improvement → KEEP-VERIFIED. If it regresses → VERIFY-FAI
 ## Anti-Patterns
 - Don't make multiple changes at once — isolate variables
 - Don't widen search spaces without reason (unless auditor says WIDEN)
-- Don't reduce regularization without evidence of underfitting
+- Don't reduce min_child_samples below 100 (Pulse has 8 correlated samples per bar)
+- Don't remove tick features (indices 0-7) — they ARE the signal
+- Don't change fee_bps or impact_bps (maker-only: both are 0)
+- Don't change market_sim.efficiency (baked into dataset)
 - Don't chase backtest PnL at the expense of Brier/ECE
 - Don't repeat experiments that are on the strategist's blacklist
+
+## Maker-Only Fee Model
+Polymarket crypto 5-min markets: makers pay 0 fees and earn 20% rebates.
+Our strategy uses limit orders only, so fee_bps=0 and impact_bps=0 is correct.

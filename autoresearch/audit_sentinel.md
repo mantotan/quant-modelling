@@ -1,16 +1,20 @@
 # Audit Report
-Updated: (not yet)
-Directive: CONTINUE
-Model: Pulse V2
-Baseline Brier: ~0.198
+Updated: none
+After iteration: 0
 
-## Assessment
-(No data yet — first audit after iteration 20)
+## Verdict: CONTINUE
+No experiments run yet.
+
+## Progress
+(No data)
+
+## Risk Flags
+(No data)
 
 ## Acceptance Status
 | Metric | Target | Best | Status |
 |--------|--------|------|--------|
-| Brier  | <0.25  | ~0.198 | PASS |
+| Brier  | <0.25  | -    | -      |
 | ECE    | <0.05  | -    | -      |
 | PnL    | >0     | -    | -      |
 | Sharpe | >0.0   | -    | -      |

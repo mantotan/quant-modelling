@@ -1,0 +1,6 @@
+iteration	timestamp	asset	status	oos_brier	oos_ece	backtest_pnl	backtest_sharpe	description	commit
+1	2026-03-19T00:00:00	BTC	KEEP	0.249371	0.0094	1004038.6	13.36	baseline — default knobs, no changes	d4a9a0b
+2	2026-03-19T00:30:00	BTC	DISCARD	0.249409	0.0125	1035969.25	9.87	raise min_target_corr 0.005→0.010 (tighten feature selection)	b8d9bcb
+3	2026-03-19T01:00:00	BTC	DISCARD	0.249429	0.0113	1072229.21	16.11	narrow num_leaves upper bound 127→63 (HPO complexity constraint)	f79df29
+4	2026-03-19T01:30:00	BTC	DISCARD	0.249416	0.0124	1038175.35	17.27	increase walk_forward n_splits 5→7 (more CV folds)	b1a97b9
+5	2026-03-19T03:00:00	BTC	DISCARD	0.249517	0.0129	1027270.27	15.15	narrow reg_alpha+reg_lambda [1e-8,10.0]→[0.01,5.0] (HPO regularization range)	463c8f1

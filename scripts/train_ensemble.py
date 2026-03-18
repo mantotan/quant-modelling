@@ -101,38 +101,51 @@ def main() -> None:
     lookback = cross_pipeline.max_lookback
     clean_df = featured_df.slice(lookback).drop_nulls(subset=["target"])
 
-    # Sentinel feature columns
+    # Sentinel feature columns — filter to only those actually computed
     all_feat_names = cross_pipeline.feature_names(asset)
-    sentinel_features = [f for f in all_feat_names if f not in EXCLUDE_FEATURES]
+    available_cols = set(clean_df.columns)
+    sentinel_features = [
+        f for f in all_feat_names
+        if f not in EXCLUDE_FEATURES and f in available_cols
+    ]
     logger.info("Sentinel features: %d, bars: %d (%.1fs)",
                 len(sentinel_features), len(clean_df), time.time() - t0)
 
     # ── 2. Generate Pulse training data from real ticks ─────────────
-    t0 = time.time()
-    trades_store = ParquetStore(base_dir=Path(args.trades_dir))
-    trade_dates = trades_store.list_trade_dates(asset)
-    if not trade_dates:
-        logger.error("No trade data for %s. Run download_trades.py first.", asset.value)
-        sys.exit(1)
+    # Try cached dataset first (saved by train_pulse_v2.py)
+    from qm.model.targets.intrabar import IntraBarDataset
+    cache_path = Path(f"data/models/pulse_v2/{asset.value}_{timeframe.value}/dataset.npz")
 
-    # Compute Pulse historical features
-    pipeline = FeaturePipeline()
-    bars_df = ohlcv_store.read_bars(asset, timeframe)
-    featured_bars = pipeline.compute(bars_df)
-    available = [c for c in CACHED_FEATURE_NAMES if c in featured_bars.columns]
-    history_features = featured_bars.select(available)
+    if cache_path.exists():
+        t0 = time.time()
+        pulse_dataset = IntraBarDataset.load(cache_path)
+        logger.info("Loaded cached Pulse dataset: %d samples (%.1fs)",
+                     len(pulse_dataset.y), time.time() - t0)
+    else:
+        t0 = time.time()
+        trades_store = ParquetStore(base_dir=Path(args.trades_dir))
+        trade_dates = trades_store.list_trade_dates(asset)
+        if not trade_dates:
+            logger.error("No trade data for %s. Run download_trades.py first.", asset.value)
+            sys.exit(1)
 
-    market_sim = MarketOddsSimulator(efficiency=args.efficiency, timeframe=timeframe)
-    gen = RealTickDataGenerator(timeframe=timeframe, seed=args.seed)
-    pulse_dataset = gen.generate(bars_df, trades_store, history_features, market_sim)
+        pipeline = FeaturePipeline()
+        bars_df = ohlcv_store.read_bars(asset, timeframe)
+        featured_bars = pipeline.compute(bars_df)
+        available = [c for c in CACHED_FEATURE_NAMES if c in featured_bars.columns]
+        history_features = featured_bars.select(available)
+
+        market_sim = MarketOddsSimulator(efficiency=args.efficiency, timeframe=timeframe)
+        gen = RealTickDataGenerator(timeframe=timeframe, seed=args.seed)
+        pulse_dataset = gen.generate(bars_df, trades_store, history_features, market_sim)
+
+        logger.info("Pulse data: %d samples from %d bars (%.1fs)",
+                     len(pulse_dataset.y), len(np.unique(pulse_dataset.bar_indices)),
+                     time.time() - t0)
 
     if len(pulse_dataset.y) < 5000:
         logger.error("Not enough Pulse samples (%d). Need more trade data.", len(pulse_dataset.y))
         sys.exit(1)
-
-    logger.info("Pulse data: %d samples from %d bars (%.1fs)",
-                len(pulse_dataset.y), len(np.unique(pulse_dataset.bar_indices)),
-                time.time() - t0)
 
     # ── 3. Align bar indices between Sentinel and Pulse ─────────────
     # Sentinel: clean_df has one row per bar (indexed 0..N-1)

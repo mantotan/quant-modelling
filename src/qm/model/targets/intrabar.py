@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import timedelta
+from pathlib import Path
 
 import numpy as np
 import polars as pl
@@ -44,6 +45,26 @@ class IntraBarDataset:
     bar_indices: np.ndarray  # (n_samples,) bar index per sample
     time_pcts: np.ndarray  # (n_samples,) elapsed_pct per sample
     feature_names: list[str]  # 23 feature names
+
+    def save(self, path: Path) -> None:
+        """Save dataset to .npz for fast reload."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(
+            path,
+            X=self.X, y=self.y, market_probs=self.market_probs,
+            bar_indices=self.bar_indices, time_pcts=self.time_pcts,
+            feature_names=np.array(self.feature_names),
+        )
+
+    @classmethod
+    def load(cls, path: Path) -> "IntraBarDataset":
+        """Load dataset from .npz."""
+        data = np.load(path, allow_pickle=False)
+        return cls(
+            X=data["X"], y=data["y"], market_probs=data["market_probs"],
+            bar_indices=data["bar_indices"], time_pcts=data["time_pcts"],
+            feature_names=list(data["feature_names"]),
+        )
 
 
 def _align_1m_to_parent(
