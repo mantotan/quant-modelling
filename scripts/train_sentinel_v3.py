@@ -49,8 +49,12 @@ def main() -> None:
 
     # ── Load data ─────────────────────────────────────────────────
     store = ParquetStore(base_dir=Path("data/raw/ohlcv"))
+    metrics_store = ParquetStore(base_dir=Path("data/raw/metrics"))
     pipeline = FeaturePipeline()
-    cross_pipeline = CrossAssetPipeline(store, Timeframe.M5, pipeline=pipeline)
+    cross_pipeline = CrossAssetPipeline(
+        store, Timeframe.M5, pipeline=pipeline,
+        metrics_store=metrics_store,
+    )
 
     assets_results = {}
 

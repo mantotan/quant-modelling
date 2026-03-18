@@ -22,6 +22,7 @@ import qm.features.groups.volatility  # noqa: F401
 import qm.features.groups.momentum  # noqa: F401
 import qm.features.groups.volume  # noqa: F401
 import qm.features.groups.time_features  # noqa: F401
+import qm.features.groups.derivatives  # noqa: F401
 
 
 def _get_calculators() -> dict[str, FeatureCalculatorBase]:

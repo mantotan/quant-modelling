@@ -127,22 +127,30 @@ class CrossAssetPipeline:
         timeframe: Timeframe,
         pipeline: FeaturePipeline | None = None,
         context_map: dict[Asset, Asset] | None = None,
+        metrics_store: ParquetStore | None = None,
     ) -> None:
         self._store = store
         self._timeframe = timeframe
         self._pipeline = pipeline or FeaturePipeline()
         self._context_map = context_map or DEFAULT_CONTEXT_MAP
+        self._metrics_store = metrics_store
         self._featured_cache: dict[Asset, pl.DataFrame] = {}
 
     def _get_featured(self, asset: Asset) -> pl.DataFrame:
-        """Load bars and compute base features, with caching."""
+        """Load bars, join metrics if available, compute base features, with caching."""
         if asset not in self._featured_cache:
             bars = self._store.read_bars(asset, self._timeframe)
             if bars.is_empty():
                 self._featured_cache[asset] = bars
             else:
+                # Join metrics data before feature computation (so derivatives group can use it)
+                if self._metrics_store is not None:
+                    metrics = self._metrics_store.read_metrics(asset)
+                    if not metrics.is_empty():
+                        bars = bars.join(metrics, on="time", how="left")
+                        logger.debug("Joined %d metrics rows for %s", len(metrics), asset.value)
                 self._featured_cache[asset] = self._pipeline.compute(bars)
-                logger.debug("Computed base features for %s (%d bars)", asset.value, len(bars))
+                logger.debug("Computed features for %s (%d bars)", asset.value, len(bars))
         return self._featured_cache[asset]
 
     def compute(self, asset: Asset) -> pl.DataFrame:
@@ -171,7 +179,7 @@ class CrossAssetPipeline:
         return result
 
     def feature_names(self, asset: Asset) -> list[str]:
-        """Base pipeline feature names + cross-asset feature names."""
+        """Base pipeline feature names + cross-asset + derivatives feature names."""
         base = list(self._pipeline.feature_names)
         context_asset = self._context_map.get(asset)
         if context_asset is None:
@@ -179,7 +187,13 @@ class CrossAssetPipeline:
         prefix = context_asset.value.lower()
         cross = [f"{prefix}_{f}" for f in CONTEXT_FEATURES]
         derived = ["spread_return_1", "spread_return_5", "relative_strength", "correlation_30"]
-        return base + cross + derived
+        # Derivatives features (computed by DerivativesFeatures group if columns exist)
+        derivatives = [
+            "taker_buy_ratio", "oi_change", "oi_change_5",
+            "ls_ratio", "ls_ratio_change", "top_ls_ratio",
+            "top_ls_divergence", "taker_ls_vol_ratio",
+        ]
+        return base + cross + derived + derivatives
 
     @property
     def max_lookback(self) -> int:
