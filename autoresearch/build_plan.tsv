@@ -7,7 +7,7 @@ id	phase	work_unit	description	dependencies	status
 6	1C	regime_risk	RiskManager.set_regime() + dynamic correlations + tests	5	DONE
 7	1D	interaction_features	InteractionFeatures (8 alpha x TA) + tests	3,4,5	DONE
 8	2A	feature_selection_protect	Add protected_prefixes to select_features() + tests	3,4,5,7	DONE
-9	2A	hpo_objective	ObjectiveConfig + compute_objective() + trainer mods + tests		PENDING
+9	2A	hpo_objective	ObjectiveConfig + compute_objective() + trainer mods + tests		DONE
 10	2B	vol_kelly	Vol-scaled Kelly sizing + tests	5	PENDING
 11	2C	sanity_checker	BacktestSanityChecker + tighten acceptance criteria + tests		PENDING
 12	3A	options_iv	DeribitIVDownloader + OptionsIVFeatures (5 features) + tests	1	PENDING
