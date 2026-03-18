@@ -144,9 +144,9 @@ def run(args: argparse.Namespace) -> dict:
     unique_bars = np.unique(bar_indices)
     n_bars = len(unique_bars)
     split_bar_idx = int(n_bars * 0.80)
-    train_bar_set = set(unique_bars[:split_bar_idx].tolist())
+    train_bars = unique_bars[:split_bar_idx]
 
-    train_mask = np.array([bi in train_bar_set for bi in bar_indices])
+    train_mask = np.isin(bar_indices, train_bars)
     test_mask = ~train_mask
 
     X_train, y_train = X[train_mask], y[train_mask]

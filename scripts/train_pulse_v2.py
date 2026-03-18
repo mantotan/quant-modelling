@@ -27,6 +27,7 @@ from qm.data.storage.parquet import ParquetStore
 from qm.features.intrabar import CACHED_FEATURE_NAMES
 from qm.features.pipeline import FeaturePipeline
 from qm.model.calibration.calibrator import IsotonicCalibrator
+from qm.model.targets.intrabar import IntraBarDataset
 from qm.model.targets.tick_generator import RealTickDataGenerator
 from qm.model.trainers.pulse_trainer import PulseTrainer
 
@@ -95,7 +96,6 @@ def main() -> None:
     # Check for cached dataset first
     cache_path = Path(args.model_dir) / f"{asset.value}_{timeframe.value}" / "dataset.npz"
     if cache_path.exists():
-        from qm.model.targets.intrabar import IntraBarDataset
         dataset = IntraBarDataset.load(cache_path)
         logger.info("Loaded cached dataset: %d samples from %s", len(dataset.y), cache_path)
     else:
