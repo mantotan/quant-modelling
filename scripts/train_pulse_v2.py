@@ -5,7 +5,7 @@ Uses actual aggTrades from Binance for honest intra-bar features.
 Backtests on held-out OOS with realistic friction ($50 flat bets).
 
 Usage:
-    python scripts/train_pulse_v2.py --asset BTC --timeframe 5m --n-trials 20
+    python scripts/train_pulse_v2.py --asset BTC --timeframe 5m --n-trials 50
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ohlcv-dir", type=str, default="data/raw/ohlcv")
     parser.add_argument("--trades-dir", type=str, default="data/raw/trades")
     parser.add_argument("--model-dir", type=str, default="data/models/pulse_v2")
-    parser.add_argument("--n-trials", type=int, default=20)
+    parser.add_argument("--n-trials", type=int, default=50)
     parser.add_argument("--efficiency", type=float, default=0.75)
     parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()
@@ -108,8 +108,8 @@ def main() -> None:
     # 4. Optuna HPO
     t0 = time.time()
     trainer = PulseTrainer(
-        n_trials=args.n_trials, n_splits=3,
-        train_bars=2000, test_bars=500, seed=args.seed,
+        n_trials=args.n_trials, n_splits=5,
+        train_bars=5000, test_bars=1000, seed=args.seed,
     )
     best_metrics = trainer.fit(dataset)
     logger.info("HPO complete in %.1fs", time.time() - t0)

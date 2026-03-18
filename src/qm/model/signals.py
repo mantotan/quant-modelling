@@ -90,6 +90,31 @@ class SignalGenerator:
             recommended_size=0.0,  # filled in by Kelly sizer
         )
 
+    def check_model_agreement(
+        self,
+        sentinel_prob: float,
+        pulse_prob: float,
+        time_elapsed_pct: float,
+    ) -> tuple[bool, float]:
+        """Check if Sentinel and Pulse agree enough to trust the ensemble.
+
+        At early bar (t~0), Pulse has no tick data, so disagreement is
+        expected and allowed. At late bar (t~0.80), both models have
+        strong evidence, so less disagreement is tolerated.
+
+        Args:
+            sentinel_prob: Calibrated P(Up) from Sentinel.
+            pulse_prob: Calibrated P(Up) from Pulse.
+            time_elapsed_pct: Fraction of bar elapsed (0.0 to 1.0).
+
+        Returns:
+            (ok, disagreement): ok=True if trade should proceed.
+        """
+        disagreement = abs(sentinel_prob - pulse_prob)
+        # Linear ramp: 0.40 at t=0 -> 0.15 at t=0.80
+        max_allowed = max(0.15, 0.40 - 0.3125 * time_elapsed_pct)
+        return disagreement <= max_allowed, disagreement
+
     def generate_batch(
         self,
         timestamps: np.ndarray,

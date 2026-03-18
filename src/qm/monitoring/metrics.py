@@ -167,6 +167,33 @@ POLYMARKET_ACTIVE_MARKETS = Gauge(
     "Number of active Polymarket markets being tracked",
 )
 
+# ── Ensemble metrics ──────────────────────────────────────────────
+
+ENSEMBLE_PREDICTIONS = Counter(
+    "qm_ensemble_predictions_total",
+    "Ensemble predictions generated",
+    ["asset", "strategy"],
+)
+
+ENSEMBLE_DISAGREEMENT = Histogram(
+    "qm_ensemble_disagreement",
+    "|sentinel_prob - pulse_prob| distribution",
+    ["asset"],
+    buckets=[0.02, 0.05, 0.10, 0.15, 0.20, 0.30, 0.40],
+)
+
+ENSEMBLE_STRATEGY_SELECTED = Counter(
+    "qm_ensemble_strategy_selected_total",
+    "Which ensemble strategy was used",
+    ["strategy"],
+)
+
+ENSEMBLE_TRADES_FILTERED_DISAGREEMENT = Counter(
+    "qm_ensemble_filtered_disagreement_total",
+    "Trades rejected due to model disagreement",
+    ["asset"],
+)
+
 FEATURE_COMPUTE_NS = Histogram(
     "qm_feature_compute_ns",
     "Feature computation latency in nanoseconds",
