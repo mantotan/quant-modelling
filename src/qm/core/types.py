@@ -28,6 +28,14 @@ class MarketType(str, Enum):
     MONTHLY = "monthly"
 
 
+class RegimeState(int, Enum):
+    """Market volatility regime, matching regime_vol_state feature values."""
+    LOW = 0
+    NORMAL = 1
+    HIGH = 2
+    CRISIS = 3
+
+
 class Side(str, Enum):
     BUY = "BUY"
     SELL = "SELL"

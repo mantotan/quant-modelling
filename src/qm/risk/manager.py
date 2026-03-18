@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from qm.core.types import Signal
+from qm.core.types import RegimeState, Signal
 from qm.monitoring.metrics import ORDERS_REJECTED
 from qm.risk.bankroll import Bankroll
 from qm.risk.circuit_breaker import CircuitBreaker
@@ -20,6 +20,7 @@ from qm.risk.limits import (
     check_daily_loss,
     check_drawdown,
     check_single_bet_size,
+    get_regime_correlations,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,44 @@ class RiskManager:
         self.max_drawdown_pct = max_drawdown_pct
         self.max_asset_concentration = max_asset_concentration
         self.max_correlated_exposure = max_correlated_exposure
+        self._regime = RegimeState.NORMAL
+        self._regime_correlations = get_regime_correlations(RegimeState.NORMAL)
+
+        # Regime-specific limit adjustments (multiplied with base limits)
+        self._regime_bet_scale: dict[RegimeState, float] = {
+            RegimeState.LOW: 1.0,
+            RegimeState.NORMAL: 1.0,
+            RegimeState.HIGH: 0.75,   # reduce bet size in high vol
+            RegimeState.CRISIS: 0.50,  # halve bets in crisis
+        }
+
+    @property
+    def regime(self) -> RegimeState:
+        """Current market regime."""
+        return self._regime
+
+    def set_regime(self, regime: RegimeState) -> None:
+        """Update the market regime, adjusting correlations and limits.
+
+        Called when new regime detection data arrives (e.g., from
+        RegimeFeatures). In crisis regime, correlations increase
+        and maximum bet sizes decrease.
+        """
+        if regime == self._regime:
+            return
+        old = self._regime
+        self._regime = regime
+        self._regime_correlations = get_regime_correlations(regime)
+        logger.info(
+            "Regime changed: %s → %s (bet_scale=%.2f)",
+            old.name, regime.name,
+            self._regime_bet_scale.get(regime, 1.0),
+        )
+
+    def regime_adjusted_max_bet_pct(self) -> float:
+        """Max single bet % adjusted for current regime."""
+        scale = self._regime_bet_scale.get(self._regime, 1.0)
+        return self.max_single_bet_pct * scale
 
     def pre_trade_check(
         self,
@@ -86,8 +125,10 @@ class RiskManager:
             self._reject(signal, reason)
             return False, reason
 
-        # 3. Single bet size
-        ok, reason = check_single_bet_size(size_usd, self.bankroll, self.max_single_bet_pct)
+        # 3. Single bet size (regime-adjusted)
+        ok, reason = check_single_bet_size(
+            size_usd, self.bankroll, self.regime_adjusted_max_bet_pct()
+        )
         if not ok:
             self._reject(signal, reason)
             return False, reason
@@ -113,9 +154,11 @@ class RiskManager:
             self._reject(signal, reason)
             return False, reason
 
-        # 7. Correlated exposure
+        # 7. Correlated exposure (regime-adjusted correlations)
         ok, reason = check_correlated_exposure(
-            signal, size_usd, open_positions, total_value, self.max_correlated_exposure,
+            signal, size_usd, open_positions, total_value,
+            self.max_correlated_exposure,
+            correlations=self._regime_correlations,
         )
         if not ok:
             self._reject(signal, reason)

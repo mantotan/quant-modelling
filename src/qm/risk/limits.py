@@ -6,7 +6,7 @@ The RiskManager chains these in order.
 
 from __future__ import annotations
 
-from qm.core.types import Asset, Signal
+from qm.core.types import Asset, RegimeState, Signal
 from qm.risk.bankroll import Bankroll
 
 # Default asset correlations (hardcoded, can be overridden via config)
@@ -18,6 +18,30 @@ ASSET_CORRELATIONS: dict[tuple[Asset, Asset], float] = {
     (Asset.ETH, Asset.XRP): 0.60,
     (Asset.SOL, Asset.XRP): 0.55,
 }
+
+# Correlation multipliers per regime — crisis drives correlations toward 1.0
+_REGIME_CORR_MULTIPLIER: dict[RegimeState, float] = {
+    RegimeState.LOW: 0.90,     # slightly lower in calm markets
+    RegimeState.NORMAL: 1.00,  # baseline
+    RegimeState.HIGH: 1.10,    # tighter in volatile markets
+    RegimeState.CRISIS: 1.25,  # near-1.0 correlations in panic
+}
+
+
+def get_regime_correlations(
+    regime: RegimeState,
+) -> dict[tuple[Asset, Asset], float]:
+    """Return asset correlations adjusted for the current regime.
+
+    In crisis regimes, correlations increase (everything sells together).
+    In low-vol regimes, correlations decrease slightly.
+    Correlations are clamped to [0, 1].
+    """
+    multiplier = _REGIME_CORR_MULTIPLIER.get(regime, 1.0)
+    return {
+        pair: min(1.0, corr * multiplier)
+        for pair, corr in ASSET_CORRELATIONS.items()
+    }
 
 
 def check_concurrent_limit(
@@ -74,14 +98,21 @@ def check_correlated_exposure(
     open_positions: list[dict],
     total_value: float,
     max_correlated: float,
+    correlations: dict[tuple[Asset, Asset], float] | None = None,
 ) -> tuple[bool, str]:
     """Reject if correlated directional exposure is too high.
 
     BTC and ETH are highly correlated. Betting $500 Up on BTC and $500 Up on ETH
     is effectively ~$925 of correlated directional exposure (at 0.85 correlation).
+
+    Args:
+        correlations: Optional regime-adjusted correlations. Defaults to
+            static ASSET_CORRELATIONS if not provided.
     """
     if total_value <= 0:
         return True, ""
+
+    corr_table = correlations if correlations is not None else ASSET_CORRELATIONS
 
     corr_exposure = size_usd
     for pos in open_positions:
@@ -94,7 +125,7 @@ def check_correlated_exposure(
 
         # Get correlation
         pair = tuple(sorted([signal.asset, pos_asset], key=lambda a: a.value))
-        corr = ASSET_CORRELATIONS.get(pair, 0.3)
+        corr = corr_table.get(pair, 0.3)
 
         # Same direction amplifies risk
         same_direction = (
