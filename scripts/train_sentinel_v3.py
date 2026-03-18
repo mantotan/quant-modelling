@@ -28,6 +28,7 @@ from qm.backtest.report import check_acceptance
 from qm.backtest.validation.walk_forward import WalkForwardSplitter
 from qm.core.types import Asset, Timeframe
 from qm.data.storage.parquet import ParquetStore
+from qm.features.cross_asset import CrossAssetPipeline
 from qm.features.pipeline import FeaturePipeline
 from qm.features.selection import select_features
 from qm.model.calibration.calibrator import IsotonicCalibrator
@@ -48,6 +49,8 @@ def main() -> None:
 
     # ── Load data ─────────────────────────────────────────────────
     store = ParquetStore(base_dir=Path("data/raw/ohlcv"))
+    pipeline = FeaturePipeline()
+    cross_pipeline = CrossAssetPipeline(store, Timeframe.M5, pipeline=pipeline)
 
     assets_results = {}
 
@@ -57,20 +60,17 @@ def main() -> None:
         logger.info("ASSET: %s 5m", asset.value)
         logger.info("━" * 70)
 
-        bars = store.read_bars(asset, Timeframe.M5)
-        if bars.is_empty():
+        # Features (with cross-asset context)
+        featured = cross_pipeline.compute(asset)
+        if featured.is_empty():
             continue
-
-        # Features
-        pipeline = FeaturePipeline()
-        featured = pipeline.compute(bars)
-        feature_names = [f for f in pipeline.feature_names if f not in EXCLUDE_FEATURES]
+        feature_names = [f for f in cross_pipeline.feature_names(asset) if f not in EXCLUDE_FEATURES]
 
         # CORRECT target
         target = BinaryDirectionTarget(horizon_bars=1).compute(featured)
         featured = featured.with_columns(target)
 
-        lookback = pipeline.max_lookback
+        lookback = cross_pipeline.max_lookback
         clean = featured.slice(lookback).drop_nulls(subset=["target"])
 
         # 80/20 temporal split
@@ -120,6 +120,7 @@ def main() -> None:
                 "objective": "binary",
                 "metric": "binary_logloss",
                 "verbosity": -1,
+                "device": "gpu",
                 "n_estimators": trial.suggest_int("n_estimators", 50, 1000),
                 "learning_rate": trial.suggest_float("lr", 0.005, 0.1, log=True),
                 "max_depth": trial.suggest_int("max_depth", 2, 8),
@@ -168,7 +169,7 @@ def main() -> None:
         if "colsample" in bp: bp["colsample_bytree"] = bp.pop("colsample")
         if "min_gain" in bp: bp["min_split_gain"] = bp.pop("min_gain")
 
-        final_params = {"objective": "binary", "metric": "binary_logloss", "verbosity": -1, "seed": 42, **bp}
+        final_params = {"objective": "binary", "metric": "binary_logloss", "verbosity": -1, "device": "gpu", "seed": 42, **bp}
         ds_final = lgb.Dataset(X_train_sel, y_train, feature_name=selected)
         model_final = lgb.train(final_params, ds_final, num_boost_round=n_est)
 
