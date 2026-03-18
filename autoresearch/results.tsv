@@ -1,2 +1,3 @@
 iteration	timestamp	asset	status	oos_brier	oos_ece	backtest_pnl	backtest_sharpe	description	commit
 1	2026-03-19T00:00:00	BTC	KEEP	0.249371	0.0094	1004038.6	13.36	baseline — default knobs, no changes	d4a9a0b
+2	2026-03-19T00:30:00	BTC	DISCARD	0.249409	0.0125	1035969.25	9.87	raise min_target_corr 0.005→0.010 (tighten feature selection)	pending
