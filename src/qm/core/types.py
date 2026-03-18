@@ -53,6 +53,28 @@ class Bar:
 
 
 @dataclass(frozen=True, slots=True)
+class PartialBar:
+    """Snapshot of an in-progress bar, updated on every tick.
+
+    Frozen -- it's a point-in-time snapshot, not a live-updating object.
+    Elapsed/remaining are computed at snapshot time.
+    """
+
+    window_start: datetime
+    window_end: datetime
+    asset: Asset
+    timeframe: Timeframe
+    open: float
+    high_so_far: float
+    low_so_far: float
+    current_price: float  # latest trade price (NOT final close)
+    volume_so_far: float
+    trade_count: int
+    elapsed_seconds: float  # seconds since window_start
+    remaining_seconds: float  # seconds until window_end
+
+
+@dataclass(frozen=True, slots=True)
 class Signal:
     timestamp: datetime
     asset: Asset

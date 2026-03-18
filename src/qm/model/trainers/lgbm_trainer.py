@@ -17,6 +17,7 @@ import polars as pl
 
 from qm.backtest.engine import BacktestEngine
 from qm.backtest.validation.walk_forward import WalkForwardSplitter
+from qm.model.trainers.device import detect_device
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,7 @@ class LGBMTrainer:
         test_period: int = 1000,
         backtest_engine: BacktestEngine | None = None,
         seed: int = 42,
+        use_gpu: bool = True,
     ) -> None:
         self.n_trials = n_trials
         self.n_splits = n_splits
@@ -56,6 +58,7 @@ class LGBMTrainer:
         self.test_period = test_period
         self._engine = backtest_engine or BacktestEngine()
         self.seed = seed
+        self._device = detect_device(prefer_gpu=use_gpu)
         self._model: lgb.Booster | None = None
         self._best_params: dict[str, Any] = {}
         self._feature_names: list[str] = []
@@ -97,6 +100,7 @@ class LGBMTrainer:
                 "objective": "binary",
                 "metric": "binary_logloss",
                 "verbosity": -1,
+                "device": self._device,
                 "n_estimators": trial.suggest_int("n_estimators", 100, 2000),
                 "learning_rate": trial.suggest_float("lr", 0.005, 0.1, log=True),
                 "max_depth": trial.suggest_int("max_depth", 3, 12),
@@ -160,6 +164,7 @@ class LGBMTrainer:
             "objective": "binary",
             "metric": "binary_logloss",
             "verbosity": -1,
+            "device": self._device,
             "seed": self.seed,
             **self._best_params,
         }

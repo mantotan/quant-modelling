@@ -109,6 +109,45 @@ INFERENCE_LATENCY_NS = Histogram(
     ],
 )
 
+# ── Pulse (intra-bar) metrics ──────────────────────────────────────
+
+PULSE_PREDICTIONS = Counter(
+    "qm_pulse_predictions_total",
+    "Pulse tick predictions",
+    ["asset"],
+)
+
+PULSE_LATENCY_NS = Histogram(
+    "qm_pulse_latency_ns",
+    "Pulse prediction latency in nanoseconds",
+    buckets=[50_000, 100_000, 250_000, 500_000, 1_000_000, 5_000_000],
+)
+
+PULSE_EDGE = Histogram(
+    "qm_pulse_edge",
+    "Pulse edge distribution",
+    ["asset"],
+    buckets=[0.005, 0.01, 0.02, 0.03, 0.05, 0.10, 0.15],
+)
+
+PULSE_TRADES = Counter(
+    "qm_pulse_trades_total",
+    "Pulse trades executed",
+    ["asset", "side"],
+)
+
+PULSE_ELAPSED_AT_TRADE = Histogram(
+    "qm_pulse_elapsed_pct",
+    "Elapsed pct when Pulse trade placed",
+    buckets=[0.01, 0.05, 0.10, 0.20, 0.30, 0.50, 0.70, 0.90],
+)
+
+PULSE_ROI_PER_TRADE = Histogram(
+    "qm_pulse_roi_per_trade",
+    "ROI per Pulse trade",
+    buckets=[-0.10, -0.05, -0.02, 0.0, 0.02, 0.05, 0.10, 0.20],
+)
+
 FEATURE_COMPUTE_NS = Histogram(
     "qm_feature_compute_ns",
     "Feature computation latency in nanoseconds",

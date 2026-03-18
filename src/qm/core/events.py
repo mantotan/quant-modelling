@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable, Coroutine
 
-from qm.core.types import Asset, Timeframe, Bar
+from qm.core.types import Asset, Bar, PartialBar, Timeframe
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,11 @@ class OrderPlaced:
     side: str
     size: float
     price: float
+
+
+@dataclass(frozen=True, slots=True)
+class PartialBarUpdated:
+    partial_bar: PartialBar
 
 
 @dataclass(frozen=True, slots=True)
