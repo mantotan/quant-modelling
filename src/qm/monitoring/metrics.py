@@ -148,6 +148,25 @@ PULSE_ROI_PER_TRADE = Histogram(
     buckets=[-0.10, -0.05, -0.02, 0.0, 0.02, 0.05, 0.10, 0.20],
 )
 
+# ── Polymarket recorder metrics ────────────────────────────────────
+
+POLYMARKET_SNAPSHOTS_RECORDED = Counter(
+    "qm_polymarket_snapshots_total",
+    "Polymarket odds snapshots recorded",
+    ["asset"],
+)
+
+POLYMARKET_RECORDER_ERRORS = Counter(
+    "qm_polymarket_recorder_errors_total",
+    "Polymarket recorder errors",
+    ["error_type"],
+)
+
+POLYMARKET_ACTIVE_MARKETS = Gauge(
+    "qm_polymarket_active_markets",
+    "Number of active Polymarket markets being tracked",
+)
+
 FEATURE_COMPUTE_NS = Histogram(
     "qm_feature_compute_ns",
     "Feature computation latency in nanoseconds",

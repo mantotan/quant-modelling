@@ -50,6 +50,14 @@ class PartialBarUpdated:
 
 
 @dataclass(frozen=True, slots=True)
+class PolymarketSnapshotRecorded:
+    condition_id: str
+    asset: Asset
+    mid_up: float
+    timestamp: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class CircuitBreakerTrip:
     reason: str
     timestamp: datetime
