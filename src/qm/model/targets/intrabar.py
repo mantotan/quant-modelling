@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Aligned with real 1m boundaries for 5m bars + early interpolation points
 DEFAULT_TIME_PCTS: list[float] = [
-    0.003, 0.01, 0.05, 0.10, 0.20, 0.40, 0.60, 0.80, 0.90, 0.95,
+    0.003, 0.01, 0.05, 0.10, 0.20, 0.40, 0.60, 0.80,
 ]
 
 
@@ -159,9 +159,10 @@ def _interpolate_price_at_pct(
         Interpolated prices, shape (n_bars,)
     """
     n = parent_minutes
-    # Snapshot fractions: 0.0 (open), 1/n, 2/n, ..., 1.0
-    # e.g. for 5m: 0.0, 0.2, 0.4, 0.6, 0.8, 1.0
-    # m1_closes[:, 0] = close at 1/n, m1_closes[:, n-1] = close at 1.0
+    # Clamp to last safe 1m boundary -- never interpolate toward the final
+    # 1m close (which equals the parent bar close = the target).
+    max_safe_pct = (n - 1) / n  # 0.80 for 5m, 0.933 for 15m, 0.983 for 1h
+    time_pct = min(time_pct, max_safe_pct)
 
     # Which segment does time_pct fall in?
     segment_frac = time_pct * n  # e.g. 0.3 * 5 = 1.5
@@ -196,8 +197,11 @@ def _compute_high_low_so_far(
         (high_so_far, low_so_far) each shape (n_bars,)
     """
     n = parent_minutes
-    # How many complete 1m bars have elapsed?
-    n_complete = min(int(time_pct * n), n)
+    # Clamp to last safe boundary -- never include the final 1m close
+    max_safe_pct = (n - 1) / n
+    time_pct = min(time_pct, max_safe_pct)
+    # How many complete 1m bars have elapsed? Cap at n-1 to exclude parent close.
+    n_complete = min(int(time_pct * n), n - 1)
 
     # Start with open
     high = opens.copy()

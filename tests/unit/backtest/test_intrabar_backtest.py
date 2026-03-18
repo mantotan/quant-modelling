@@ -205,3 +205,46 @@ class TestFullSimulation:
         if result.trade_log:
             assert "impact" in result.trade_log[0]
             assert result.trade_log[0]["impact"] >= 0
+
+
+class TestFixedBetMode:
+    def test_fixed_bet_uses_exact_amount(self):
+        bt = IntraBarBacktester(
+            fee_bps=0, spread=0.0, min_edge=0.01,
+            impact_bps=0, max_trades_per_bar=10,
+            max_daily_trades=10_000,
+            fixed_bet_usd=50.0,
+        )
+        result = bt.run_full(
+            model_probs=np.array([0.85, 0.85, 0.85]),
+            targets=np.array([1.0, 1.0, 1.0]),
+            market_probs=np.array([0.50, 0.50, 0.50]),
+            time_pcts=np.array([0.20, 0.40, 0.60]),
+            bar_indices=np.array([0, 1, 2]),
+            initial_bankroll=10_000.0,
+        )
+        for trade in result.trade_log:
+            assert trade["bet_usd"] == pytest.approx(50.0)
+
+    def test_fixed_bet_no_compounding(self):
+        """PnL should grow linearly, not exponentially, with fixed bets."""
+        bt = IntraBarBacktester(
+            fee_bps=0, spread=0.0, min_edge=0.01,
+            impact_bps=0, max_trades_per_bar=10,
+            max_daily_trades=10_000,
+            fixed_bet_usd=50.0,
+        )
+        # 10 identical winning trades
+        n = 10
+        result = bt.run_full(
+            model_probs=np.full(n, 0.85),
+            targets=np.ones(n),
+            market_probs=np.full(n, 0.50),
+            time_pcts=np.linspace(0.10, 0.80, n),
+            bar_indices=np.arange(n),
+            initial_bankroll=10_000.0,
+        )
+        if len(result.trade_log) >= 2:
+            pnls = [t["pnl"] for t in result.trade_log]
+            # All trades should have roughly equal PnL (linear, not exponential)
+            assert max(pnls) / (min(pnls) + 1e-10) < 1.5

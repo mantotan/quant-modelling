@@ -135,16 +135,24 @@ def main() -> None:
         logger.error("Not enough OOS samples (%d) for calibration.", len(oos_idx))
         sys.exit(1)
 
-    # 6. Calibrate on OOS only
-    calibrator = IsotonicCalibrator()
-    calibrator.fit(oos_probs[oos_idx], oos_targets[oos_idx])
-    logger.info("Calibrator fitted on %d OOS samples", len(oos_idx))
+    # 6. Split OOS: 70% for calibration, 30% for backtest (never overlap)
+    n_oos = len(oos_idx)
+    cal_end = int(n_oos * 0.7)
+    cal_idx = oos_idx[:cal_end]
+    bt_idx = oos_idx[cal_end:]
 
-    # 7. BACKTEST: OOS-ONLY with realistic friction
-    calibrated_oos = calibrator.transform(oos_probs[oos_idx])
+    if len(cal_idx) < 5000:
+        logger.warning("Calibration set small (%d samples) -- results may be noisy", len(cal_idx))
+
+    calibrator = IsotonicCalibrator()
+    calibrator.fit(oos_probs[cal_idx], oos_targets[cal_idx])
+    logger.info("Calibrator fitted on %d OOS samples (holdout: %d)", len(cal_idx), len(bt_idx))
+
+    # 7. BACKTEST: held-out OOS with realistic friction + flat $50 bets
+    calibrated_bt = calibrator.transform(oos_probs[bt_idx])
     logger.info(
-        "BACKTEST: OOS-only (%d samples, %.1f%% of total)",
-        len(oos_idx), 100 * len(oos_idx) / len(dataset.y),
+        "BACKTEST: held-out OOS (%d samples, calibrator trained on %d separate samples)",
+        len(bt_idx), len(cal_idx),
     )
 
     backtester = IntraBarBacktester(
@@ -156,19 +164,20 @@ def main() -> None:
         impact_bps=50,
         avg_daily_volume=50_000,
         max_daily_trades=100,
+        fixed_bet_usd=50.0,
     )
     result = backtester.run_full(
-        calibrated_oos,
-        dataset.y[oos_idx],
-        dataset.market_probs[oos_idx],
-        dataset.time_pcts[oos_idx],
-        dataset.bar_indices[oos_idx],
+        calibrated_bt,
+        dataset.y[bt_idx],
+        dataset.market_probs[bt_idx],
+        dataset.time_pcts[bt_idx],
+        dataset.bar_indices[bt_idx],
         initial_bankroll=10_000.0,
     )
 
     # 8. Print results
     logger.info("=" * 60)
-    logger.info("BACKTEST RESULTS (OOS-only, 2%% fees, market impact)")
+    logger.info("BACKTEST RESULTS (held-out OOS, $50 flat bets, 2%% fees, impact)")
     logger.info("=" * 60)
     for k, v in result.metrics.items():
         logger.info("  %-25s %s", k, f"{v:.4f}" if isinstance(v, float) else v)
@@ -186,12 +195,26 @@ def main() -> None:
             metrics["win_rate"] * 100,
         )
 
-    # OOS accuracy breakdown
-    oos_accuracy = float(np.mean((calibrated_oos > 0.5) == (dataset.y[oos_idx] == 1)))
-    oos_brier = float(np.mean((calibrated_oos - dataset.y[oos_idx]) ** 2))
+    # Per-time-point accuracy (honest breakdown)
+    bt_time_pcts = dataset.time_pcts[bt_idx]
+    bt_targets = dataset.y[bt_idx]
+    bt_accuracy = float(np.mean((calibrated_bt > 0.5) == (bt_targets == 1)))
+    bt_brier = float(np.mean((calibrated_bt - bt_targets) ** 2))
+
     logger.info("")
-    logger.info("OOS ACCURACY: %.2f%%", oos_accuracy * 100)
-    logger.info("OOS BRIER:    %.4f", oos_brier)
+    logger.info("HELD-OUT OOS ACCURACY: %.2f%%", bt_accuracy * 100)
+    logger.info("HELD-OUT OOS BRIER:    %.4f", bt_brier)
+
+    logger.info("")
+    logger.info("PER-TIME-POINT ACCURACY (honest breakdown):")
+    logger.info("%-10s %10s %10s", "time_pct", "N Samples", "Accuracy")
+    logger.info("-" * 35)
+    for tp in sorted(set(bt_time_pcts)):
+        mask = bt_time_pcts == tp
+        tp_probs = calibrated_bt[mask]
+        tp_targets = bt_targets[mask]
+        acc = float(np.mean((tp_probs > 0.5) == (tp_targets == 1)))
+        logger.info("%-10.3f %10d %9.1f%%", tp, int(mask.sum()), acc * 100)
 
     # Feature importance
     logger.info("")

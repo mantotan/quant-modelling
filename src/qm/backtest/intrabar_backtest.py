@@ -65,6 +65,7 @@ class IntraBarBacktester:
         impact_bps: float = 50,
         avg_daily_volume: float = 50_000.0,
         max_daily_trades: int = 100,
+        fixed_bet_usd: float | None = None,
     ) -> None:
         self._fee_bps = fee_bps
         self._spread = spread
@@ -81,6 +82,7 @@ class IntraBarBacktester:
         self._impact_bps = impact_bps
         self._avg_daily_volume = avg_daily_volume
         self._max_daily_trades = max_daily_trades
+        self._fixed_bet_usd = fixed_bet_usd
         self._bars_per_day = int(86400 / self._total_seconds)
 
     def evaluate_fast(
@@ -135,11 +137,15 @@ class IntraBarBacktester:
         if not tradeable.any():
             return self._empty_metrics()
 
-        # Kelly sizing
+        # Bet sizing
         buy_price = np.where(bet_up, market_probs, 1 - market_probs)
         buy_price = np.clip(buy_price, 0.01, 0.99)
-        kelly_f = edge / (1 - buy_price)
-        bet_size = np.clip(kelly_f * self._kelly_fraction, 0, self._max_bet_frac)
+        if self._fixed_bet_usd is not None:
+            # Fixed flat bet: normalize as fraction of $10K notional
+            bet_size = np.where(tradeable, self._fixed_bet_usd / 10_000.0, 0)
+        else:
+            kelly_f = edge / (1 - buy_price)
+            bet_size = np.clip(kelly_f * self._kelly_fraction, 0, self._max_bet_frac)
 
         # PnL
         correct = np.where(bet_up, targets == 1, targets == 0)
@@ -259,9 +265,13 @@ class IntraBarBacktester:
 
             buy_price = mkt if bet_up else (1 - mkt)
             buy_price = max(0.01, min(0.99, buy_price))
-            kelly_f = edge / (1 - buy_price)
-            bet_frac = min(kelly_f * self._kelly_fraction, self._max_bet_frac)
-            bet_usd = max(0.0, min(bet_frac * bankroll, max_bet_usd))
+
+            if self._fixed_bet_usd is not None:
+                bet_usd = self._fixed_bet_usd
+            else:
+                kelly_f = edge / (1 - buy_price)
+                bet_frac = min(kelly_f * self._kelly_fraction, self._max_bet_frac)
+                bet_usd = max(0.0, min(bet_frac * bankroll, max_bet_usd))
 
             if bet_usd < min_bet_usd:
                 pnl_series[i] = cum_pnl

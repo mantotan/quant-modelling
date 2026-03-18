@@ -110,11 +110,13 @@ class TestInterpolatePriceAtPct:
         prices = _interpolate_price_at_pct(opens, m1_closes, 0.10, 5)
         np.testing.assert_allclose(prices, [110.0])  # 100 + (120-100)*0.5
 
-    def test_at_end_returns_last_close(self):
+    def test_at_end_clamped_to_safe_boundary(self):
+        """t=1.0 is clamped to max_safe_pct=0.80, returning 4th 1m close (not 5th)."""
         opens = np.array([100.0])
         m1_closes = np.array([[101.0, 102.0, 103.0, 104.0, 105.0]])
         prices = _interpolate_price_at_pct(opens, m1_closes, 1.0, 5)
-        np.testing.assert_allclose(prices, [105.0])
+        # 5th 1m close (105) = parent close, MUST NOT be returned
+        np.testing.assert_allclose(prices, [104.0])  # 4th 1m close
 
 
 class TestHighLowSoFar:
@@ -144,6 +146,35 @@ class TestHighLowSoFar:
         assert l[0] <= 90.0
 
 
+class TestMaxSafePctGuard:
+    def test_clamp_interpolation_at_099(self):
+        """t=0.99 for 5m bars should be clamped to 0.80 (= m1_closes[:, 3])."""
+        opens = np.array([100.0])
+        m1_closes = np.array([[101.0, 99.0, 102.0, 98.0, 105.0]])
+        # t=0.80 should return m1_closes[:, 3] = 98.0
+        price_080 = _interpolate_price_at_pct(opens, m1_closes, 0.80, 5)
+        # t=0.99 should be clamped to 0.80 and return same value
+        price_099 = _interpolate_price_at_pct(opens, m1_closes, 0.99, 5)
+        np.testing.assert_allclose(price_099, price_080)
+
+    def test_clamp_interpolation_at_100(self):
+        """t=1.0 should also be clamped to 0.80."""
+        opens = np.array([100.0])
+        m1_closes = np.array([[101.0, 99.0, 102.0, 98.0, 105.0]])
+        price_080 = _interpolate_price_at_pct(opens, m1_closes, 0.80, 5)
+        price_100 = _interpolate_price_at_pct(opens, m1_closes, 1.0, 5)
+        np.testing.assert_allclose(price_100, price_080)
+
+    def test_high_low_excludes_final_1m_close(self):
+        """high_so_far at any time_pct should never include m1_closes[:, 4]."""
+        opens = np.array([100.0])
+        # Make the 5th 1m close (= parent close) the highest value
+        m1_closes = np.array([[101.0, 99.0, 102.0, 98.0, 200.0]])
+        for t in [0.003, 0.10, 0.20, 0.40, 0.60, 0.80, 0.95, 1.0]:
+            h, l = _compute_high_low_so_far(opens, m1_closes, t, 5)
+            assert h[0] < 200.0, f"Final 1m close leaked into high at t={t}"
+
+
 class TestRealPathGenerator:
     def test_output_shape(self):
         bars_df, m1_df, hist = _make_5m_bars_and_1m(50)
@@ -157,14 +188,14 @@ class TestRealPathGenerator:
         assert ds.y.shape == (n_bars * n_tp,)
         assert ds.market_probs.shape == (n_bars * n_tp,)
 
-    def test_10_samples_per_bar(self):
+    def test_8_samples_per_bar(self):
         bars_df, m1_df, hist = _make_5m_bars_and_1m(20)
         sim = MarketOddsSimulator(efficiency=0.75, timeframe=Timeframe.M5)
         gen = RealPathIntraBarDataGenerator(timeframe=Timeframe.M5)
         ds = gen.generate(bars_df, m1_df, hist, sim)
 
         unique, counts = np.unique(ds.bar_indices, return_counts=True)
-        assert np.all(counts == 10)  # 10 time points per bar
+        assert np.all(counts == 8)  # 8 time points per bar (capped at 0.80)
 
     def test_targets_shared_within_bar(self):
         bars_df, m1_df, hist = _make_5m_bars_and_1m(30)
