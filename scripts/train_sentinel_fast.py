@@ -101,8 +101,9 @@ def run(args: argparse.Namespace) -> dict:
 
     # ── Load data + cross-asset features ──────────────────────────
     store = ParquetStore(base_dir=Path("data/raw/ohlcv"))
+    metrics_store = ParquetStore(base_dir=Path("data/raw/metrics"))
     pipeline = FeaturePipeline()
-    cross_pipeline = CrossAssetPipeline(store, tf, pipeline=pipeline)
+    cross_pipeline = CrossAssetPipeline(store, tf, pipeline=pipeline, metrics_store=metrics_store)
 
     featured = cross_pipeline.compute(asset)
     if featured.is_empty():
