@@ -1,8 +1,12 @@
 """Binary direction target for 5m/15m Up/Down prediction.
 
 Mirrors Polymarket resolution exactly:
-  y = 1 if close[t + horizon] >= open[t], else 0
-  "Resolve to 'Up' if price at end of window >= price at beginning."
+  y = 1 if close[t+1] >= open[t+1], else 0
+  "Resolve to 'Up' if price at END of window >= price at BEGINNING of same window."
+
+CRITICAL: The target compares close and open of the SAME FUTURE bar,
+NOT close of future bar vs open of current bar. The latter leaks
+information from the current bar (which features can see).
 """
 
 from __future__ import annotations
@@ -11,10 +15,13 @@ import polars as pl
 
 
 class BinaryDirectionTarget:
-    """Target: 1 if price went up over the horizon, 0 otherwise.
+    """Target: 1 if the NEXT bar went up (close >= open), 0 otherwise.
+
+    This matches Polymarket 5m/15m market resolution:
+    "Price at end of window >= price at beginning of THAT window."
 
     Args:
-        horizon_bars: Number of bars forward to look. For 5m markets
+        horizon_bars: How many bars ahead to predict. For 5m markets
                       on 5m bars, horizon=1. For 1h markets on 5m bars,
                       horizon=12.
     """
@@ -25,19 +32,21 @@ class BinaryDirectionTarget:
     def compute(self, bars: pl.DataFrame) -> pl.Series:
         """Compute binary target from OHLCV data.
 
-        Uses close[t+horizon] vs open[t] to match Polymarket resolution.
+        Target: close[t+h] >= open[t+h]  (did the future bar itself go up?)
+        NOT: close[t+h] >= open[t]  (which leaks current bar info)
+
         The last `horizon_bars` rows will be null (no future data).
         """
         future_close = bars["close"].shift(-self.horizon_bars)
-        current_open = bars["open"]
-        return (future_close >= current_open).cast(pl.Int8).alias("target")
+        future_open = bars["open"].shift(-self.horizon_bars)
+        return (future_close >= future_open).cast(pl.Int8).alias("target")
 
     def compute_with_meta(self, bars: pl.DataFrame) -> pl.DataFrame:
         """Compute target and add metadata columns for analysis."""
         target = self.compute(bars)
         future_close = bars["close"].shift(-self.horizon_bars)
-        current_open = bars["open"]
-        future_return = (future_close - current_open) / current_open
+        future_open = bars["open"].shift(-self.horizon_bars)
+        future_return = (future_close - future_open) / future_open
 
         return bars.with_columns(
             target,
