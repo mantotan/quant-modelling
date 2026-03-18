@@ -179,7 +179,11 @@ class CrossAssetPipeline:
         return result
 
     def feature_names(self, asset: Asset) -> list[str]:
-        """Base pipeline feature names + cross-asset + derivatives feature names."""
+        """Base pipeline feature names + cross-asset feature names.
+
+        Derivatives features (oi_change, ls_ratio, etc.) are already included
+        in base pipeline feature_names via the DerivativesFeatures group registry.
+        """
         base = list(self._pipeline.feature_names)
         context_asset = self._context_map.get(asset)
         if context_asset is None:
@@ -187,13 +191,7 @@ class CrossAssetPipeline:
         prefix = context_asset.value.lower()
         cross = [f"{prefix}_{f}" for f in CONTEXT_FEATURES]
         derived = ["spread_return_1", "spread_return_5", "relative_strength", "correlation_30"]
-        # Derivatives features (computed by DerivativesFeatures group if columns exist)
-        derivatives = [
-            "taker_buy_ratio", "oi_change", "oi_change_5",
-            "ls_ratio", "ls_ratio_change", "top_ls_ratio",
-            "top_ls_divergence", "taker_ls_vol_ratio",
-        ]
-        return base + cross + derived + derivatives
+        return base + cross + derived
 
     @property
     def max_lookback(self) -> int:

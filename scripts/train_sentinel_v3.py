@@ -68,7 +68,9 @@ def main() -> None:
         featured = cross_pipeline.compute(asset)
         if featured.is_empty():
             continue
-        feature_names = [f for f in cross_pipeline.feature_names(asset) if f not in EXCLUDE_FEATURES]
+        available_cols = set(featured.columns)
+        feature_names = [f for f in cross_pipeline.feature_names(asset)
+                         if f not in EXCLUDE_FEATURES and f in available_cols]
 
         # CORRECT target
         target = BinaryDirectionTarget(horizon_bars=1).compute(featured)
