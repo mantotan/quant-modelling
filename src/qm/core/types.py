@@ -15,12 +15,14 @@ class Asset(str, Enum):
 
 
 class Timeframe(str, Enum):
+    M1 = "1m"
     M5 = "5m"
     M15 = "15m"
     H1 = "1h"
 
 
 class MarketType(str, Enum):
+    ONE_MIN = "1m"
     FIVE_MIN = "5m"
     FIFTEEN_MIN = "15m"
     MONTHLY = "monthly"

@@ -4,8 +4,14 @@ from __future__ import annotations
 
 import numpy as np
 
+from qm.core.constants import BARS_PER_YEAR
+from qm.core.types import Timeframe
 
-def sharpe_ratio(returns: np.ndarray, annualization: float = 105_000) -> float:
+# Default annualization factor (5-minute bars)
+_DEFAULT_ANNUALIZATION = BARS_PER_YEAR[Timeframe.M5]
+
+
+def sharpe_ratio(returns: np.ndarray, annualization: float = _DEFAULT_ANNUALIZATION) -> float:
     """Annualized Sharpe ratio. Default assumes 5-min bars (~105k/year)."""
     if len(returns) < 2:
         return 0.0
@@ -16,7 +22,7 @@ def sharpe_ratio(returns: np.ndarray, annualization: float = 105_000) -> float:
     return float(mean / std * np.sqrt(min(len(returns), annualization)))
 
 
-def sortino_ratio(returns: np.ndarray, annualization: float = 105_000) -> float:
+def sortino_ratio(returns: np.ndarray, annualization: float = _DEFAULT_ANNUALIZATION) -> float:
     """Annualized Sortino ratio (downside deviation only)."""
     if len(returns) < 2:
         return 0.0

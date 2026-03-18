@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 
 from qm.backtest.engine import BacktestEngine
+from qm.core.constants import BARS_PER_YEAR
+from qm.core.types import Timeframe
 
 
 @pytest.fixture
@@ -101,3 +103,34 @@ class TestMetrics:
         probs = np.full(6, 0.5)
         metrics = engine.evaluate_model_fast(probs, targets)
         assert abs(metrics["brier"] - 0.25) < 0.01
+
+
+class TestTimeframeAnnualization:
+    def test_default_is_m5(self):
+        """Default engine should use M5 annualization."""
+        engine = BacktestEngine()
+        assert engine._annualization == BARS_PER_YEAR[Timeframe.M5]
+
+    def test_m1_annualization(self):
+        """M1 engine should use 525,600 bars/year."""
+        engine = BacktestEngine(timeframe=Timeframe.M1)
+        assert engine._annualization == 525_600
+
+    def test_annualization_affects_sharpe(self):
+        """Higher annualization (1m) should produce higher Sharpe than lower (1h)."""
+        np.random.seed(42)
+        n = 1000
+        targets = np.random.randint(0, 2, n).astype(float)
+        model_probs = targets * 0.85 + (1 - targets) * 0.15
+        market_probs = np.full(n, 0.5)
+
+        engine_1m = BacktestEngine(min_edge=0.03, timeframe=Timeframe.M1)
+        engine_1h = BacktestEngine(min_edge=0.03, timeframe=Timeframe.H1)
+
+        metrics_1m = engine_1m.evaluate_model_fast(model_probs, targets, market_probs)
+        metrics_1h = engine_1h.evaluate_model_fast(model_probs, targets, market_probs)
+
+        # Same data, but 1m annualization is higher → larger Sharpe
+        assert metrics_1m["sharpe"] > metrics_1h["sharpe"]
+        # PnL should be identical (annualization doesn't affect PnL)
+        assert metrics_1m["total_pnl"] == pytest.approx(metrics_1h["total_pnl"])

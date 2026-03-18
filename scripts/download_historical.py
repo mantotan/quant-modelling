@@ -77,7 +77,7 @@ def parse_assets(s: str) -> list[Asset]:
 
 
 def parse_timeframes(s: str) -> list[Timeframe]:
-    mapping = {"5m": Timeframe.M5, "15m": Timeframe.M15, "1h": Timeframe.H1}
+    mapping = {"1m": Timeframe.M1, "5m": Timeframe.M5, "15m": Timeframe.M15, "1h": Timeframe.H1}
     return [mapping[t.strip()] for t in s.split(",") if t.strip() in mapping]
 
 
@@ -133,14 +133,16 @@ async def main() -> None:
                     logger.warning("No data for %s/%s — skipping validation", asset.value, tf.value)
                     continue
 
-                # Cross-timeframe check: 5m vs 15m
+                # Cross-timeframe check: 1m→5m, 5m→15m
                 bars_coarse = None
                 coarse_tf = None
-                if tf == Timeframe.M5:
-                    bars_coarse_df = store.read_bars(asset, Timeframe.M15)
+                cross_tf_pairs = {Timeframe.M1: Timeframe.M5, Timeframe.M5: Timeframe.M15, Timeframe.M15: Timeframe.H1}
+                if tf in cross_tf_pairs:
+                    target_coarse = cross_tf_pairs[tf]
+                    bars_coarse_df = store.read_bars(asset, target_coarse)
                     if not bars_coarse_df.is_empty():
                         bars_coarse = bars_coarse_df
-                        coarse_tf = Timeframe.M15
+                        coarse_tf = target_coarse
 
                 report = run_full_reconciliation(
                     bars_df, asset, tf,

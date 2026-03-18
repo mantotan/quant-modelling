@@ -20,6 +20,9 @@ from datetime import datetime
 import numpy as np
 import polars as pl
 
+from qm.core.constants import BARS_PER_YEAR
+from qm.core.types import Timeframe
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,10 +51,12 @@ class BacktestEngine:
         fee_bps: float = 0.0,
         spread: float = 0.02,
         min_edge: float = 0.05,
+        timeframe: Timeframe = Timeframe.M5,
     ) -> None:
         self._fee_bps = fee_bps
         self._spread = spread
         self._min_edge = min_edge
+        self._annualization = BARS_PER_YEAR[timeframe]
 
     def evaluate_model_fast(
         self,
@@ -132,9 +137,9 @@ class BacktestEngine:
         traded_pnl = pnl_per_bet[traded]
         win_rate = float((traded_pnl > 0).mean())
 
-        # Sharpe (annualized assuming 5-minute bars, ~105k bars/year)
+        # Sharpe (annualized)
         pnl_std = traded_pnl.std()
-        sharpe = float(traded_pnl.mean() / (pnl_std + 1e-10) * np.sqrt(105_000))
+        sharpe = float(traded_pnl.mean() / (pnl_std + 1e-10) * np.sqrt(self._annualization))
 
         # Max drawdown on cumulative PnL
         peak = np.maximum.accumulate(cum_pnl)
@@ -151,7 +156,7 @@ class BacktestEngine:
         # Sortino (downside deviation)
         negative_pnls = traded_pnl[traded_pnl < 0]
         downside_std = negative_pnls.std() if len(negative_pnls) > 1 else 1e-10
-        sortino = float(traded_pnl.mean() / (downside_std + 1e-10) * np.sqrt(105_000))
+        sortino = float(traded_pnl.mean() / (downside_std + 1e-10) * np.sqrt(self._annualization))
 
         # Calmar
         calmar = float(cum_pnl[-1] / (max_dd + 1e-10)) if max_dd > 0 else 0.0
@@ -287,7 +292,7 @@ class BacktestEngine:
 
         # Sharpe
         pnl_std = trade_pnls.std()
-        sharpe = float(trade_pnls.mean() / (pnl_std + 1e-10) * np.sqrt(105_000))
+        sharpe = float(trade_pnls.mean() / (pnl_std + 1e-10) * np.sqrt(self._annualization))
 
         # Max drawdown
         peak = np.maximum.accumulate(pnl_series)
@@ -303,7 +308,7 @@ class BacktestEngine:
         # Sortino (downside deviation)
         negative_pnls = trade_pnls[trade_pnls < 0]
         downside_std = negative_pnls.std() if len(negative_pnls) > 0 else 1e-10
-        sortino = float(trade_pnls.mean() / (downside_std + 1e-10) * np.sqrt(105_000))
+        sortino = float(trade_pnls.mean() / (downside_std + 1e-10) * np.sqrt(self._annualization))
 
         # Calmar
         calmar = float(pnl_series[-1] / (max_dd + 1e-10)) if max_dd > 0 else 0.0
