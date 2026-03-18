@@ -1,656 +1,672 @@
-# ML/Quant Crypto Polymarket Prediction System — Implementation Plan
+# Phases 4-5 Implementation Plan (Revised)
 
 ## Context
 
-Build a production-grade ML system that predicts crypto price movements (BTC, ETH, XRP, SOL) on 5m/15m/1h timeframes to exploit edge on Polymarket prediction markets. This is a greenfield project — no existing code.
+Phases 1-3 are committed (`bca4dd1`): 4,387 lines of production code, 98 tests passing. Data infrastructure, feature engineering, backtesting engine, model training, calibration, and signal generation are complete.
 
-**Polymarket crypto market structure:**
-- **5m/15m markets**: Binary Up/Down — "resolve to 'Up' if price at end of window >= price at beginning." Resolved via Chainlink Data Streams.
-- **Monthly markets**: "Will BTC hit $X this month?" — resolved via Binance 1-minute candle highs.
+**What remains:** Risk management, paper trading, live Polymarket execution, monitoring, scheduling, deployment, Rust fast path, and CLI commands. ~2,500-3,000 lines of new code.
 
-**Core ML problem**: Predict calibrated P(Up) for a given window, compare against Polymarket market-implied P(Up), bet when edge exceeds costs.
-
-**Hardware**: RTX 4090 24GB, 96GB RAM, i7-10700, 2TB NVMe + 8TB HDD. More than sufficient.
-
-**Platform strategy**:
-- **Development + backtesting**: Windows 11 (native) — research, feature engineering, model training, backtesting all run here
-- **Production (inference + live trading)**: Ubuntu Linux — the deployed system runs on Linux for reliability, systemd service management, and lower overhead
-- **WSL2 available** on the Windows machine for Linux-specific testing and Docker workloads
-- **Code must be cross-platform**: use `pathlib.Path` everywhere (no hardcoded backslashes), avoid Windows-only APIs, test critical paths under WSL2 before production deployment
-- **Docker containers** (TimescaleDB, Prometheus, Grafana) run via WSL2/Docker Desktop on Windows, natively on Linux production
-- **[ADDED] Dependency lockfile**: use `uv` with `uv.lock` for reproducible cross-platform installs (uv resolves platform-specific wheels automatically)
-- **[ADDED] CI gate**: run `pytest` + `ruff` + `mypy` under both Windows and WSL2/Linux before merging to main
+**Key revision from review:** Monitoring/logging moved to Step 1 (wire in from day one). Paper and live engines share a single `TradingLoop` with pluggable executor (no duplication). Backtest report + acceptance gates added explicitly. Rust fast path acknowledged as post-paper-trading optimization.
 
 ---
 
-## Project Structure
+## Build Order (revised, 9 steps)
 
 ```
-c:\quant-modelling\
-├── pyproject.toml                      # Dependencies, project metadata, tool configs
-├── uv.lock                             # [ADDED] Locked dependencies for cross-platform reproducibility
-├── Makefile                            # Common commands: test, lint, format, docker
-├── docker-compose.yml                  # TimescaleDB, Redis, Prometheus, Grafana
-├── docker-compose.prod.yml             # [ADDED] Production overrides (no ports exposed, restart policies)
-├── alembic.ini                         # DB migration config
-├── .env.example                        # Environment variable template (NO real secrets)
-├── .gitignore                          # [ADDED] Must cover: .env, data/, *.pkl, *.parquet, __pycache__
-├── .pre-commit-config.yaml             # ruff, mypy, pytest hooks
-├── deploy/                             # [ADDED] Deployment artifacts
-│   ├── qm.service                     # systemd service file for Linux production
-│   ├── deploy.sh                      # rsync + restart script (Windows→Linux)
-│   └── Dockerfile                     # Production container
-│
-├── conf/                               # Hydra configuration root
-│   ├── config.yaml                     # Main config with defaults list
-│   ├── env/                            # [ADDED] Environment overlays
-│   │   ├── dev.yaml                   # Windows dev: local DB, debug logging, small bets
-│   │   └── prod.yaml                  # Linux prod: prod DB URL, JSON logging, real limits
-│   ├── exchanges/                      # binance.yaml, bybit.yaml
-│   ├── polymarket/                     # clob.yaml, markets.yaml
-│   ├── data/                           # timescaledb.yaml, duckdb.yaml, storage.yaml
-│   ├── features/                       # registry.yaml, engineering.yaml
-│   ├── model/                          # lightgbm.yaml, calibration.yaml, ensemble.yaml
-│   ├── backtest/                       # engine.yaml, costs.yaml
-│   ├── execution/                      # risk.yaml, sizing.yaml, paper.yaml
-│   └── monitoring/                     # prometheus.yaml, alerting.yaml
-│
-├── migrations/versions/                # Alembic DB migrations (each MUST have downgrade())
-│
-├── src/qm/                             # Main package
-│   ├── core/                           # Shared primitives
-│   │   ├── types.py                    # Asset, Timeframe, MarketType, Side, Signal, Bar
-│   │   ├── constants.py                # SUPPORTED_ASSETS, TIMEFRAMES
-│   │   ├── clock.py                    # Wall-clock + simulated clock for backtest
-│   │   ├── events.py                   # Typed event bus, pub/sub
-│   │   ├── errors.py                   # Exception hierarchy
-│   │   ├── protocols.py               # ExchangeConnector, FeatureCalculator, Trainer, Sizer, CVSplitter
-│   │   └── secrets.py                 # [ADDED] Secret loader: env vars → keyring → .env fallback
-│   │
-│   ├── data/                           # PHASE 1
-│   │   ├── connectors/                 # ccxt_ws.py, polymarket_ws.py, health.py
-│   │   ├── ingestion/                  # manager.py, trade_handler.py, bar_builder.py, bar_aligner.py
-│   │   ├── storage/                    # timescale.py, parquet.py, duckdb_store.py, schemas.py
-│   │   ├── quality/                    # gap_detector.py, outlier_filter.py, reconciler.py
-│   │   └── historical/                # backfill.py, polymarket_hist.py
-│   │
-│   ├── features/                       # PHASE 2
-│   │   ├── registry.py                 # Feature registry: name, dtype, compute_fn, lookback
-│   │   ├── base.py                     # FeatureCalculator base class
-│   │   ├── pipeline.py                 # Feature computation DAG with dependency ordering
-│   │   ├── store.py                    # DuckDB + Parquet feature store (batch: backtest/train)
-│   │   ├── live_cache.py              # [ADDED] In-memory rolling feature window (live inference)
-│   │   ├── selection.py                # Importance, correlation filter, stability
-│   │   └── groups/                     # price, volatility, momentum, microstructure,
-│   │                                   # volume, cross_asset, regime, time, polymarket
-│   │
-│   ├── backtest/                       # PHASE 2 (engine) + PHASE 4 (validation runs)
-│   │   ├── engine.py                   # Dual-mode: fast vectorized + full event-driven
-│   │   ├── clock.py                    # Simulated clock stepping through bar timestamps
-│   │   ├── data_feed.py               # Historical bars + features reader
-│   │   ├── portfolio.py               # Position/cash/PnL tracking during simulation
-│   │   ├── cost_model.py              # Polymarket fees (currently ~0bps maker), spread, slippage
-│   │   ├── order_simulator.py         # Simulates fills against historical books
-│   │   ├── report.py                  # HTML/PDF backtest report generation
-│   │   ├── validation/                # walk_forward.py, cpcv.py, purging.py, splitter.py
-│   │   └── metrics/                   # performance.py, calibration.py, statistical.py
-│   │
-│   ├── model/                          # PHASE 3
-│   │   ├── targets/                    # binary.py (Up/Down), threshold.py (monthly), labeler.py
-│   │   ├── trainers/                   # lgbm_trainer.py, temporal_trainer.py, meta_trainer.py
-│   │   ├── calibration/               # calibrator.py, isotonic.py, platt.py, validator.py
-│   │   ├── ensemble/                  # stacker.py, blender.py, diversity.py
-│   │   ├── registry.py                # Model versioning + artifact storage
-│   │   ├── experiment.py              # Experiment tracking
-│   │   └── signals.py                 # Model prob -> edge vs PM odds -> Signal
-│   │
-│   ├── strategy/                       # PHASE 4-5
-│   │   ├── edge.py                     # Edge calculation: P_model - P_market - costs
-│   │   ├── sizing/                     # kelly.py, fixed.py, meta_sized.py
-│   │   ├── filter.py                  # Min edge, min confidence, max correlation
-│   │   └── portfolio.py               # Portfolio-level allocation across concurrent bets
-│   │
-│   ├── execution/                      # PHASE 5
-│   │   ├── polymarket/                # client.py, market_scanner.py, order_manager.py, position_tracker.py
-│   │   ├── paper/                     # engine.py, recorder.py
-│   │   ├── reconciliation.py         # Cross-check local vs Polymarket positions
-│   │   └── audit.py                  # [ADDED] Immutable append-only trade audit log
-│   │
-│   ├── risk/                           # PHASE 5
-│   │   ├── manager.py                 # Pre-trade + post-trade risk checks
-│   │   ├── limits.py                  # Position limits, daily loss, drawdown circuit
-│   │   ├── correlation.py            # Cross-bet correlation, concentration risk
-│   │   ├── bankroll.py               # HWM tracking, Kelly readjustment
-│   │   └── circuit_breaker.py        # Emergency shutdown: staleness, drift, PnL
-│   │
-│   ├── monitoring/                     # Grows across all phases
-│   │   ├── metrics.py                 # Prometheus counters/gauges/histograms
-│   │   ├── alerting.py               # Drift, drawdown, feed-down alerts
-│   │   ├── logging.py                # Structured logging (structlog)
-│   │   └── dashboards/               # Grafana JSON: trading, model, data
-│   │
-│   ├── scheduler/                      # runner.py, jobs.py, lifecycle.py
-│   └── cli/commands/                   # ingest, backfill, features, train, backtest, paper, live
-│
-├── crates/                             # [ADDED] Rust fast-path extensions
-│   └── qm-fast/                       # PyO3/maturin module → `import qm_fast`
-│       ├── Cargo.toml
-│       ├── pyproject.toml             # maturin build config
-│       └── src/                       # features/, orderbook/, signing/
-│
-├── tests/                              # unit/, integration/, backtest/, benchmark/
-├── notebooks/                          # Research notebooks (01-06)
-├── scripts/                            # setup_timescaledb.sh, download_historical.py
-└── data/                               # gitignored: raw/, features/, models/, reports/
+Step 0: DATA DOWNLOAD (PARALLEL)   ← start immediately, runs in background while coding
+Step 1: Monitoring + Logging       ← wire in first, never debug blind
+Step 2: Risk Management            ← foundation for all execution
+Step 3: Strategy + Portfolio       ← edge calc, filtering, portfolio state, audit
+Step 4: Trading Loop + Paper       ← single loop, paper executor, backtest report
+Step 5: Polymarket Execution       ← live executor, market scanner, order manager
+Step 6: Scheduler + Runner + CLI   ← orchestration, startup/shutdown, commands
+Step 7: Rust Fast Path             ← performance optimization (paper validates it)
+Step 8: Deployment                 ← systemd, deploy script, Dockerfile
 ```
 
 ---
 
-## Phase 1: Data Infrastructure (Weeks 1-3)
+## Step 0: Bulk Data Download from Binance Vision (runs in background while we code)
 
-### Week 1: Core + Exchange Connectors + Bar Construction
-**Files**: `src/qm/core/*`, `src/qm/data/connectors/ccxt_ws.py`, `src/qm/data/ingestion/bar_builder.py`, `src/qm/data/ingestion/bar_aligner.py`
+**Why first:** Historical data for backtesting takes time. Start immediately, code against it in parallel.
 
-- Core types: `Asset`, `Timeframe`, `MarketType`, `Bar`, `Signal`, `PolymarketOrder`
-- Core protocols: `ExchangeConnector`, `FeatureCalculator`, `Trainer`, `CVSplitter`, `Sizer`
-- **[ADDED] `src/qm/core/secrets.py`** — Secret loading hierarchy: (1) environment variables, (2) system keyring via `keyring` library, (3) `.env` file fallback. NEVER log secret values. Secrets needed: `POLYMARKET_PRIVATE_KEY`, `POLYMARKET_API_KEY`, `BINANCE_API_KEY`, `BINANCE_API_SECRET`, `BYBIT_API_KEY`, `BYBIT_API_SECRET`, `TIMESCALEDB_URL`
-- ccxt Pro websocket connector: `watch_trades()` for BTC/ETH/XRP/SOL on Binance + Bybit
-  - Build OHLCV from raw trades (not exchange bars) for accuracy
-  - Auto-reconnect with exponential backoff (max 60s), health monitoring with heartbeat timeout
-  - **[ADDED]** On disconnect mid-bar: flush partial bar as incomplete, mark gap, emit `DataGap` event. BarBuilder must handle re-sync on reconnect (request REST snapshot to fill gap)
-- Bar construction aligned to Polymarket window boundaries (ET timezone, every 5m on clock)
-  - **[ADDED]** DST transition handling: use `zoneinfo.ZoneInfo("America/New_York")` which handles DST automatically. Add explicit test cases for March/November DST transitions
-  - **[ADDED]** NTP enforcement: on startup, check system clock against `time.google.com`. Warn if drift > 500ms, abort if drift > 2s. Use `ntplib` library
+**Why Binance Vision instead of ccxt REST:**
+- Static file hosting — no API rate limits, can download in parallel
+- Complete daily archives: one ZIP/CSV per day per symbol/timeframe
+- Futures USDT-M data — better liquidity, tighter spreads, includes quote volume + taker data
+- Speed: entire month downloads in seconds vs hours of paginated REST
 
-### Week 2: Storage + Polymarket Connector
-**Files**: `src/qm/data/storage/*`, `src/qm/data/connectors/polymarket_ws.py`, `docker-compose.yml`, `migrations/`
+**Source URL pattern:**
+```
+https://data.binance.vision/data/futures/um/daily/klines/{SYMBOL}/{INTERVAL}/{SYMBOL}-{INTERVAL}-{DATE}.zip
+```
+Example: `https://data.binance.vision/data/futures/um/daily/klines/BTCUSDT/5m/BTCUSDT-5m-2026-03-17.zip`
 
-- TimescaleDB: `trades` hypertable (1h chunks), `ohlcv` hypertable (1d chunks), `polymarket_snapshots`
-  - **[ADDED]** Data retention policies: raw trades TTL = 7 days (continuous aggregate to OHLCV then drop), OHLCV retained indefinitely, Polymarket snapshots TTL = 90 days
-  - **[ADDED]** TimescaleDB compression: enable native compression on chunks older than 1 day (10-20x space reduction)
-  - **[ADDED]** Disk monitoring: alert at 80% NVMe usage, auto-archive cold parquet to HDD (E: drive) at 85%
-- Parquet: Hive-style partitioning `data/raw/ohlcv/asset=BTC/timeframe=5m/date=YYYY-MM-DD/`
-- Polymarket CLOB websocket: real-time odds, spread, volume for active crypto prediction markets
-- **[ADDED]** Docker security: `docker-compose.yml` must NOT bind TimescaleDB to 0.0.0.0 — use `127.0.0.1:5432` only. Grafana behind auth. Prometheus no external access
+Also available as monthly archives (faster for bulk):
+```
+https://data.binance.vision/data/futures/um/monthly/klines/{SYMBOL}/{INTERVAL}/{SYMBOL}-{INTERVAL}-{YYYY-MM}.zip
+```
 
-### Week 3: Data Quality + Historical Backfill
-**Files**: `src/qm/data/quality/*`, `src/qm/data/historical/*`, `scripts/download_historical.py`
+**What to download:**
+| Symbol | Timeframes | Type | History |
+|--------|-----------|------|---------|
+| BTCUSDT | 5m, 15m, 1h | Futures USDT-M | From 2019-09 (futures launch) |
+| ETHUSDT | 5m, 15m, 1h | Futures USDT-M | From 2019-09 |
+| SOLUSDT | 5m, 15m, 1h | Futures USDT-M | From 2020-09 (SOL futures launch) |
+| XRPUSDT | 5m, 15m, 1h | Futures USDT-M | From 2020-01 |
 
-- Gap detection, outlier filtering (>5 sigma single-exchange spikes), completeness scoring
-- Historical backfill: ccxt `fetch_ohlcv()` for 2+ years, Polymarket `/prices-history`
-  - **[ADDED]** Backfill is idempotent: use upsert (ON CONFLICT DO NOTHING) so re-runs are safe
-  - **[ADDED]** Rate limit awareness: Binance 1200 req/min, Bybit 120 req/5s. Implement adaptive backoff
-- Reconciliation: periodic REST snapshots to validate websocket state
-- **[ADDED]** Polymarket historical data caveat: 5m crypto markets are relatively new. Expect 6-12 months of history max. For longer backtest periods, use exchange OHLCV data with synthetic Polymarket odds (assume market-implied = 50% ± noise) to validate the model's directional accuracy independent of PM-specific features
+**Raw CSV columns (12 fields per Binance Vision klines):**
+```
+open_time, open, high, low, close, volume, close_time,
+quote_volume, trade_count, taker_buy_volume, taker_buy_quote_volume, ignore
+```
+
+**Data volume estimate:**
+- 5m bars: ~105k/year × 6 years × 4 symbols = ~2.5M bars
+- 15m + 1h: ~250k additional
+- Total: ~2.8M bars → ~500MB Parquet (Snappy compressed)
+- Raw ZIPs: ~2-3GB (downloaded then deleted after processing)
+
+**Files to create:**
+- `src/qm/data/historical/binance_vision.py` — Binance Vision bulk downloader
+- `scripts/download_historical.py` — CLI script to run the download
+
+**`binance_vision.py` design (adapted from crypto-watcher `BaseCollector` + `KlinesCollector`):**
+
+```python
+class BinanceVisionDownloader:
+    """Download bulk historical klines from data.binance.vision.
+
+    Downloads monthly ZIPs for older data, daily ZIPs for recent data.
+    Extracts CSV, validates, converts to Polars DataFrame, saves as Parquet.
+    """
+
+    BASE_URL = "https://data.binance.vision/data/futures/um"
+
+    async def download_symbol(self, symbol, timeframe, start_date, end_date):
+        """Download all data for one symbol/timeframe combo."""
+        # 1. Use monthly archives for complete months (much faster)
+        # 2. Use daily archives for partial current month
+        # 3. Skip already-downloaded date partitions (idempotent)
+
+    async def _download_monthly(self, symbol, timeframe, year_month) -> Path:
+        """Download monthly ZIP, return local path."""
+        url = f"{self.BASE_URL}/monthly/klines/{symbol}/{timeframe}/{symbol}-{timeframe}-{year_month}.zip"
+        # aiohttp GET → save to temp dir → return path
+
+    async def _download_daily(self, symbol, timeframe, date) -> Path:
+        """Download daily ZIP for recent/partial months."""
+        url = f"{self.BASE_URL}/daily/klines/{symbol}/{timeframe}/{symbol}-{timeframe}-{date}.zip"
+
+    def _extract_and_parse(self, zip_path) -> pl.DataFrame:
+        """Extract CSV from ZIP, parse to Polars DataFrame."""
+        # ZIP contains single CSV file
+        # Parse 12 columns, rename to our schema
+        # Validate: high >= low, open/close between low-high
+        # Convert open_time from ms epoch to datetime
+
+    def _save_to_parquet(self, df, symbol, timeframe):
+        """Save to Hive-partitioned Parquet via existing ParquetStore."""
+```
+
+**Data validation (adapted from crypto-watcher `DataProcessor`):**
+1. Duplicate removal by timestamp
+2. OHLC relationship checks: high >= low, open/close within [low, high]
+3. Volume >= 0, trade_count >= 0
+4. Monotonic timestamps
+5. Gap detection after full download
+6. Completeness score per symbol/timeframe
+
+**Improvements over crypto-watcher approach:**
+- Use `aiohttp` for parallel downloads (download multiple months concurrently, 4 at a time)
+- Use Polars instead of Pandas for parsing (5-10x faster CSV parsing)
+- Store in our existing Hive-partitioned Parquet format (compatible with existing `ParquetStore`)
+- No ClickHouse dependency — Parquet + DuckDB is simpler and sufficient
+- Checksum verification: Binance Vision provides `.zip.CHECKSUM` files — verify integrity
+
+**Download strategy:**
+1. Try monthly archives first (1 file per month vs 28-31 daily files)
+2. For current incomplete month: fall back to daily archives
+3. If monthly archive 404s (too recent): fall back to daily
+4. Parallel: download up to 4 months concurrently per symbol
+5. Sequential across symbols (to be a good citizen)
+
+**Execution:**
+1. Write the downloader module and script
+2. Start download in background terminal: `python scripts/download_historical.py`
+3. Expected time: 15-30 minutes (parallel monthly downloads, not hours of REST)
+4. Continue coding Steps 1-8 while download runs
+
+**Storage layout (matches existing ParquetStore):**
+```
+data/raw/ohlcv/
+├── asset=BTC/
+│   ├── timeframe=5m/
+│   │   ├── date=2024-01-15/data.parquet
+│   │   ├── date=2024-01-16/data.parquet
+│   │   └── ...
+│   ├── timeframe=15m/
+│   └── timeframe=1h/
+├── asset=ETH/
+├── asset=SOL/
+└── asset=XRP/
+```
+
+**Post-download validation script:**
+```bash
+python scripts/validate_data.py --assets BTC,ETH,SOL,XRP --timeframes 5m,15m,1h
+# Output: completeness scores, gap counts, date ranges per symbol
+```
+
+### Data Reconciliation (non-negotiable for production quant)
+
+**Why this matters:** If the data is wrong, the model is wrong, and you lose money. Binance Vision archives are generally reliable but not infallible — corrupt ZIPs, missing days during maintenance, exchange API outages that produced bad candles, timezone misalignment. One bad day of training data can silently bias the model.
+
+**File to create:** `src/qm/data/quality/reconciler.py`
+
+**5 layers of reconciliation:**
+
+**Layer 1: ZIP integrity**
+- Every Binance Vision ZIP has a companion `.CHECKSUM` file (SHA256)
+- Download checksum, verify before extracting
+- On mismatch: re-download once, then flag as corrupt and skip the day
+
+**Layer 2: Internal consistency (per-bar)**
+- `high >= low` (always)
+- `high >= max(open, close)` and `low <= min(open, close)`
+- `volume >= 0`, `quote_volume >= 0`, `trade_count >= 0`
+- `open_time < close_time` and `close_time - open_time == timeframe`
+- Flag violations, don't silently drop — log them and count per day
+
+**Layer 3: Cross-timeframe reconciliation**
+- 5m bars should aggregate to match 15m bars:
+  - `15m_open == first_5m_open_in_window`
+  - `15m_high == max(three 5m highs)`
+  - `15m_low == min(three 5m lows)`
+  - `15m_close == last_5m_close_in_window`
+  - `15m_volume ≈ sum(three 5m volumes)` (within 0.1% tolerance for rounding)
+- Same logic: 15m → 1h (four 15m bars)
+- **This catches timezone alignment bugs** — if our 15m bars are shifted by 1 minute relative to Binance's, the cross-timeframe check will fail
+
+**Layer 4: Temporal continuity**
+- No missing bars (gap detection via existing `gap_detector.py`)
+- No duplicate timestamps
+- Timestamps strictly monotonic increasing
+- Expected bar count per day: 5m=288, 15m=96, 1h=24
+- Missing bars during exchange maintenance: flag and record, but don't fail
+  - Binance has ~2-4 maintenance windows per year, typically 30-60 min
+  - These gaps are real, not data errors — mark them in a `known_gaps` table
+
+**Layer 5: Cross-source spot check (optional, live validation)**
+- For the most recent 7 days: compare Binance Vision data against live ccxt `fetch_ohlcv()` REST
+- Should match exactly (Binance Vision is derived from the same source)
+- Any divergence > 0.01% on close price → flag the entire day for investigation
+- This catches: Binance Vision publishing errors, our parsing bugs, timezone issues
+
+**Reconciliation output:**
+```python
+@dataclass
+class ReconciliationReport:
+    symbol: str
+    timeframe: str
+    date_range: tuple[str, str]      # "2020-01-01" to "2026-03-18"
+    total_bars: int
+    expected_bars: int
+    completeness: float              # 0.0 - 1.0
+    gaps: list[Gap]                  # missing bar timestamps
+    known_maintenance_gaps: int      # expected gaps (exchange maintenance)
+    integrity_violations: int        # OHLC relationship failures
+    cross_tf_mismatches: int         # 5m→15m→1h aggregation failures
+    cross_source_divergences: int    # vs live REST (if checked)
+    status: str                      # "PASS", "WARN", "FAIL"
+```
+
+**Acceptance criteria for data quality:**
+| Check | Threshold | Action if failed |
+|-------|-----------|-----------------|
+| Completeness | > 99.5% | WARN if 99-99.5%, FAIL if <99% |
+| Integrity violations | 0 | FAIL — bad bars must be removed |
+| Cross-TF mismatches | 0 | FAIL — alignment bug |
+| Cross-source divergence | < 0.01% | WARN, investigate |
+| Checksum failures | 0 after retry | FAIL — re-download day |
+
+**When to run reconciliation:**
+1. After initial bulk download (full reconciliation)
+2. After each daily incremental update (Layer 1-4 on new day only)
+3. Weekly: full cross-source spot check on last 7 days
+4. Before any model training: verify data quality of training date range
 
 ---
 
-## Phase 2: Feature Engineering + Backtesting Engine + Fast Path (Weeks 4-8)
+## Step 1: Monitoring + Logging
 
-### Week 4: Feature Registry + Core Feature Groups (Research Path)
-**Files**: `src/qm/features/registry.py`, `src/qm/features/base.py`, `src/qm/features/pipeline.py`, `src/qm/features/groups/{price,volatility,momentum}.py`
+**Why first:** Every subsequent step instruments itself against these. Without this, risk checks, paper trades, and execution happen without visibility.
 
-- Feature registry: single source of truth — name, dtype, compute_fn, lookback, dependencies
-- Topological sort for dependency-aware computation ordering
-- All computation via Polars expressions for speed
-- Price features: returns (1/5/12), log returns, VWAP deviation, gap, bar position
-- Volatility: realized, Parkinson, Garman-Klass, vol-of-vol
-- Momentum: RSI, MACD, ROC, Stochastic
+**Files to create:**
+- `src/qm/monitoring/metrics.py` — Prometheus counters, gauges, histograms
+- `src/qm/monitoring/logging.py` — structlog config with secret redaction
+- `src/qm/monitoring/alerting.py` — Alert dispatch (Slack webhook)
 
-### Week 5: Advanced Features + Feature Store
-**Files**: `src/qm/features/groups/{microstructure,volume,cross_asset,regime,time,polymarket}.py`, `src/qm/features/store.py`, `src/qm/features/selection.py`
+**`metrics.py` — all Prometheus metrics in one place:**
+```python
+# Trading
+SIGNALS_GENERATED = Counter('qm_signals_total', 'Signals generated', ['asset', 'market_type', 'side'])
+ORDERS_PLACED = Counter('qm_orders_placed_total', 'Orders placed', ['asset', 'outcome'])
+ORDERS_REJECTED = Counter('qm_orders_rejected_total', 'Orders rejected by risk', ['asset', 'reason'])
+BET_SIZE_USD = Histogram('qm_bet_size_usd', 'Bet sizes', buckets=[5, 10, 25, 50, 100, 200, 500])
+EDGE_OBSERVED = Histogram('qm_edge_observed', 'Edge at signal time', buckets=[0.01, 0.02, 0.05, 0.10, 0.20])
+PNL_TOTAL = Gauge('qm_pnl_total_usd', 'Total cumulative PnL')
+PNL_DAILY = Gauge('qm_pnl_daily_usd', 'Today PnL')
+DRAWDOWN_PCT = Gauge('qm_drawdown_pct', 'Drawdown from HWM')
+BANKROLL = Gauge('qm_bankroll_usd', 'Current bankroll')
 
-- Microstructure: orderbook imbalance, trade flow toxicity (VPIN), spread dynamics
-- Cross-asset: BTC-ETH correlation, lead-lag, beta to BTC
-- Regime: HMM state, volatility regime, trend strength
-- **Polymarket-specific**: implied prob, spread, volume, prob momentum, odds-price divergence
-- Feature store: DuckDB for fast reads, Parquet for persistence
-  - **[ADDED]** Point-in-time enforcement: feature store `read()` method takes a `as_of` timestamp parameter. All queries filter `WHERE time <= as_of`. Cross-asset features must use the latest available data per asset AT that timestamp, not the latest row across all assets (which could be from the future for a slow-updating asset)
-- Selection: remove >50% missing, <0.01 target correlation, >0.95 pairwise correlation
+# Model
+MODEL_ACCURACY = Gauge('qm_model_accuracy', 'Rolling accuracy', ['asset', 'window'])
+CALIBRATION_ECE = Gauge('qm_calibration_ece', 'Expected calibration error', ['asset'])
+BRIER_SCORE = Gauge('qm_brier_score', 'Rolling Brier score', ['asset'])
 
-### Week 6: Backtesting Engine Core
-**Files**: `src/qm/backtest/engine.py`, `src/qm/backtest/clock.py`, `src/qm/backtest/portfolio.py`, `src/qm/backtest/cost_model.py`, `src/qm/backtest/order_simulator.py`
+# Data
+FEED_LATENCY = Histogram('qm_feed_latency_ms', 'Feed latency', ['exchange', 'asset'],
+                         buckets=[10, 50, 100, 250, 500, 1000, 5000])
+FEED_HEALTH = Gauge('qm_feed_healthy', 'Feed status', ['exchange'])
+DATA_GAPS = Counter('qm_data_gaps_total', 'Missing bars', ['asset', 'timeframe'])
 
-**Dual-mode engine** — this is a critical design decision:
-1. **`evaluate_model_fast()`** — vectorized PnL, no order simulation. Used during Optuna HPO in Phase 3 training loop. Must be fast (thousands of evaluations).
-2. **`run_full_simulation()`** — event-driven with order fills, spread, portfolio tracking. Used for final OOS validation in Phase 4. Must be realistic.
+# Performance
+FAST_PATH_FALLBACK = Counter('qm_fast_path_fallback_total', 'Python fallbacks', ['component'])
+INFERENCE_LATENCY_NS = Histogram('qm_inference_latency_ns', 'Inference time',
+                                  buckets=[500_000, 1_000_000, 2_000_000, 5_000_000, 10_000_000])
+```
 
-- Cost model: Polymarket fee schedule + empirical spread model
-  - **[ADDED]** Liquidity-aware slippage: cost model must use historical orderbook depth, not fixed spread. For a $100 bet, walk the book to compute actual fill price. Cap bet size at 10% of available depth on the side you're trading to avoid adverse price impact
-- Portfolio: tracks positions, cash, PnL, open/resolved bets
+**`logging.py` — structlog with secret redaction:**
+- `SecretFilter` processor: replaces values matching `(?i)(key|secret|password|token|private).*[=:]\s*\S+` with `***REDACTED***`
+- Dev: `ConsoleRenderer` (human-readable)
+- Prod: `JSONRenderer` (machine-parseable)
+- Bound context: `env`, `hostname`, `pid`
 
-### Week 7: Walk-Forward, CPCV, Statistical Metrics
-**Files**: `src/qm/backtest/validation/{walk_forward,cpcv,purging,splitter}.py`, `src/qm/backtest/metrics/{performance,calibration,statistical}.py`
+**`alerting.py`:**
+- `async def send_alert(severity, title, message)` — dispatches to Slack webhook
+- Circuit breaker trip → CRITICAL alert
+- Drawdown > 15% → WARNING
+- Feed down > 5 min → WARNING
+- ECE drift > 0.08 → WARNING
+- Idempotent: deduplicates alerts within a 5-minute window (same title → skip)
 
-- Walk-forward: anchored + sliding window, purge period (1h at 5m bars), embargo
-- CPCV: C(10,2) = 45 paths, probability of backtest overfitting (PBO)
-- Metrics: Sharpe, Sortino, Calmar, max DD, win rate, Brier score, ECE, reliability diagram
-- Statistical: deflated Sharpe ratio (multiple testing correction), minimum backtest length
-
-### Week 8: Rust Fast Path (`crates/qm-fast/`)
-**Files**: `crates/qm-fast/src/{lib.rs, features/, orderbook/, signing/}`
-
-Build the Rust extension module that powers the live inference hot path:
-
-1. **Rolling feature engine** (`features/rolling.rs`)
-   - Pre-allocated ring buffer holds last N bars per asset per timeframe
-   - Each feature is an incremental computation: on new bar, update only the delta (O(1) per feature)
-   - Example: rolling mean = `(old_sum - dropped_bar + new_bar) / window_size`, no recomputation
-   - Expose to Python via `qm_fast.update_bar(asset, bar_data)` and `qm_fast.get_features(asset) → numpy`
-   - Zero-copy numpy export via PyO3's numpy integration
-
-2. **Orderbook manager** (`orderbook/l2_book.rs`)
-   - Maintain sorted L2 orderbook per asset from websocket deltas
-   - `qm_fast.apply_book_delta(asset, bids, asks)` — apply incremental update
-   - `qm_fast.get_book_state(asset) → (best_bid, best_ask, mid, spread, depth_at_size)`
-   - Price impact calculator: `qm_fast.price_impact(asset, side, size) → fill_price`
-
-3. **EIP-712 order signer** (`signing/eip712.rs`)
-   - Uses `alloy` crate for EIP-712 typed data hashing + secp256k1 signing
-   - `qm_fast.sign_order(token_id, price, size, side, nonce, expiration) → signed_order_json`
-   - Private key loaded once at startup into Rust memory (never exposed back to Python)
-
-4. **CI parity tests** (`tests/`)
-   - For every Rust function, a Python reference implementation exists
-   - CI runs both on identical inputs, asserts `|rust_output - python_output| < 1e-9`
-   - Parity test failure = CI failure = cannot merge
-
-5. **Benchmark suite** (`tests/benchmark/`)
-   - Criterion benchmarks for all hot-path functions
-   - Track p50/p95/p99 across commits
-   - Alert on >10% regression
+**Tests:** `tests/unit/monitoring/test_logging.py` (verify secret redaction)
 
 ---
 
-## Phase 3: Model Training + Signal Generation (Weeks 9-12)
+## Step 2: Risk Management
 
-### Week 9: Target Construction + LightGBM Trainer
-**Files**: `src/qm/model/targets/{binary,threshold,labeler}.py`, `src/qm/model/trainers/lgbm_trainer.py`
+**Files to create:**
+- `src/qm/risk/manager.py` — Central risk manager: pre-trade + post-trade
+- `src/qm/risk/limits.py` — Individual limit checks
+- `src/qm/risk/correlation.py` — Cross-asset correlation monitoring
+- `src/qm/risk/bankroll.py` — Bankroll tracking, high-water mark, daily PnL reset
+- `src/qm/risk/circuit_breaker.py` — Emergency shutdown with manual reset
 
-- **Binary target**: `y = 1 if close[t+horizon] >= open[t]` — mirrors Polymarket resolution exactly
-- **Threshold target**: `y = 1 if max(high[t:t+window]) >= threshold` — for monthly markets
-- LightGBM trainer with Optuna HPO:
-  - **Objective function = BacktestEngine.evaluate_model_fast()** — walk-forward evaluation IS the training metric
-  - Optimize for Brier score (calibration quality), secondary: Sharpe of simulated PnL
-  - HPO search space: n_estimators, learning_rate, max_depth, num_leaves, regularization
-  - RTX 4090 + 96GB allows parallel Optuna trials
+**Key design:**
 
-### Week 10: Probability Calibration
-**Files**: `src/qm/model/calibration/{calibrator,isotonic,platt,validator}.py`
+`RiskManager.__init__(portfolio, config, event_bus)` — receives shared `Portfolio` instance, not global state.
 
-- **Expanding window isotonic regression** — fitted on OOS walk-forward predictions only (prevents leakage)
-- Online recalibration: accumulate live predictions, refit every 500 bets or when ECE > 0.07
-- Validation: ECE, Brier score, Brier decomposition (reliability + resolution + uncertainty), reliability diagrams
-- Clip calibrated outputs to [0.01, 0.99] — never output 0 or 1
+`RiskManager.pre_trade_check(signal, size) → (bool, reason)`:
+- Chain: circuit_breaker → concurrent_limit → single_bet_size → daily_loss → drawdown → asset_concentration → correlated_exposure
+- Circuit breaker checked FIRST (if tripped, instant reject without running other checks)
+- Every rejection increments `ORDERS_REJECTED` Prometheus counter with reason label
 
-### Week 11: Ensemble + Model Registry + treelite Compilation
-**Files**: `src/qm/model/ensemble/{stacker,blender,diversity}.py`, `src/qm/model/registry.py`, `src/qm/model/compiler.py`
+`CircuitBreaker` triggers:
+| Condition | Threshold | Action |
+|-----------|-----------|--------|
+| Drawdown from HWM | > 30% | Trip |
+| Daily loss | > 15% | Trip |
+| Data staleness | > 300s | Trip |
+| ECE drift | > 0.10 | Trip |
+| Consecutive losses | > 20 | Trip |
 
-- Stacking ensemble: multiple LightGBM configs as base → logistic regression meta-learner → isotonic calibration
-- All fitting via walk-forward (base OOS predictions → meta-learner OOS → final calibration)
-- Diversity metrics: correlation between base models, Q-statistic
-- Model registry: versioned artifacts (model.txt + calibrator.pkl + config + metrics)
-- **treelite compilation step** (`src/qm/model/compiler.py`):
-  - After training finishes: `treelite.frontend.load_lightgbm_model(model.txt)` → compile to shared lib
-  - Output: `model.so` (Linux) / `model.dll` (Windows) saved alongside model.txt in registry
-  - Validation: run 1000 predictions through both LightGBM Python and treelite, assert max absolute diff < 1e-6
-  - If compilation fails: log warning, fall back to LightGBM Python predict at runtime. Never block deployment.
+- Tripped state persisted to DB (`audit_log` with event_type='circuit_breaker_trip')
+- Manual reset: `qm reset-circuit-breaker` checks DB, clears flag
+- On trip: publishes `CircuitBreakerTrip` event → alerting sends Slack
 
-### Week 12: Signal Generation
-**Files**: `src/qm/model/signals.py`, `src/qm/strategy/edge.py`
+`Bankroll`:
+- Tracks `initial_bankroll`, `current_bankroll`, `high_water_mark`, `daily_pnl`
+- `daily_pnl` resets at midnight ET (Polymarket's reference timezone)
+- [ADDED] `save_state(writer)` / `load_state(writer)` — persist to `audit_log` table for crash recovery
+- HWM only updated upward (never decreases)
 
-- Edge calculation: `effective_edge = (cal_prob - pm_mid) - pm_spread/2`
-- Signal filtering: min edge 5 cents, after spread adjustment
-- For binary markets: `edge_up = cal_prob - pm_mid_up`, `edge_down = -edge_up` (symmetric)
-- Signal includes: timestamp, asset, market_type, model_prob, market_prob, edge, recommended_side
+**Config:** `conf/execution/risk.yaml` (as in original plan)
+
+**Asset correlations:** Hardcoded initially, loaded from config. Updated dynamically in future.
+```python
+ASSET_CORRELATIONS = {
+    (Asset.BTC, Asset.ETH): 0.85,
+    (Asset.BTC, Asset.SOL): 0.75,
+    (Asset.BTC, Asset.XRP): 0.65,
+    (Asset.ETH, Asset.SOL): 0.80,
+    (Asset.ETH, Asset.XRP): 0.60,
+    (Asset.SOL, Asset.XRP): 0.55,
+}
+```
+
+**Tests:** `tests/unit/risk/test_limits.py`, `tests/unit/risk/test_circuit_breaker.py`, `tests/unit/risk/test_bankroll.py`
 
 ---
 
-## Phase 4: Full Backtest Validation + Paper Trading (Weeks 13-15)
+## Step 3: Strategy + Portfolio + Audit
 
-### Week 13: Comprehensive OOS Validation
-**Files**: `src/qm/backtest/report.py`, `src/qm/cli/commands/backtest.py`
+**Files to create:**
+- `src/qm/strategy/edge.py` — Edge calculation with cost adjustment
+- `src/qm/strategy/filter.py` — Trade filter chain
+- `src/qm/strategy/portfolio.py` — Portfolio state: positions, cash, PnL
+- `src/qm/execution/audit.py` — Append-only audit log writer
 
-Run `BacktestEngine.run_full_simulation()` on strictly held-out data. **Acceptance criteria (must pass ALL):**
+**`Portfolio`:**
+- Tracks: `open_positions: list[Position]`, `available_cash`, `total_value`, `realized_pnl`
+- `Position` dataclass: `signal_id, asset, side, entry_price, size_usd, entry_time, market_condition_id`
+- `on_fill(signal, size, fill_price)` — adds position, deducts cash
+- `on_resolution(condition_id, outcome)` — resolves position, computes PnL, updates cash
+- [ADDED] `to_dict() / from_dict()` — serializable for crash recovery via audit log
+- Updated by both paper and live executors (single instance, no duplication)
 
-| Metric | Threshold | Why |
-|--------|-----------|-----|
-| PBO | < 0.40 | Less than 40% chance strategy is overfit |
-| Deflated Sharpe | > 0.0 | Significant after multiple testing correction |
-| OOS Brier score | < 0.25 | Better than uninformed prior |
-| OOS ECE | < 0.05 | Calibration error under 5pp |
-| Net PnL | > 0 after costs | Profitable including Polymarket fees + spread |
-| Max drawdown | < 30% bankroll | Survivable worst case |
+**`EdgeCalculator`:**
+- `compute(model_prob, market_prob, spread) → (edge, side)` — stateless, pure function
+- Already partially in `SignalGenerator` — extract and reuse, no duplication
 
-Also: regime breakdown (performance by vol regime, time-of-day, asset)
+**`TradeFilter`:**
+- `filter(signal, portfolio, market) → (bool, reason)` — chain of checks:
+  1. Min edge (from risk config)
+  2. Time budget: skip if <2 min until window close
+  3. Liquidity: skip if orderbook depth < $500
+  4. Risk manager pre-trade check (delegates to Step 2)
 
-### Weeks 14-15: Paper Trading
-**Files**: `src/qm/execution/paper/{engine,recorder}.py`, `src/qm/cli/commands/paper.py`
+**`AuditWriter`:**
+- Wraps `TimescaleWriter.write_audit()` (already exists)
+- Methods: `log_signal()`, `log_risk_check()`, `log_order()`, `log_fill()`, `log_resolution()`, `log_state_snapshot()`
+- All async, non-blocking
+- [ADDED] `log_state_snapshot(portfolio)` — called on shutdown and periodically (every 5 min) for crash recovery
 
-- Full live pipeline with simulated execution — real data, real model, fake fills
-- Pessimistic fill assumption: always cross the spread
-- **Minimum 2 weeks** before live transition
-- Acceptance: PnL within 2 sigma of backtest, calibration holds, no risk limit breaches
-- **Fast path validation during paper trading**: run both Rust and Python paths in parallel, compare outputs. Log any divergence. This is the real-world integration test for the fast path before money is on the line.
-- **Latency profiling**: measure every hot-path component under real load. Verify p99 < 5ms local compute. Identify any unexpected GC pauses or contention.
+**Reuses:**
+- `KellySizer` from `src/qm/strategy/sizing/kelly.py`
+- `Signal`, `PolymarketMarket` from `src/qm/core/types.py`
+- `TimescaleWriter` from `src/qm/data/storage/timescale.py`
 
----
-
-## Phase 5: Live Execution + Risk Management (Weeks 16-20)
-
-### Week 16: Polymarket Execution Client
-**Files**: `src/qm/execution/polymarket/{client,market_scanner,order_manager,position_tracker}.py`
-
-- py-clob-client wrapper with retry, rate limiting, structured logging
-  - **[ADDED]** Structured logging MUST redact private keys and API keys. Use a `SecretFilter` log processor that replaces any value matching known secret patterns with `***REDACTED***`
-- Market scanner: continuously discovers new 5m/15m crypto markets as they're created
-  - **[ADDED]** Time budget: for 5m markets, scanner must discover market at least 3 minutes before window closes to have time for feature computation + signal generation + order placement. Skip markets discovered with <2 minutes remaining
-  - **[ADDED]** Liquidity filter: skip markets with total orderbook depth < $500 on either side (not worth the adverse selection risk)
-- Order manager: **must maintain heartbeat** (Polymarket cancels orders if heartbeat stops)
-  - **[ADDED]** Heartbeat supervisor: separate asyncio task with its own error handling. If heartbeat fails 3x consecutively, trigger circuit breaker and cancel all open orders via REST fallback
-- Position tracker: syncs local state against Polymarket API
-  - **[ADDED]** On startup: always reconcile local DB state against Polymarket API positions before placing any new orders. Resolve discrepancies by trusting Polymarket API as source of truth
-- **[ADDED]** Audit log (`src/qm/execution/audit.py`): Every signal, risk check result, order placed/filled/rejected, and resolution outcome is written to an append-only `audit_log` table in TimescaleDB. Columns: `timestamp, event_type, asset, market_type, signal_id, details_json`. This is the single source of truth for post-mortem analysis. Never delete or update rows.
-- **[ADDED]** Polygon blockchain handling:
-  - Use reliable RPC endpoint (Alchemy/QuickNode, not public RPCs). Configure fallback RPC
-  - Nonce management: track nonce locally, re-fetch from chain if transaction reverts
-  - Gas price: use Polygon gas oracle, set max gas price cap (e.g., 500 gwei). Skip trade if gas > expected profit
-  - Transaction monitoring: poll for confirmation, timeout after 30s, retry with higher gas if stuck
-
-### Week 17: Risk Management
-**Files**: `src/qm/risk/{manager,limits,correlation,bankroll,circuit_breaker}.py`, `src/qm/strategy/sizing/kelly.py`
-
-**Kelly sizing:**
-- Fractional Kelly (0.25x) — quarter Kelly for conservative growth with estimation uncertainty
-- `kelly_f = edge / (1 - market_price)`, then `bet = kelly_f * fraction * bankroll`
-- Caps: max 5% bankroll per bet, max $500 per bet, min $5
-
-**Risk limits:**
-- Max 20 concurrent bets
-- Max 40% concentration in single asset
-- Max 60% correlated directional exposure (BTC-ETH correlation ~0.85)
-- Daily loss stop at 10%, circuit breaker at 25% drawdown from HWM
-- Circuit breaker also triggers on: data staleness >300s, ECE drift >0.10, 20 consecutive losses
-
-### Week 18: Monitoring + Observability
-**Files**: `src/qm/monitoring/*`, Grafana dashboards
-
-- Prometheus metrics: signals, orders, bet sizes, edge observed, PnL, drawdown, accuracy, ECE, Brier, feed latency, data gaps
-- Grafana dashboards: trading (PnL/positions/fills), model (calibration/drift/accuracy), data (feed health/latency)
-- Structured logging via structlog
-- Alerts: model drift, drawdown threshold, feed down
-
-### Week 19: Main Runner + CLI + Integration
-**Files**: `src/qm/scheduler/*`, `src/qm/cli/*`
-
-- SystemRunner: orchestrates all subsystems with graceful startup/shutdown
-  - **[ADDED]** Graceful shutdown: on SIGTERM/SIGINT, (1) stop placing new orders, (2) wait for pending order confirmations (max 60s), (3) save portfolio state to DB, (4) close websockets, (5) flush logs. On restart, reconcile from saved state + Polymarket API
-- CLI modes: `qm ingest`, `qm backfill`, `qm features`, `qm train`, `qm backtest`, `qm paper`, `qm live`
-- Scheduled jobs: recalibration (6h), data quality check (30m), model drift check (1h)
-  - **[ADDED]** Model retraining: triggered when (a) rolling 7-day ECE > 0.08, OR (b) rolling 7-day accuracy < 48%, OR (c) manually via `qm retrain`. Retraining runs full Phase 3 pipeline, deploys only if new model passes Phase 4 acceptance criteria. Old model stays active until new model is validated
-
-### Week 20: Deployment Pipeline
-**Files**: `deploy/qm.service`, `deploy/deploy.sh`, `deploy/Dockerfile`
-
-- **systemd service** (`deploy/qm.service`): auto-restart on failure (max 3 retries in 5min), `Restart=on-failure`, `WatchdogSec=300` (5min health check). Environment file points to `/etc/qm/.env`
-- **Deployment script** (`deploy/deploy.sh`): rsync code from Windows (via WSL2 or SSH) to Linux prod → install deps via `uv sync` → run migrations → restart service. Zero-downtime: stop accepting new bets, wait for current window to resolve, swap, restart
-- **Rollback**: keep last 3 deployments. Rollback = symlink swap + service restart. Model rollback = point registry to previous version
-- **[ADDED] Backup strategy**: TimescaleDB `pg_dump` daily to E: drive (HDD). Model artifacts are versioned in `data/models/` and backed up with the DB dump. Parquet files on NVMe are the ephemeral cache; HDD archive is the durable copy
+**Tests:** `tests/unit/strategy/test_portfolio.py`, `tests/unit/strategy/test_filter.py`
 
 ---
 
-## Tech Stack
+## Step 4: Trading Loop + Paper Engine + Backtest Report
 
-| Layer | Tool | Why |
-|-------|------|-----|
-| Language | Python 3.11+ + Rust | Python for research/strategy, Rust for live hot path |
-| Package manager | uv | Fast, cross-platform lockfile, resolves platform-specific wheels |
-| Rust build | maturin + PyO3 | Compiles Rust → Python wheel. `#![forbid(unsafe_code)]` |
-| Compiled inference | treelite | Compiles LightGBM trees → native C → .so/.dll. <0.5ms predict |
-| Data manipulation | Polars | 10-50x faster than Pandas, zero-copy DuckDB integration |
-| ML | LightGBM → PyTorch | GBM first (proven on tabular), DL only if justified |
-| Time-series DB | TimescaleDB | Production-grade, continuous aggregates, compression |
-| Analytics | DuckDB | In-process, zero infra, Parquet predicate pushdown |
-| Exchange feeds | ccxt Pro + websockets | Unified API, battle-tested |
-| Polymarket | py-clob-client | Official Python SDK |
-| Blockchain RPC | Alchemy / QuickNode | Reliable Polygon RPC with fallback |
-| Order signing | Rust alloy (via qm-fast) | EIP-712 signing in <1ms vs Python's ~30ms |
-| HPO | Optuna | TPE sampler, pruning, parallel trials |
-| Config | Hydra | Hierarchical config, experiment overrides |
-| Secrets | keyring + python-dotenv | [ADDED] OS keyring for prod, .env for dev |
-| Scheduling | APScheduler | In-process cron |
-| Monitoring | Prometheus + Grafana | Industry standard |
-| Logging | structlog | Structured, JSON output |
-| Testing | pytest + pytest-asyncio | [ADDED] Async test support for WS connectors |
-| Deployment | systemd + rsync | [ADDED] Simple, reliable, easy rollback |
+**Files to create:**
+- `src/qm/execution/loop.py` — [ADDED] Single trading loop, shared by paper and live
+- `src/qm/execution/paper/engine.py` — Paper executor (simulated fills)
+- `src/qm/execution/paper/recorder.py` — Paper trade recording + analysis
+- `src/qm/backtest/report.py` — [ADDED] Backtest report generation + acceptance gates
+
+**[ADDED] `TradingLoop` — single decision loop, two executors:**
+```python
+class TradingLoop:
+    """Core decision loop shared by paper and live execution.
+
+    Eliminates duplication between paper and live paths.
+    The executor is pluggable: PaperExecutor or LiveExecutor.
+    """
+    def __init__(self, signal_generator, risk_manager, sizer,
+                 portfolio, executor, audit_writer, event_bus): ...
+
+    async def on_bar_completed(self, event: BarCompleted):
+        # 1. Generate signal
+        signal = self.signal_generator.generate(...)
+        if signal is None: return
+        self.audit_writer.log_signal(signal)
+
+        # 2. Size the bet
+        size = self.sizer.size(signal.edge, market_price, portfolio.available_cash)
+        if size == 0: return
+
+        # 3. Risk check
+        ok, reason = self.risk_manager.pre_trade_check(signal, size)
+        self.audit_writer.log_risk_check(signal, ok, reason)
+        if not ok: return
+
+        # 4. Execute (paper or live — polymorphic)
+        fill = await self.executor.execute(signal, size)
+        self.audit_writer.log_fill(fill)
+        self.portfolio.on_fill(signal, size, fill.price)
+
+    async def on_market_resolution(self, condition_id, outcome):
+        self.portfolio.on_resolution(condition_id, outcome)
+        self.audit_writer.log_resolution(...)
+```
+
+**`PaperExecutor`:**
+- `execute(signal, size) → Fill` — simulates fill at `market_price + spread/2` (pessimistic)
+- No network calls, instant return
+- Records all fills for analysis
+
+**[ADDED] `BacktestReport`:**
+- `generate(backtest_result) → dict` — computes all acceptance criteria
+- `check_acceptance(metrics) → (bool, list[str])` — returns pass/fail + list of failed criteria
+- Acceptance criteria from plan: PBO < 0.40, deflated Sharpe > 0.0, Brier < 0.25, ECE < 0.05, PnL > 0, max DD < 30%
+- Outputs HTML report to `data/reports/`
+
+**[ADDED] Parallel fast-path validation:**
+- During paper trading, if Rust module available: run Python path alongside, compare outputs
+- Log divergence as WARNING, increment `FAST_PATH_FALLBACK` if Rust disagrees
+- This happens in Step 7 when Rust is built — paper engine has a hook for it
+
+**Tests:** `tests/unit/execution/test_trading_loop.py`, `tests/unit/execution/test_paper_engine.py`
 
 ---
 
-## Production Inference: Fastest Possible, Never Breaks
+## Step 5: Polymarket Live Execution
 
-**Design principle**: Every millisecond counts AND a crash mid-trade costs more than any latency gain. The architecture uses a **dual-path design**: Rust fast path for speed, Python fallback for reliability. If the fast path fails, the system seamlessly degrades to the Python path — never skips a trade, never enters an inconsistent state.
+**Files to create:**
+- `src/qm/execution/polymarket/client.py` — py-clob-client wrapper
+- `src/qm/execution/polymarket/market_scanner.py` — Discover active markets
+- `src/qm/execution/polymarket/order_manager.py` — Order lifecycle + heartbeat
+- `src/qm/execution/polymarket/position_tracker.py` — Position sync
+- `src/qm/execution/polymarket/live_executor.py` — [ADDED] `LiveExecutor` implementing same interface as `PaperExecutor`
+- `src/qm/execution/reconciliation.py` — Startup reconciliation
 
-### Two Separate Code Paths
+**`LiveExecutor`:**
+- Same interface as `PaperExecutor`: `execute(signal, size) → Fill`
+- Calls `PolymarketClient.place_limit_order()` → waits for fill confirmation
+- On failure: returns `Fill(status='rejected')`, logs to audit, increments metric
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   RESEARCH PATH (Python)                     │
-│  Training, backtesting, feature exploration, notebooks       │
-│  Priority: accuracy, flexibility, debuggability              │
-│  Speed: acceptable (seconds per prediction is fine)          │
-│  Stack: Polars, DuckDB, LightGBM Python API, scikit-learn   │
-└─────────────────────────────────────────────────────────────┘
+**`PolymarketClient`:**
+- Wraps `py-clob-client` with retry (3x, exponential backoff), rate limiting
+- [ADDED] All methods wrapped in `try/except` with structured logging
+- Secret redaction via `SecretFilter` from monitoring/logging.py
+- Methods: `place_limit_order()`, `cancel_order()`, `get_positions()`, `get_active_markets()`
 
-┌─────────────────────────────────────────────────────────────┐
-│               LIVE FAST PATH (Rust + compiled)               │
-│  Production inference, signal generation, order execution    │
-│  Priority: speed first, reliability always                   │
-│  Speed: <5ms local compute (bar→signal), <300ms to order     │
-│  Stack: qm-fast (Rust/PyO3), treelite, pre-allocated bufs   │
-│                                                              │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │          PYTHON FALLBACK (automatic)                 │    │
-│  │  If Rust path panics or returns error,               │    │
-│  │  Python path runs same logic in ~25ms.               │    │
-│  │  Latency penalty: ~20ms. Trade still happens.        │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-```
+**`MarketScanner`:**
+- Polls Gamma API every 15s
+- Filters: target assets, target market types, time budget (>2 min remaining), liquidity (>$500 depth)
+- In-memory cache of active markets (avoids API call at decision time)
+- [ADDED] Emits `MarketDiscovered` event for the trading loop to subscribe to
 
-### Rust Extension: `qm-fast` (`crates/qm-fast/`)
+**`OrderManager`:**
+- Heartbeat supervisor: separate asyncio task, 10s interval
+- Heartbeat fail 3x → circuit breaker + cancel all via REST fallback
+- Order timeout: cancel unfilled after 60s
+- [ADDED] Tracks all open order IDs for reconciliation
 
-Built with **maturin + PyO3**. Compiled to a Python wheel, imported as `import qm_fast`.
+**`PositionTracker`:**
+- On startup: calls `get_positions()`, compares to local `Portfolio`
+- Discrepancies: trust Polymarket API, adjust local state, log WARNING
+- Monitors market resolutions via websocket or polling
 
-**What goes in Rust (and why):**
+**Blockchain handling:**
+- RPC from config (POLYGON_RPC_URL + fallback)
+- Nonce: local tracking, re-fetch from chain on revert
+- Gas cap: skip trade if gas > expected profit
+- Tx monitoring: poll confirmation, 30s timeout, retry +20% gas if stuck
 
-| Component | Why Rust | Python fallback |
-|-----------|----------|-----------------|
-| Rolling feature engine | Incremental O(1) updates per bar. Pre-allocated ring buffers. No GC pauses, no DataFrame overhead. | Polars computation (~50-200ms) |
-| Orderbook manager | Maintain real-time L2 books for 4 assets. Apply WS deltas in <1us. Instant price-impact calc. | Python dict-based book (~5ms) |
-| EIP-712 order signer | Python `eth_account` is ~20-50ms. Rust `alloy` does it in <1ms. | Python eth_account (~30ms) |
-| Feature buf → numpy | Zero-copy from Rust ring buffer to numpy array via PyO3. No serialization. | Polars .to_numpy() (~2ms) |
-
-**What stays in Python (and why):**
-
-| Component | Why Python | Speed impact |
-|-----------|-----------|--------------|
-| Model inference | treelite/LightGBM are already C/C++. Python is just the call wrapper. | ~0ms overhead |
-| Calibration | Isotonic regression = binary search on small array. | <0.1ms |
-| Risk checks | Simple comparisons and arithmetic. Not worth FFI overhead. | <0.1ms |
-| Strategy logic | Must be readable, auditable, frequently changed. Rust recompile would slow iteration. | <0.1ms |
-| Monitoring/logging | I/O-bound, async. Language irrelevant. | 0ms (async, non-blocking) |
-| All training/backtest | Accuracy and flexibility matter more than speed here. | N/A |
-
-### Compiled Model Inference: treelite
-
-LightGBM's Python `predict()` has overhead (~3-5ms) from data marshaling. **treelite** compiles the trained tree ensemble to optimized C code, then to a shared library:
-
-```
-Training (Python):  LightGBM.fit() → model.txt
-Compilation:        treelite.compile(model.txt) → model.so (Linux) / model.dll (Windows)
-Live inference:     treelite.predict(features_array) → 0.3-0.5ms
-```
-
-- Compiled once after training, loaded at startup, stays in memory
-- Cross-platform: .so on Linux prod, .dll on Windows dev
-- Battle-tested at multiple quant firms
-- **Fallback**: if treelite model fails to load, fall back to LightGBM Python predict (~3-5ms). Trade still happens.
-
-### Latency Budget (Live Fast Path)
-
-```
-Event: bar completes at T=0
-───────────────────────────────────────────────────────────
-T+0.0ms   Rust rolling features already updated (incremental on each trade)
-T+0.1ms   Feature buffer → numpy array (zero-copy via PyO3)
-T+0.5ms   treelite inference (compiled C tree model)
-T+0.6ms   Isotonic calibration lookup (binary search, Python)
-T+0.7ms   Edge calc + risk checks (Python arithmetic)
-T+1.0ms   Rust EIP-712 order signing
-T+1.5ms   ─── LOCAL COMPUTE DONE ─── (~1.5ms fast path)
-T+2.0ms   HTTP POST to Polymarket CLOB (pre-warmed persistent connection)
-T+200ms   Order acknowledged by CLOB
-T+2000ms  Polygon tx confirmed
-───────────────────────────────────────────────────────────
-          Fast path local:     ~1.5ms
-          Python fallback:     ~25ms
-          Network (irreducible): ~200-2000ms
-```
-
-### Reliability Guarantees (Non-Negotiable)
-
-**Rule: "no trade" beats "bad trade", "slow trade" beats "no trade".**
-
-1. **Every Rust FFI call wrapped with automatic Python fallback**
-   ```python
-   def compute_features(self, asset: Asset) -> np.ndarray:
-       try:
-           return qm_fast.get_features(asset.value)  # ~0.1ms
-       except Exception as e:
-           logger.warning("fast_path_fallback", component="features", error=str(e))
-           FAST_PATH_FALLBACK.labels(component="features").inc()
-           return self._python_fallback.compute(asset)  # ~100ms, still works
-   ```
-
-2. **Rust module: `#![forbid(unsafe_code)]`** — all memory-safe. No undefined behavior risk. PyO3 handles all FFI boundary safety.
-
-3. **State is always reconstructable** — Rust feature engine state can be rebuilt from last N bars in TimescaleDB. On crash → restart: load last 100 bars → replay through engine → state restored in <1s. No data loss.
-
-4. **Startup health check** — known-input/known-output test on Rust module before accepting any trades. Fail → start in Python-only mode + alert operator.
-
-5. **Audit writes are async** — append-only audit log writes happen AFTER order submission, never blocking the hot path. If audit write fails, order is already placed — audit catches up on retry.
-
-6. **Fallback monitoring** — Prometheus counter tracks Python fallback invocations. If >5 fallbacks in 1 hour → circuit breaker halts trading + alerts. Indicates Rust module instability that needs investigation.
-
-7. **CI correctness guarantee** — test suite runs both Rust and Python paths on identical inputs, asserts outputs match within float tolerance (1e-9). If they diverge, CI fails. You can never ship a Rust module that disagrees with the Python reference.
-
-### Project Structure Addition: `crates/`
-
-```
-crates/
-└── qm-fast/
-    ├── Cargo.toml                  # Rust dependencies: pyo3, alloy, etc.
-    ├── pyproject.toml              # maturin build config
-    ├── src/
-    │   ├── lib.rs                  # PyO3 module entry, #![forbid(unsafe_code)]
-    │   ├── features/
-    │   │   ├── mod.rs
-    │   │   ├── ring_buffer.rs      # Pre-allocated ring buffer for bar history
-    │   │   ├── rolling.rs          # Incremental feature computations
-    │   │   └── export.rs           # Zero-copy numpy export
-    │   ├── orderbook/
-    │   │   ├── mod.rs
-    │   │   ├── l2_book.rs          # L2 orderbook with delta application
-    │   │   └── impact.rs           # Price impact / slippage calculator
-    │   └── signing/
-    │       ├── mod.rs
-    │       └── eip712.rs           # Polymarket order signing via alloy
-    └── tests/
-        ├── test_features.rs        # Rust-side unit tests
-        └── test_signing.rs
-```
-
-### Benchmarking Infrastructure
-
-**You cannot optimize what you cannot measure.**
-
-- `src/qm/monitoring/latency.py` — wraps every hot-path step with `time.perf_counter_ns()`, pushes to Prometheus histogram
-- Per-component histograms: `feature_compute_ns`, `model_inference_ns`, `calibration_ns`, `risk_check_ns`, `order_sign_ns`, `api_submit_ns`
-- CI benchmark suite (`tests/benchmark/`): runs hot path 10,000 iterations, reports p50/p95/p99/max. CI **fails if p99 regresses >20%** vs committed baseline
-- Grafana latency dashboard: real-time percentile tracking per component
-- Weekly automated latency report: identifies regressions before they compound
+**Tests:** `tests/unit/execution/test_market_scanner.py` (mocked API), `tests/unit/execution/test_live_executor.py` (mocked client)
 
 ---
 
-## Key Architectural Decisions
+## Step 6: Scheduler + Runner + CLI
 
-1. **Build OHLCV from raw trades** — exchange bars have subtle alignment/aggregation issues
-2. **Polars over Pandas** — 5-30x faster for our feature computation volumes
-3. **DuckDB as feature store** — simpler than Feast for single-machine, in-process analytics
-4. **LightGBM first** — beats DL on tabular data, trains in seconds, interpretable
-5. **Isotonic calibration** — handles non-sigmoid miscalibration in GBM outputs
-6. **Dual-mode backtest engine** — fast vectorized for HPO, realistic event-driven for validation
-7. **0.25x Kelly** — quarter Kelly balances growth vs drawdown with estimation uncertainty
-8. **CPCV + walk-forward** — WF for training speed, CPCV for statistical rigor in validation
-9. **Hydra env overlays** — `conf/env/dev.yaml` vs `conf/env/prod.yaml` for clean separation of Windows dev and Linux prod configs
-10. **Append-only audit log** — every trading decision is immutably recorded for regulatory and debugging purposes
-11. **uv for dependency management** — cross-platform lockfile resolves the Windows-vs-Linux binary wheel problem
-12. **Dual-path: Rust fast + Python fallback** — every Rust call auto-degrades to Python on failure. 1.5ms fast path, 25ms fallback. Trade always happens.
-13. **treelite compiled inference** — LightGBM tree ensemble compiled to native C code. 0.3-0.5ms vs 3-5ms Python API. No runtime dependency on LightGBM in prod.
-14. **`#![forbid(unsafe_code)]` in Rust** — speed without memory safety risk. All unsafe operations handled by PyO3 boundary.
-15. **CI parity tests** — Rust and Python paths must produce identical outputs on identical inputs. Divergence = CI failure. No silent correctness drift.
+**Files to create:**
+- `src/qm/scheduler/runner.py` — Main system orchestrator
+- `src/qm/scheduler/jobs.py` — Periodic jobs
+- `src/qm/scheduler/lifecycle.py` — Startup/shutdown coordination
+- `src/qm/cli/commands/ingest.py`
+- `src/qm/cli/commands/backfill.py`
+- `src/qm/cli/commands/features.py`
+- `src/qm/cli/commands/train.py`
+- `src/qm/cli/commands/backtest.py`
+- `src/qm/cli/commands/paper.py`
+- `src/qm/cli/commands/live.py`
+- `src/qm/cli/commands/report.py`
+
+**`SystemRunner` modes:** `ingest`, `paper`, `live`
+
+**Startup sequence:**
+1. Load config (Hydra)
+2. Init structured logging (Step 1)
+3. Validate secrets (fail fast if missing)
+4. Check NTP clock sync (abort if drift > 2s)
+5. Connect TimescaleDB + init schema
+6. [ADDED] Load portfolio state from audit_log (crash recovery)
+7. Start data ingestion (exchange WS)
+8. Load model + calibrator from registry
+9. [ADDED] Init Rust fast path if available (else Python-only + warn)
+10. Start Prometheus metrics server (port 8000)
+11. Start TradingLoop with appropriate executor (paper or live)
+12. [ADDED] If live: run PositionTracker reconciliation before first trade
+13. Start scheduled jobs
+
+**Graceful shutdown (SIGTERM/SIGINT):**
+1. Stop TradingLoop (no new trades)
+2. If live: wait for pending order confirmations (max 60s)
+3. Save portfolio snapshot via AuditWriter
+4. Close websockets
+5. Close TimescaleDB pool
+6. Flush logs
+7. Exit 0
+
+**Scheduled jobs:**
+- Online recalibration: every 6h, or when rolling ECE > 0.08
+- Data quality check: every 30m
+- Model drift check: every 1h
+- [ADDED] Portfolio state snapshot: every 5 min (crash recovery)
+- Model retraining trigger: when 7-day ECE > 0.08 OR 7-day accuracy < 48%
+
+**CLI commands:** Each is a thin wrapper: parse args → load config → call subsystem. `cli/main.py` (already exists) dispatches to these.
 
 ---
 
-## [ADDED] Testing Strategy
+## Step 7: Rust Fast Path (`crates/qm-fast/`)
 
-### Framework: pytest + pytest-asyncio
-- **Unit tests** (`tests/unit/`): Pure logic — bar builder, feature computation, Kelly sizing, CPCV splits, calibration math. No external dependencies. Target: 90%+ coverage on core logic.
-- **Integration tests** (`tests/integration/`): Require Docker (TimescaleDB). Use `pytest-docker` fixtures to spin up/teardown. Test: data pipeline end-to-end, feature store read/write, model registry save/load.
-- **Exchange mocking**: Use `aioresponses` + recorded WS fixtures (saved JSON) for ccxt connector tests. Never hit real exchange APIs in CI.
-- **Polymarket mocking**: Record real API responses to JSON fixtures. Test order flow, market discovery, resolution handling against fixtures.
-- **Backtest smoke tests** (`tests/backtest/`): Run small-data backtests to verify metrics computation. Verify random strategy produces ~0 Sharpe. Verify known-signal strategy produces expected PnL.
-- **Cross-platform CI**: Run `pytest` on both Windows (native) and WSL2 (Linux). Use GitHub Actions matrix or local `make test-all`.
+**Files to create:**
+- `crates/qm-fast/Cargo.toml`
+- `crates/qm-fast/pyproject.toml` (maturin)
+- `crates/qm-fast/src/lib.rs` — `#![forbid(unsafe_code)]`
+- `crates/qm-fast/src/features/{mod,ring_buffer,rolling,export}.rs`
+- `crates/qm-fast/src/orderbook/{mod,l2_book,impact}.rs`
+- `crates/qm-fast/src/signing/{mod,eip712}.rs`
+- `crates/qm-fast/tests/{test_features,test_signing}.rs`
+- `src/qm/features/live_cache.py` — Python wrapper with fallback
+
+**Python integration:**
+```python
+# src/qm/features/live_cache.py
+class LiveFeatureCache:
+    def compute(self, asset, bar):
+        try:
+            return qm_fast.get_features(asset.value)
+        except Exception:
+            FAST_PATH_FALLBACK.labels(component="features").inc()
+            return self._python_fallback.compute(asset)
+```
+
+**CI parity tests:** `tests/benchmark/test_parity.py`
+- Run Rust + Python on identical 10,000-bar input
+- Assert `max(|rust - python|) < 1e-9`
+- CI failure if divergence detected
+
+**[ADDED] Paper trading fast-path validation:**
+- After Rust is built, re-run paper trading with both paths active
+- Compare feature outputs, signal decisions, bet sizes
+- Log any divergence
+
+**Requires:** `rustc` + `cargo` installed. Not a blocker — system runs Python-only without it.
+
+---
+
+## Step 8: Deployment
+
+**Files to create:**
+- `deploy/qm.service` — systemd unit
+- `deploy/deploy.sh` — Deployment script
+- `deploy/Dockerfile` — Production container
+- `docker-compose.prod.yml` — Prod overrides
+
+**systemd service:**
+```ini
+[Unit]
+Description=QM Polymarket Trading System
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=qm
+WorkingDirectory=/opt/qm
+ExecStart=/opt/qm/.venv/bin/python -m qm live
+Restart=on-failure
+RestartSec=10
+WatchdogSec=300
+EnvironmentFile=/etc/qm/.env
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**`deploy.sh` flow:**
+1. rsync code to prod (exclude .venv, data/, .git)
+2. `uv sync --no-dev` (prod deps only)
+3. `maturin develop --release` (if Rust available)
+4. `alembic upgrade head`
+5. `systemctl restart qm`
+6. Health check: poll `localhost:8000/metrics` for 30s
+7. On failure: `systemctl stop qm && ln -sfn $PREV /opt/qm && systemctl start qm`
+
+**[ADDED] `docker-compose.prod.yml`:**
+- No port exposure to 0.0.0.0 (all 127.0.0.1)
+- `restart: always` for all services
+- Resource limits for TimescaleDB
+- Grafana admin password from env
 
 ---
 
 ## Verification Plan
 
-### Per-Phase Testing
-1. **Phase 1**: Run `qm ingest` for 1 hour, verify bars in TimescaleDB match exchange REST data. Verify DST-edge timestamps. Verify gap detection fires on simulated disconnect.
-2. **Phase 2**: Compute features on synthetic data, verify no NaN leakage; run backtest on random strategy, verify metrics are ~0 Sharpe. Verify CPCV produces expected number of splits.
-3. **Phase 3**: Train model, verify OOS accuracy > random (50%); verify calibration curve is close to diagonal. Verify Optuna uses backtest engine as objective.
-4. **Phase 4**: Run full backtest, verify all acceptance criteria; paper trade 2 weeks. Verify paper PnL tracking matches manual calculation.
-5. **Phase 5**: Run live with min bet size ($5), verify fill reconciliation matches Polymarket API. Verify circuit breaker triggers on simulated conditions. **[ADDED]** Verify graceful shutdown preserves state and restart reconciles correctly.
+### Per-step tests:
+1. **Monitoring**: Secret redaction test, metrics server serves `/metrics`
+2. **Risk**: Unit tests for each limit, circuit breaker trip/reset, bankroll HWM
+3. **Strategy/Portfolio**: Fill → position created → resolution → PnL computed
+4. **Trading Loop**: Synthetic bars → signal → risk check → paper fill → audit logged
+5. **Polymarket**: Mocked API fixtures for market discovery, order placement, resolution
+6. **Scheduler**: Startup sequence completes, SIGTERM triggers graceful shutdown
+7. **Rust**: `cargo test` + parity tests + p99 < 5ms benchmark
+8. **Deployment**: `deploy.sh --dry-run` on WSL2
 
-### End-to-End Smoke Test
+### End-to-end smoke test:
 ```bash
-# 1. Start infra
-docker compose up -d  # [ADDED] modern docker compose (no hyphen)
-
-# 2. Backfill 3 months of data
-python -m qm backfill --assets BTC,ETH --timeframes 5m,15m --months 3
-
-# 3. Compute features
-python -m qm features --assets BTC,ETH --timeframes 5m
-
-# 4. Train model
-python -m qm train --config conf/model/lightgbm.yaml --n-trials 50
-
-# 5. Run backtest
-python -m qm backtest --model latest --start 2026-01-01 --end 2026-03-01
-
-# 6. Paper trade
-python -m qm paper --model latest --duration 14d
-
-# 7. Go live (min size)
-python -m qm live --model latest --max-bet-usd 5
+docker compose up -d
+python -m qm backfill --assets BTC --timeframes 5m --months 1
+python -m qm features --assets BTC --timeframes 5m
+python -m qm train --n-trials 10
+python -m qm backtest --model latest    # runs acceptance gates
+python -m qm paper --model latest --duration 1h
 ```
 
-### [ADDED] Incident Response
-When circuit breaker trips:
-1. System automatically: stops new orders, cancels open orders, logs full state snapshot
-2. Alert sent via configured channel (Slack webhook / email)
-3. Operator investigates: check Grafana dashboards (model drift? data gap? market regime shift?)
-4. Resolution: either (a) reset circuit breaker via `qm reset-circuit-breaker` after root cause fixed, or (b) trigger model retraining via `qm retrain`
-5. Post-mortem: log the incident, update risk parameters if needed
+### Acceptance criteria (Phase 4):
+| Metric | Threshold |
+|--------|-----------|
+| PBO | < 0.40 |
+| Deflated Sharpe | > 0.0 |
+| OOS Brier | < 0.25 |
+| OOS ECE | < 0.05 |
+| Net PnL after costs | > 0 |
+| Max drawdown | < 30% |
