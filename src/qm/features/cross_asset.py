@@ -7,11 +7,16 @@ features are strong predictors for ETH/SOL/XRP direction.
 Uses left join on timestamp — LightGBM handles nulls natively (sends them
 down the best split direction), so missing context bars produce null
 features rather than dropped rows.
+
+Alpha stores (funding, liquidation, options IV, etc.) are joined via
+``join_asof`` so data with different cadences (e.g., 8h funding rates)
+aligns correctly to bar timestamps without introducing look-ahead bias.
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 import polars as pl
 
@@ -20,6 +25,10 @@ from qm.data.storage.parquet import ParquetStore
 from qm.features.pipeline import FeaturePipeline
 
 logger = logging.getLogger(__name__)
+
+# Type alias for alpha store reader callables.
+# Each callable takes (asset,) and returns a DataFrame with a "time" column.
+AlphaReader = Callable[[Asset], pl.DataFrame]
 
 # Context features to pull from the reference asset
 CONTEXT_FEATURES = ["return_1", "return_5", "rsi_14", "realized_vol_10", "volume_ratio"]
@@ -57,7 +66,7 @@ def compute_cross_asset_features(
 
     # Also bring context return_1 unaliased for derived features
     if "return_1" in context_df.columns:
-        context_cols.append(pl.col("return_1").alias(f"_ctx_return_1"))
+        context_cols.append(pl.col("return_1").alias("_ctx_return_1"))
 
     context_subset = context_df.select(context_cols)
 
@@ -109,16 +118,83 @@ def compute_cross_asset_features(
     return joined
 
 
+def join_alpha_asof(
+    bars: pl.DataFrame,
+    alpha_df: pl.DataFrame,
+    prefix: str,
+    *,
+    tolerance: str | None = None,
+    strategy: str = "backward",
+) -> pl.DataFrame:
+    """Join alpha-source data to bar timestamps via ``join_asof``.
+
+    Alpha data (funding rates, liquidation snapshots, options IV, etc.)
+    often arrives at a different cadence than OHLCV bars. ``join_asof``
+    picks the most recent alpha row at-or-before each bar's timestamp,
+    preventing look-ahead bias.
+
+    Args:
+        bars: Target OHLCV DataFrame with a ``time`` column (sorted).
+        alpha_df: Alpha-source DataFrame with a ``time`` column (sorted).
+            All non-``time`` columns will be prefixed with *prefix*.
+        prefix: String prepended to every alpha column name
+            (e.g., ``"funding"`` → ``funding_rate``, ``funding_predicted``).
+        tolerance: Optional maximum time gap (e.g., ``"8h"``).
+            Rows in *bars* farther than this from any alpha row get nulls.
+        strategy: Join strategy — ``"backward"`` (default, no look-ahead)
+            or ``"forward"``.
+
+    Returns:
+        *bars* with alpha columns appended. Rows without a matching alpha
+        observation within *tolerance* contain nulls (LightGBM-safe).
+    """
+    if alpha_df.is_empty() or "time" not in alpha_df.columns:
+        return bars
+
+    # Rename alpha columns with prefix (skip "time")
+    rename_map: dict[str, str] = {}
+    for col in alpha_df.columns:
+        if col != "time":
+            rename_map[col] = f"{prefix}_{col}"
+    alpha_renamed = alpha_df.rename(rename_map)
+
+    # Both sides must be sorted on the join key
+    bars_sorted = bars.sort("time") if not bars["time"].is_sorted() else bars
+    alpha_sorted = (
+        alpha_renamed.sort("time")
+        if not alpha_renamed["time"].is_sorted()
+        else alpha_renamed
+    )
+
+    kwargs: dict[str, object] = {
+        "on": "time",
+        "strategy": strategy,
+    }
+    if tolerance is not None:
+        kwargs["tolerance"] = tolerance
+
+    result = bars_sorted.join_asof(alpha_sorted, **kwargs)  # type: ignore[arg-type]
+    return result
+
+
 class CrossAssetPipeline:
-    """Wraps FeaturePipeline to add cross-asset features.
+    """Wraps FeaturePipeline to add cross-asset and alpha-source features.
 
     Computes base features per asset (cached), then joins cross-asset
     features from the context asset. BTC features are computed once
     and reused for ETH/SOL/XRP.
 
+    Alpha stores supply auxiliary time-series (funding rates, liquidation
+    snapshots, options IV, Polymarket microstructure) that are joined via
+    ``join_asof`` before feature computation so that feature groups can
+    consume the new columns.
+
     Usage:
-        cross = CrossAssetPipeline(store, Timeframe.M5)
-        featured_eth = cross.compute(Asset.ETH)  # includes btc_* features
+        cross = CrossAssetPipeline(
+            store, Timeframe.M5,
+            alpha_stores={"funding": funding_store},
+        )
+        featured_eth = cross.compute(Asset.ETH)  # includes funding + btc_* features
     """
 
     def __init__(
@@ -128,16 +204,67 @@ class CrossAssetPipeline:
         pipeline: FeaturePipeline | None = None,
         context_map: dict[Asset, Asset] | None = None,
         metrics_store: ParquetStore | None = None,
+        alpha_stores: dict[str, ParquetStore] | None = None,
+        alpha_tolerances: dict[str, str] | None = None,
     ) -> None:
+        """Initialise the cross-asset pipeline.
+
+        Args:
+            store: Primary OHLCV ParquetStore.
+            timeframe: Bar timeframe being processed.
+            pipeline: Feature computation pipeline (default: all groups).
+            context_map: Asset → context-asset mapping.
+            metrics_store: Legacy metrics ParquetStore (OI, L/S ratios).
+            alpha_stores: Mapping of alpha source name → ParquetStore.
+                Each store must implement ``read_metrics(asset)`` returning
+                a DataFrame with a ``time`` column.
+            alpha_tolerances: Optional per-source tolerance for ``join_asof``
+                (e.g., ``{"funding": "9h"}``). Sources without an entry
+                use no tolerance (nearest backward match).
+        """
         self._store = store
         self._timeframe = timeframe
         self._pipeline = pipeline or FeaturePipeline()
         self._context_map = context_map or DEFAULT_CONTEXT_MAP
         self._metrics_store = metrics_store
+        self._alpha_stores: dict[str, ParquetStore] = alpha_stores or {}
+        self._alpha_tolerances: dict[str, str] = alpha_tolerances or {}
         self._featured_cache: dict[Asset, pl.DataFrame] = {}
 
+    def _join_alpha_stores(self, bars: pl.DataFrame, asset: Asset) -> pl.DataFrame:
+        """Join all registered alpha stores to bars via join_asof."""
+        for name, alpha_store in self._alpha_stores.items():
+            try:
+                alpha_df = alpha_store.read_metrics(asset)
+            except Exception:
+                logger.warning(
+                    "Failed to read alpha store '%s' for %s, skipping",
+                    name, asset.value,
+                    exc_info=True,
+                )
+                continue
+
+            if alpha_df.is_empty():
+                logger.debug(
+                    "Alpha store '%s' empty for %s, skipping", name, asset.value
+                )
+                continue
+
+            tolerance = self._alpha_tolerances.get(name)
+            bars = join_alpha_asof(
+                bars, alpha_df, prefix=name, tolerance=tolerance
+            )
+            n_new = sum(
+                1 for c in bars.columns if c.startswith(f"{name}_")
+            )
+            logger.debug(
+                "Joined %d cols from alpha store '%s' for %s",
+                n_new, name, asset.value,
+            )
+        return bars
+
     def _get_featured(self, asset: Asset) -> pl.DataFrame:
-        """Load bars, join metrics if available, compute base features, with caching."""
+        """Load bars, join metrics + alpha stores, compute base features, with caching."""
         if asset not in self._featured_cache:
             bars = self._store.read_bars(asset, self._timeframe)
             if bars.is_empty():
@@ -149,6 +276,10 @@ class CrossAssetPipeline:
                     if not metrics.is_empty():
                         bars = bars.join(metrics, on="time", how="left")
                         logger.debug("Joined %d metrics rows for %s", len(metrics), asset.value)
+
+                # Join alpha stores via join_asof (funding, liquidation, IV, etc.)
+                bars = self._join_alpha_stores(bars, asset)
+
                 self._featured_cache[asset] = self._pipeline.compute(bars)
                 logger.debug("Computed features for %s (%d bars)", asset.value, len(bars))
         return self._featured_cache[asset]
