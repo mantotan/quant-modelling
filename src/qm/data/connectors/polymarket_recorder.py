@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -112,6 +112,83 @@ def _is_short_duration_market(market: dict[str, Any], max_minutes: int = 60) -> 
     # If we can't determine duration, check question for time hints
     question = market.get("question", "").lower()
     return bool(re.search(r"\b(5.?min|15.?min|1.?hour|5m|15m|1h)\b", question))
+
+
+def _detect_market_type(market: dict[str, Any]) -> str:
+    """Detect market duration type from market data."""
+    try:
+        end_str = market.get("end_date_iso", "")
+        start_str = (
+            market.get("game_start_time", "")
+            or market.get("start_date_iso", "")
+        )
+        if end_str and start_str:
+            end = datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+            start = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+            duration_min = (end - start).total_seconds() / 60
+            if duration_min <= 7:
+                return "5m"
+            if duration_min <= 20:
+                return "15m"
+            if duration_min <= 90:
+                return "1h"
+    except (ValueError, TypeError):
+        pass
+    # Fallback: check question text
+    question = market.get("question", "").lower()
+    if re.search(r"\b(5.?min\w*|5m)\b", question):
+        return "5m"
+    if re.search(r"\b(15.?min\w*|15m)\b", question):
+        return "15m"
+    if re.search(r"\b(1.?hour\w*|1h)\b", question):
+        return "1h"
+    return "5m"
+
+
+def _parse_window_start(
+    market: dict[str, Any], fallback: datetime,
+) -> datetime:
+    """Parse window start time from market data."""
+    start_str = (
+        market.get("game_start_time", "")
+        or market.get("start_date_iso", "")
+    )
+    if start_str:
+        try:
+            return datetime.fromisoformat(
+                start_str.replace("Z", "+00:00")
+            )
+        except (ValueError, TypeError):
+            pass
+    return fallback
+
+
+def _parse_window_end(
+    market: dict[str, Any], fallback: datetime,
+) -> datetime:
+    """Parse window end time from market data."""
+    end_str = market.get("end_date_iso", "")
+    if end_str:
+        try:
+            return datetime.fromisoformat(
+                end_str.replace("Z", "+00:00")
+            )
+        except (ValueError, TypeError):
+            pass
+    return fallback
+
+
+def _compute_spread(
+    price_up: float | None, price_down: float | None,
+) -> float | None:
+    """Compute bid-ask spread from up/down token prices.
+
+    In an efficient binary market, price_up + price_down ≈ 1.0.
+    The deviation from 1.0 represents the effective spread.
+    """
+    if price_up is None or price_down is None:
+        return None
+    return abs(1.0 - price_up - price_down)
 
 
 class PolymarketOddsRecorder:
@@ -238,7 +315,7 @@ class PolymarketOddsRecorder:
 
     async def _record_snapshot(self, market_data: dict[str, Any]) -> None:
         """Record a single odds snapshot."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         tokens = market_data.get("tokens", [])
         price_up, price_down = _extract_prices(tokens)
         asset: Asset = market_data["_matched_asset"]
@@ -249,12 +326,12 @@ class PolymarketOddsRecorder:
             "token_id_up": market_data["_token_id_up"],
             "token_id_down": market_data["_token_id_down"],
             "asset": asset.value,
-            "market_type": "5m",  # TODO: detect from duration
-            "window_start": now,  # TODO: parse from market data
-            "window_end": now,  # TODO: parse from market data
+            "market_type": _detect_market_type(market_data),
+            "window_start": _parse_window_start(market_data, now),
+            "window_end": _parse_window_end(market_data, now),
             "mid_up": price_up,
             "mid_down": price_down,
-            "spread_up": None,  # TODO: compute from orderbook if available
+            "spread_up": _compute_spread(price_up, price_down),
             "volume": _safe_float(market_data.get("volume", 0)),
             "question": market_data.get("question", ""),
         }
@@ -299,7 +376,7 @@ class PolymarketOddsRecorder:
             return
 
         df = pl.DataFrame(self._parquet_buffer)
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         out_dir = self._parquet_dir / f"date={today}"
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / "snapshots.parquet"

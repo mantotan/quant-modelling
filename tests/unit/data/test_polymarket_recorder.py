@@ -1,14 +1,20 @@
 """Tests for Polymarket odds recorder."""
 
+from datetime import UTC, datetime
+
 import pytest
 
 from qm.core.types import Asset
 from qm.data.connectors.polymarket_recorder import (
+    _compute_spread,
+    _detect_market_type,
     _extract_prices,
     _extract_token_ids,
     _is_binary_up_down,
     _is_short_duration_market,
     _match_asset,
+    _parse_window_end,
+    _parse_window_start,
 )
 
 
@@ -119,3 +125,72 @@ class TestIsShortDurationMarket:
     def test_no_info(self):
         market = {"question": "Something random"}
         assert _is_short_duration_market(market) is False
+
+
+class TestDetectMarketType:
+    def test_5m_from_duration(self):
+        market = {
+            "game_start_time": "2026-01-01T00:00:00Z",
+            "end_date_iso": "2026-01-01T00:05:00Z",
+        }
+        assert _detect_market_type(market) == "5m"
+
+    def test_15m_from_duration(self):
+        market = {
+            "game_start_time": "2026-01-01T00:00:00Z",
+            "end_date_iso": "2026-01-01T00:15:00Z",
+        }
+        assert _detect_market_type(market) == "15m"
+
+    def test_1h_from_duration(self):
+        market = {
+            "game_start_time": "2026-01-01T00:00:00Z",
+            "end_date_iso": "2026-01-01T01:00:00Z",
+        }
+        assert _detect_market_type(market) == "1h"
+
+    def test_fallback_from_question(self):
+        market = {"question": "Will BTC go up in the next 15 minutes?"}
+        assert _detect_market_type(market) == "15m"
+
+    def test_default_5m(self):
+        market = {"question": "Unknown format"}
+        assert _detect_market_type(market) == "5m"
+
+
+class TestParseWindowStart:
+    def test_from_game_start_time(self):
+        market = {"game_start_time": "2026-01-01T12:00:00Z"}
+        fallback = datetime(2026, 1, 1, tzinfo=UTC)
+        result = _parse_window_start(market, fallback)
+        assert result.hour == 12
+
+    def test_fallback_on_missing(self):
+        fallback = datetime(2026, 1, 1, 8, 0, tzinfo=UTC)
+        result = _parse_window_start({}, fallback)
+        assert result == fallback
+
+
+class TestParseWindowEnd:
+    def test_from_end_date_iso(self):
+        market = {"end_date_iso": "2026-01-01T13:00:00Z"}
+        fallback = datetime(2026, 1, 1, tzinfo=UTC)
+        result = _parse_window_end(market, fallback)
+        assert result.hour == 13
+
+    def test_fallback_on_missing(self):
+        fallback = datetime(2026, 1, 1, 8, 0, tzinfo=UTC)
+        result = _parse_window_end({}, fallback)
+        assert result == fallback
+
+
+class TestComputeSpread:
+    def test_no_spread(self):
+        assert _compute_spread(0.55, 0.45) == pytest.approx(0.0)
+
+    def test_positive_spread(self):
+        assert _compute_spread(0.55, 0.43) == pytest.approx(0.02)
+
+    def test_none_inputs(self):
+        assert _compute_spread(None, 0.45) is None
+        assert _compute_spread(0.55, None) is None
