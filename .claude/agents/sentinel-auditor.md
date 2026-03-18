@@ -86,6 +86,7 @@ After iteration: {N}
 - Overfitting: {none|low|moderate|high} — hpo_brier vs oos_brier gap: {X} ({stable|widening|narrowing})
 - Calibration drift: ECE trend over last 10 iterations: {values}
 - PnL disconnect: Brier-PnL correlation: {X} ({strong|moderate|weak})
+- Strategy divergence: {if bs_pnl present, note if Brier improvements translate to both-sides PnL gains or only single-side. Divergence = model improving in non-actionable regions}
 - Search exhaustion: {evidence or "no signs"}
 
 ## Acceptance Criteria Status
@@ -95,6 +96,7 @@ After iteration: {N}
 | ECE    | < 0.05  | {X}         | {OK/X%}  |
 | PnL    | > 0     | ${X}        | {OK/gap} |
 | Sharpe | > 0.0   | {X}         | {OK/gap} |
+| BS PnL | > 0     | ${X}        | {OK/gap} (informational, not blocking) |
 ```
 
 ### Step 5: Commit

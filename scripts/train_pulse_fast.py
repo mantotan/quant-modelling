@@ -291,6 +291,31 @@ def run(args: argparse.Namespace) -> dict:
     )
     bt_metrics = backtester.evaluate_fast(cal_test, y_test, mp_test, tp_test, bi_test)
 
+    # ── Both-sides evaluation (trader_a-style) ────────────────────
+    bs_results = {}
+    strategies = knobs.get("strategies", {})
+    bs_cfg = strategies.get("both_sides_mm", {})
+    if bs_cfg.get("enabled", False):
+        try:
+            from qm.backtest.both_sides_backtest import BothSidesBacktester
+            bs_bt = BothSidesBacktester(
+                margin=bs_cfg.get("margin", 0.03),
+                fixed_bet_usd=bs_cfg.get("fixed_bet_usd", 100),
+                max_trades_per_bar=bs_cfg.get("max_trades_per_bar", 26),
+                fee_bps=bt["fee_bps"],
+                timeframe=tf,
+            )
+            bs_metrics = bs_bt.evaluate_fast(cal_test, y_test, mp_test, tp_test, bi_test)
+            bs_results = {
+                "bs_pnl": round(bs_metrics.get("total_pnl", 0), 2),
+                "bs_sharpe": round(bs_metrics.get("sharpe", 0), 2),
+                "bs_trades": bs_metrics.get("n_trades", 0),
+            }
+            logger.info("Both-sides: pnl=$%.2f, sharpe=%.2f, trades=%d",
+                        bs_results["bs_pnl"], bs_results["bs_sharpe"], bs_results["bs_trades"])
+        except Exception as e:
+            logger.warning("Both-sides eval failed: %s", e)
+
     # ── Feature importance ────────────────────────────────────────
     fi = dict(zip(model_final.feature_name(),
                   model_final.feature_importance(importance_type="gain")))
@@ -325,6 +350,7 @@ def run(args: argparse.Namespace) -> dict:
         "top_features": [f[0] for f in top_features],
         "best_params": {k: round(v, 6) if isinstance(v, float) else v
                         for k, v in study.best_params.items()},
+        **bs_results,
     }
 
 

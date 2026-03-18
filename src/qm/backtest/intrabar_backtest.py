@@ -108,8 +108,8 @@ class IntraBarBacktester:
 
         tradeable = valid & (edge >= self._min_edge)
 
-        # Per-bar trade limiting
-        if self._max_trades_per_bar < 16:
+        # Per-bar trade limiting (skip loop when effectively unlimited)
+        if self._max_trades_per_bar < 10_000:
             bar_trade_count: dict[int, int] = {}
             for i in range(n):
                 if not tradeable[i]:

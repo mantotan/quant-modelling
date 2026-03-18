@@ -31,10 +31,26 @@
   "backtest": {
     "fee_bps": 0,
     "spread": 0.02,
-    "min_edge": 0.02,
+    "min_edge": 0.01,
     "impact_bps": 0,
-    "fixed_bet_usd": 50.0,
-    "max_trades_per_bar": 3,
-    "max_daily_trades": 100
+    "fixed_bet_usd": 100.0,
+    "max_trades_per_bar": 15,
+    "max_daily_trades": 500
+  },
+  "strategies": {
+    "single_side_sniper": {
+      "enabled": true,
+      "description": "single-side edge detection, maker limit orders",
+      "min_edge": 0.01,
+      "fixed_bet_usd": 100,
+      "max_trades_per_bar": 15
+    },
+    "both_sides_mm": {
+      "enabled": true,
+      "description": "trader_a-style: both-sides limit orders, high frequency",
+      "margin": 0.03,
+      "fixed_bet_usd": 100,
+      "max_trades_per_bar": 26
+    }
   }
 }

@@ -77,6 +77,8 @@ uv run scripts/train_pulse_fast.py --asset BTC --timeframe 5m --trials 40 --time
 - Never remove tick features (indices 0-7) — they ARE the signal
 - Never set min_child_samples below 100 (8 correlated samples per bar)
 - Never change fee_bps, impact_bps, or market_sim.efficiency (maker-only, baked into dataset)
+- Never change the `strategies` section (read-only, evaluated in parallel)
+- Never change `backtest.fixed_bet_usd`, `backtest.max_trades_per_bar`, `backtest.max_daily_trades`, `backtest.min_edge` (execution params set from trader analysis)
 
 (Adjust `--asset` if a SWITCH directive is active.)
 
@@ -86,6 +88,7 @@ If markers are not found → this is a CRASH.
 ## Phase 5: Evaluate
 
 Extract: `oos_brier`, `oos_ece`, `backtest_pnl`, `backtest_sharpe`.
+Also extract `bs_pnl` and `bs_sharpe` if present (both-sides strategy metrics — informational only, do NOT use for KEEP/DISCARD).
 
 Find the best previous OOS Brier from results.tsv (lowest value among KEEP/KEEP-VERIFIED rows).
 
@@ -132,8 +135,10 @@ Same as DISCARD, but commit message: `"autoresearch: CRASH — {reason}"`
 
 Append one row to `autoresearch/results.tsv` (tab-separated):
 ```
-{iteration}\t{timestamp}\t{asset}\t{status}\t{oos_brier}\t{oos_ece}\t{backtest_pnl}\t{backtest_sharpe}\t{description}\t{commit_hash}
+{iteration}\t{timestamp}\t{asset}\t{status}\t{oos_brier}\t{oos_ece}\t{backtest_pnl}\t{backtest_sharpe}\t{description}\t{commit_hash}\t{bs_pnl}\t{bs_sharpe}
 ```
+
+For `bs_pnl` and `bs_sharpe`: use the values from JSON output if present, otherwise use `-`.
 
 Status values: KEEP, DISCARD, CRASH, KEEP-VERIFIED, VERIFY-FAILED
 
@@ -144,6 +149,7 @@ Status values: KEEP, DISCARD, CRASH, KEEP-VERIFIED, VERIFY-FAILED
 **Directive:** [strategist priority #N / auditor SWITCH ETH / autonomous]
 **Hypothesis:** [what you changed and why]
 **Result:** brier={X}, ece={X}, pnl=${X}, sharpe={X}
+**Both-sides:** pnl=${X}, sharpe={X} (or "n/a" if not available)
 **Decision:** KEEP / DISCARD / VERIFY — [reason]
 **Best:** brier={X} (iter N)
 ```

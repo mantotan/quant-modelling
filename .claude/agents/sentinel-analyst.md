@@ -15,7 +15,7 @@ When invoked, produce a concise progress report on the autoresearch experiments.
 ## Steps
 
 1. Read `autoresearch/results.tsv` — parse all rows.
-2. Read the RESEARCH KNOBS section (lines 45-87) of `scripts/train_sentinel_fast.py` — this is the current config.
+2. Read `autoresearch/knobs.json` — this is the current config.
 3. Read `autoresearch/PROGRAM.md` for context on objectives and constraints.
 
 ## Report Format
@@ -36,6 +36,14 @@ When invoked, produce a concise progress report on the autoresearch experiments.
 | OOS ECE    | < 0.05  | X.XXX  | ✓/✗    |
 | Backtest PnL | > 0   | $X.XX  | ✓/✗    |
 | Sharpe     | > 0.0   | X.XX   | ✓/✗    |
+| BS PnL     | > 0     | $X.XX  | ✓/✗ (informational) |
+| BS Sharpe  | > 0.0   | X.XX   | ✓/✗ (informational) |
+
+## Strategy Comparison (if bs_pnl/bs_sharpe columns present in results.tsv)
+| Strategy | Best PnL | Best Sharpe | Dominant? |
+|----------|----------|-------------|-----------|
+| Single-side | $X.XX | X.XX | |
+| Both-sides  | $X.XX | X.XX | |
 
 ## What Worked (KEEP changes)
 - [list each KEEP with description and metric improvement]
