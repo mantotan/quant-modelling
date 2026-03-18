@@ -215,3 +215,86 @@ class ParquetStore:
             for d in base.iterdir()
             if d.is_dir() and d.name.startswith("date=")
         )
+
+    def write_trades(self, df: pl.DataFrame, asset: Asset) -> None:
+        """Write trades DataFrame with asset/date partitioning.
+
+        Layout: {base_dir}/asset=BTC/date=2026-03-19/trades.parquet
+        Deduplicates on agg_trade_id (not time, since multiple trades
+        can share the same millisecond).
+        """
+        if df.is_empty():
+            return
+
+        df = df.with_columns(pl.col("time").dt.date().alias("_date"))
+
+        for (date_val,), group in df.group_by(["_date"]):
+            partition_dir = self._base_dir / f"asset={asset.value}" / f"date={date_val}"
+            partition_dir.mkdir(parents=True, exist_ok=True)
+            out_path = partition_dir / "trades.parquet"
+
+            write_data = group.drop("_date")
+
+            dedup_col = "agg_trade_id" if "agg_trade_id" in write_data.columns else "time"
+
+            if out_path.exists():
+                existing = pl.read_parquet(out_path)
+                merged = pl.concat([existing, write_data], how="diagonal").unique(
+                    subset=[dedup_col]
+                )
+                merged.sort("time").write_parquet(out_path)
+            else:
+                write_data.sort("time").write_parquet(out_path)
+
+        logger.debug("Wrote %d trades for %s", len(df), asset.value)
+
+    def read_trades(
+        self,
+        asset: Asset,
+        start: str | None = None,
+        end: str | None = None,
+    ) -> pl.DataFrame:
+        """Read trades from Parquet (asset/date partitioning).
+
+        Args:
+            asset: Asset to read.
+            start: Start date "YYYY-MM-DD" (inclusive).
+            end: End date "YYYY-MM-DD" (inclusive).
+        """
+        base = self._base_dir / f"asset={asset.value}"
+        if not base.exists():
+            return pl.DataFrame()
+
+        parquet_files = sorted(base.rglob("trades.parquet"))
+        if not parquet_files:
+            return pl.DataFrame()
+
+        if start or end:
+            filtered = []
+            for f in parquet_files:
+                date_part = f.parent.name.replace("date=", "")
+                if start and date_part < start:
+                    continue
+                if end and date_part > end:
+                    continue
+                filtered.append(f)
+            parquet_files = filtered
+
+        if not parquet_files:
+            return pl.DataFrame()
+
+        dfs = [pl.read_parquet(f) for f in parquet_files]
+        return pl.concat(dfs).sort("time")
+
+    def list_trade_dates(self, asset: Asset) -> list[str]:
+        """List available trade dates for an asset."""
+        base = self._base_dir / f"asset={asset.value}"
+        if not base.exists():
+            return []
+        return sorted(
+            d.name.replace("date=", "")
+            for d in base.iterdir()
+            if d.is_dir()
+            and d.name.startswith("date=")
+            and (d / "trades.parquet").exists()
+        )

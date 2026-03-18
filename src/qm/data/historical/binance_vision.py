@@ -490,3 +490,204 @@ def _date_range(start: date, end: date) -> list[date]:
         dates.append(current)
         current += timedelta(days=1)
     return dates
+
+
+# ── Shared download helper ─────────────────────────────────────────
+
+async def fetch_with_checksum(
+    session: aiohttp.ClientSession,
+    url: str,
+) -> bytes | None:
+    """Download ZIP and verify against .CHECKSUM companion file.
+
+    Extracted as module-level function for reuse by multiple downloaders.
+    Returns ZIP bytes, or None if 404 / checksum mismatch.
+    """
+    async with session.get(url) as resp:
+        if resp.status == 404:
+            return None
+        if resp.status != 200:
+            logger.warning("HTTP %d for %s", resp.status, url)
+            return None
+        zip_data = await resp.read()
+
+    checksum_url = url + ".CHECKSUM"
+    try:
+        async with session.get(checksum_url) as resp:
+            if resp.status == 200:
+                checksum_text = await resp.text()
+                expected_hash = checksum_text.strip().split()[0].lower()
+                actual_hash = hashlib.sha256(zip_data).hexdigest().lower()
+                if actual_hash != expected_hash:
+                    logger.error(
+                        "Checksum mismatch for %s: expected %s, got %s",
+                        url, expected_hash[:12], actual_hash[:12],
+                    )
+                    return None
+    except Exception:
+        pass  # Checksum file might not exist for older data
+
+    return zip_data
+
+
+# ── AggTrades Downloader ───────────────────────────────────────────
+
+# AggTrades CSV columns (from Binance Vision documentation)
+AGGTRADES_COLUMNS = [
+    "agg_trade_id", "price", "quantity",
+    "first_trade_id", "last_trade_id",
+    "timestamp", "is_buyer_maker",
+]
+
+
+class BinanceAggTradesDownloader:
+    """Downloads aggregated trades from data.binance.vision.
+
+    AggTrades give real tick-by-tick price data for constructing
+    honest intra-bar snapshots (no interpolation needed).
+
+    URL: https://data.binance.vision/data/futures/um/daily/aggTrades/{SYMBOL}/
+    Only daily archives available (no monthly for aggTrades).
+    """
+
+    def __init__(
+        self,
+        trades_store: ParquetStore,
+        max_concurrent: int = 4,
+        timeout: int = 120,
+    ) -> None:
+        self._store = trades_store
+        self._max_concurrent = max_concurrent
+        self._timeout = aiohttp.ClientTimeout(total=timeout)
+        self._semaphore = asyncio.Semaphore(max_concurrent)
+        self._stats: dict[str, int] = {
+            "downloaded": 0, "skipped": 0, "failed": 0, "trades": 0,
+        }
+
+    async def download_all(
+        self,
+        assets: list[Asset] | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict[str, int]:
+        """Download aggTrades for specified assets and date range.
+
+        Args:
+            assets: Assets to download. Defaults to all supported.
+            start_date: Start date (inclusive).
+            end_date: End date (inclusive, default: yesterday).
+
+        Returns:
+            Stats dict with download counts.
+        """
+        assets = assets or list(ASSET_TO_SYMBOL.keys())
+        end_date = end_date or (date.today() - timedelta(days=1))
+
+        async with aiohttp.ClientSession(timeout=self._timeout) as session:
+            for asset in assets:
+                symbol = ASSET_TO_SYMBOL[asset]
+                sym_start = start_date or SYMBOL_START_DATES.get(symbol, date(2020, 1, 1))
+
+                # Check which dates we already have
+                existing_dates = set(self._store.list_trade_dates(asset))
+
+                dates = _date_range(sym_start, end_date)
+                to_download = [d for d in dates if d.isoformat() not in existing_dates]
+
+                logger.info(
+                    "AggTrades %s: %d dates to download (%d already exist), %s to %s",
+                    symbol, len(to_download), len(existing_dates),
+                    sym_start, end_date,
+                )
+
+                tasks = [
+                    self._download_daily(session, asset, symbol, d)
+                    for d in to_download
+                ]
+                await asyncio.gather(*tasks, return_exceptions=True)
+
+        logger.info("AggTrades download complete: %s", self._stats)
+        return self._stats
+
+    async def _download_daily(
+        self,
+        session: aiohttp.ClientSession,
+        asset: Asset,
+        symbol: str,
+        d: date,
+    ) -> None:
+        """Download a daily aggTrades ZIP archive."""
+        date_str = d.isoformat()
+        filename = f"{symbol}-aggTrades-{date_str}.zip"
+        url = f"{BASE_URL}/daily/aggTrades/{symbol}/{filename}"
+
+        async with self._semaphore:
+            try:
+                data = await fetch_with_checksum(session, url)
+                if data is None:
+                    self._stats["skipped"] += 1
+                    return
+
+                df = self._parse_aggtrades_zip(data, symbol)
+                if df is not None and not df.is_empty():
+                    self._store.write_trades(df, asset)
+                    self._stats["trades"] += len(df)
+                    self._stats["downloaded"] += 1
+                    logger.info(
+                        "Downloaded %s: %d trades", filename, len(df),
+                    )
+                else:
+                    self._stats["skipped"] += 1
+
+            except Exception:
+                logger.exception("Failed to download %s", filename)
+                self._stats["failed"] += 1
+
+    def _parse_aggtrades_zip(
+        self, zip_data: bytes, symbol: str,
+    ) -> pl.DataFrame | None:
+        """Extract CSV from ZIP and parse aggTrades to Polars DataFrame."""
+        try:
+            with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
+                csv_names = [n for n in zf.namelist() if n.endswith(".csv")]
+                if not csv_names:
+                    return None
+                csv_data = zf.read(csv_names[0])
+        except zipfile.BadZipFile:
+            logger.error("Corrupt ZIP for %s aggTrades", symbol)
+            return None
+
+        df = pl.read_csv(
+            io.BytesIO(csv_data),
+            has_header=True,
+            schema_overrides={
+                "agg_trade_id": pl.Int64,
+                "price": pl.Float64,
+                "quantity": pl.Float64,
+                "first_trade_id": pl.Int64,
+                "last_trade_id": pl.Int64,
+                "transact_time": pl.Int64,
+                "is_buyer_maker": pl.Boolean,
+            },
+        )
+
+        # Handle column name variations
+        time_col = "transact_time" if "transact_time" in df.columns else "timestamp"
+        if time_col not in df.columns:
+            # Try positional: 6th column is timestamp
+            cols = df.columns
+            if len(cols) >= 6:
+                time_col = cols[5]
+
+        # Convert timestamp (ms) to datetime
+        df = df.with_columns(
+            (pl.col(time_col) * 1000)
+            .cast(pl.Datetime("us"))
+            .dt.replace_time_zone("UTC")
+            .alias("time"),
+        )
+
+        # Select output columns
+        out_cols = ["time", "price", "quantity", "is_buyer_maker", "agg_trade_id"]
+        available = [c for c in out_cols if c in df.columns]
+        return df.select(available)
