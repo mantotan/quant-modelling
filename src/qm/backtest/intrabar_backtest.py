@@ -1,14 +1,17 @@
-"""Intra-bar backtester with dynamic market pricing.
+"""Intra-bar backtester with realistic market friction.
 
-Backtests the Pulse model across simulated intra-bar snapshots.
-Uses MarketOddsSimulator for realistic market odds evolution.
-Supports trading from first tick (no min_elapsed_pct).
-Only skips last 5 seconds (resolution risk).
+Backtests the Pulse model across intra-bar snapshots with:
+- Fees on winnings only (Polymarket 2% standard)
+- Square-root market impact model
+- Daily trade cap
+- Dynamic market pricing via MarketOddsSimulator
+- Time-segmented ROI reporting
 """
 
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -40,25 +43,28 @@ class IntraBarBacktestResult:
 
 
 class IntraBarBacktester:
-    """Backtests the Pulse model with dynamic market pricing.
+    """Backtests the Pulse model with realistic market friction.
 
-    Key differences from BacktestEngine:
-    - No min_elapsed_pct: trade from first tick
-    - Dynamic market_prob at each snapshot (not static per bar)
-    - max_trades_per_bar to prevent overtrading
-    - Time-segmented reporting to validate early-bar ROI thesis
+    Realistic defaults:
+    - fee_bps=200: Polymarket 2% fee on winnings only
+    - impact_bps=50: Square-root market impact model
+    - max_daily_trades=100: Prevent unrealistic trade frequency
+    - max_bet_frac=0.03: Conservative Kelly cap
     """
 
     def __init__(
         self,
-        fee_bps: float = 0.0,
+        fee_bps: float = 200,
         spread: float = 0.02,
         min_edge: float = 0.02,
         max_elapsed_pct: float = 0.983,
         max_trades_per_bar: int = 3,
         kelly_fraction: float = 0.25,
-        max_bet_frac: float = 0.05,
+        max_bet_frac: float = 0.03,
         timeframe: Timeframe = Timeframe.M5,
+        impact_bps: float = 50,
+        avg_daily_volume: float = 50_000.0,
+        max_daily_trades: int = 100,
     ) -> None:
         self._fee_bps = fee_bps
         self._spread = spread
@@ -68,10 +74,14 @@ class IntraBarBacktester:
         self._kelly_fraction = kelly_fraction
         self._max_bet_frac = max_bet_frac
         self._annualization = BARS_PER_YEAR[timeframe]
-        self._total_seconds = {
-            Timeframe.M1: 60.0, Timeframe.M5: 300.0,
-            Timeframe.M15: 900.0, Timeframe.H1: 3600.0,
-        }[timeframe]
+        self._total_seconds = float({
+            Timeframe.M1: 60, Timeframe.M5: 300,
+            Timeframe.M15: 900, Timeframe.H1: 3600,
+        }[timeframe])
+        self._impact_bps = impact_bps
+        self._avg_daily_volume = avg_daily_volume
+        self._max_daily_trades = max_daily_trades
+        self._bars_per_day = int(86400 / self._total_seconds)
 
     def evaluate_fast(
         self,
@@ -80,27 +90,14 @@ class IntraBarBacktester:
         market_probs: np.ndarray,
         time_pcts: np.ndarray,
         bar_indices: np.ndarray,
-    ) -> dict[str, float]:
-        """Fast vectorized evaluation for HPO.
-
-        Args:
-            model_probs: Calibrated P(Up) from model, shape (n,).
-            targets: Actual outcomes (1=Up, 0=Down), shape (n,).
-            market_probs: Simulated market P(Up), shape (n,).
-            time_pcts: Elapsed fraction per sample, shape (n,).
-            bar_indices: Bar index per sample, shape (n,).
-
-        Returns:
-            Dict with aggregate metrics.
-        """
+    ) -> dict[str, object]:
+        """Fast vectorized evaluation for HPO."""
         n = len(model_probs)
         if n == 0:
             return self._empty_metrics()
 
-        # Filter: skip samples past max_elapsed_pct
         valid = time_pcts <= self._max_elapsed_pct
 
-        # Edge calculation (both sides)
         half_spread = self._spread / 2
         edge_up = model_probs - market_probs - half_spread
         edge_down = (1 - model_probs) - (1 - market_probs) - half_spread
@@ -122,6 +119,19 @@ class IntraBarBacktester:
                 else:
                     bar_trade_count[bi] = count + 1
 
+        # Daily trade limiting
+        if self._max_daily_trades < 10_000:
+            daily_counts: dict[int, int] = {}
+            for i in range(n):
+                if not tradeable[i]:
+                    continue
+                day = int(bar_indices[i]) // self._bars_per_day
+                count = daily_counts.get(day, 0)
+                if count >= self._max_daily_trades:
+                    tradeable[i] = False
+                else:
+                    daily_counts[day] = count + 1
+
         if not tradeable.any():
             return self._empty_metrics()
 
@@ -133,17 +143,19 @@ class IntraBarBacktester:
 
         # PnL
         correct = np.where(bet_up, targets == 1, targets == 0)
-        pnl_per_bet = np.where(
+        gross_pnl = np.where(
             correct,
             (1 - buy_price) * bet_size,
             -buy_price * bet_size,
         )
+
+        # Fee on WINNINGS ONLY (Polymarket model)
+        gross_win = np.where(correct, (1 - buy_price) * bet_size, 0)
+        fee = gross_win * (self._fee_bps / 10_000)
+        pnl_per_bet = gross_pnl - np.where(tradeable, fee, 0)
+
         pnl_per_bet = np.where(tradeable, pnl_per_bet, 0)
         bet_size = np.where(tradeable, bet_size, 0)
-
-        # Fee
-        fee = buy_price * bet_size * (self._fee_bps / 10_000)
-        pnl_per_bet -= np.where(tradeable, fee, 0)
 
         cum_pnl = np.cumsum(pnl_per_bet)
 
@@ -208,16 +220,14 @@ class IntraBarBacktester:
         max_bet_usd: float = 500.0,
         min_bet_usd: float = 5.0,
     ) -> IntraBarBacktestResult:
-        """Full event-driven simulation with trade log.
-
-        Used once after training for final validation.
-        """
+        """Full event-driven simulation with realistic friction."""
         n = len(model_probs)
         bankroll = initial_bankroll
         cum_pnl = 0.0
         pnl_series = np.zeros(n)
         trade_log: list[dict[str, object]] = []
         bar_trade_counts: dict[int, int] = {}
+        daily_trade_counts: dict[int, int] = {}
 
         for i in range(n):
             if time_pcts[i] > self._max_elapsed_pct:
@@ -226,6 +236,11 @@ class IntraBarBacktester:
 
             bi = int(bar_indices[i])
             if bar_trade_counts.get(bi, 0) >= self._max_trades_per_bar:
+                pnl_series[i] = cum_pnl
+                continue
+
+            day_idx = bi // self._bars_per_day
+            if daily_trade_counts.get(day_idx, 0) >= self._max_daily_trades:
                 pnl_series[i] = cum_pnl
                 continue
 
@@ -252,20 +267,32 @@ class IntraBarBacktester:
                 pnl_series[i] = cum_pnl
                 continue
 
-            fill_price = buy_price + half_spread
+            # Market impact: square-root model
+            impact = (
+                self._impact_bps / 10_000
+                * math.sqrt(bet_usd / (self._avg_daily_volume + 1e-10))
+            )
+            fill_price = buy_price + half_spread + impact
             fill_price = max(0.01, min(0.99, fill_price))
             shares = bet_usd / fill_price
-            fee = bet_usd * (self._fee_bps / 10_000)
 
             target = targets[i]
             correct = (bet_up and target == 1) or (not bet_up and target == 0)
-            pnl = (shares * (1 - fill_price) - fee) if correct else (-shares * fill_price - fee)
+
+            # Fee on winnings only (Polymarket model)
+            if correct:
+                gross_pnl = shares * (1 - fill_price)
+                fee = gross_pnl * (self._fee_bps / 10_000)
+                pnl = gross_pnl - fee
+            else:
+                pnl = -shares * fill_price
 
             bankroll += pnl
             cum_pnl += pnl
             pnl_series[i] = cum_pnl
 
             bar_trade_counts[bi] = bar_trade_counts.get(bi, 0) + 1
+            daily_trade_counts[day_idx] = daily_trade_counts.get(day_idx, 0) + 1
 
             trade_log.append({
                 "sample_idx": i,
@@ -277,6 +304,7 @@ class IntraBarBacktester:
                 "edge": float(edge),
                 "bet_usd": float(bet_usd),
                 "fill_price": float(fill_price),
+                "impact": float(impact),
                 "correct": correct,
                 "pnl": float(pnl),
                 "bankroll": float(bankroll),
@@ -293,7 +321,6 @@ class IntraBarBacktester:
             n_trades=len(trade_log),
         )
 
-        # Compute metrics
         if trade_log:
             traded_pnls = np.array([t["pnl"] for t in trade_log])
             result.metrics = {
@@ -307,7 +334,6 @@ class IntraBarBacktester:
                 ),
             }
 
-            # Time-segmented
             for bucket_name, t_start, t_end in TIME_BUCKETS:
                 bucket_trades = [
                     t for t in trade_log

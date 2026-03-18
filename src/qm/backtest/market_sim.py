@@ -36,7 +36,7 @@ class MarketOddsSimulator:
 
     def __init__(
         self,
-        efficiency: float = 0.3,
+        efficiency: float = 0.75,
         timeframe: Timeframe = Timeframe.M5,
     ) -> None:
         if not 0.0 <= efficiency <= 1.0:

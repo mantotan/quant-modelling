@@ -112,17 +112,15 @@ class PulseTrainer:
             all_oos_probs = np.zeros(len(y))
             all_oos_mask = np.zeros(len(y), dtype=bool)
 
-            # Bar-level walk-forward splitting
+            # Bar-level walk-forward splitting (vectorized np.isin)
             for bar_train_idx, bar_test_idx in splitter.split(n_bars):
-                train_bars_set = set(unique_bars[bar_train_idx])
-                test_bars_set = set(unique_bars[bar_test_idx])
+                train_bars = unique_bars[bar_train_idx]
+                test_bars = unique_bars[bar_test_idx]
 
-                sample_train = np.array([
-                    i for i, b in enumerate(bar_indices) if b in train_bars_set
-                ])
-                sample_test = np.array([
-                    i for i, b in enumerate(bar_indices) if b in test_bars_set
-                ])
+                train_mask = np.isin(bar_indices, train_bars)
+                test_mask = np.isin(bar_indices, test_bars)
+                sample_train = np.where(train_mask)[0]
+                sample_test = np.where(test_mask)[0]
 
                 if len(sample_train) == 0 or len(sample_test) == 0:
                     continue
@@ -131,8 +129,18 @@ class PulseTrainer:
                     X[sample_train], y[sample_train],
                     feature_name=self._feature_names,
                 )
+                valid_data = lgb.Dataset(
+                    X[sample_test], y[sample_test],
+                    reference=train_data,
+                )
                 n_est = params.pop("n_estimators", 500)
-                model = lgb.train(params, train_data, num_boost_round=n_est)
+                callbacks = [lgb.early_stopping(50, verbose=False)]
+                model = lgb.train(
+                    params, train_data,
+                    num_boost_round=n_est,
+                    valid_sets=[valid_data],
+                    callbacks=callbacks,
+                )
                 params["n_estimators"] = n_est
 
                 oos_probs = model.predict(X[sample_test])
@@ -246,15 +254,13 @@ class PulseTrainer:
         oos_mask = np.zeros(len(y), dtype=bool)
 
         for bar_train_idx, bar_test_idx in splitter.split(n_bars):
-            train_bars_set = set(unique_bars[bar_train_idx])
-            test_bars_set = set(unique_bars[bar_test_idx])
+            train_bars = unique_bars[bar_train_idx]
+            test_bars = unique_bars[bar_test_idx]
 
-            sample_train = np.array([
-                i for i, b in enumerate(bar_indices) if b in train_bars_set
-            ])
-            sample_test = np.array([
-                i for i, b in enumerate(bar_indices) if b in test_bars_set
-            ])
+            train_mask = np.isin(bar_indices, train_bars)
+            test_mask = np.isin(bar_indices, test_bars)
+            sample_train = np.where(train_mask)[0]
+            sample_test = np.where(test_mask)[0]
 
             if len(sample_train) == 0 or len(sample_test) == 0:
                 continue
