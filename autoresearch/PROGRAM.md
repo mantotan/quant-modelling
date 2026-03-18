@@ -53,35 +53,74 @@ All fields in `autoresearch/knobs.json`:
 - **min_child_samples must be >= 100** — Pulse has 8 correlated samples per bar; lower values cause overfitting.
 - Walk-forward splits operate at **bar level**, not sample level. The script handles this automatically.
 
+## System Phases
+
+The autoresearch system operates in phases controlled by `autoresearch/phase.json`.
+All agents read it; builder and auditor can write it.
+
+### Phase A: Infrastructure Building
+- **Active:** `sentinel-builder` (researcher/strategist/auditor paused via phase gate)
+- **Goal:** Implement alpha downloaders, feature groups, interactions, regime detection
+- **Workflow:** Builder picks next PENDING work unit from `build_plan.tsv`, implements with quality gates (ruff + pytest), commits
+- **Transition:** All core build units (1-18) DONE → phase becomes `"research_enriched"`
+
+### Phase B: Enriched Autoresearch
+- **Active:** researcher, strategist, auditor, analyst (builder can run enhancement units 19-22 in parallel)
+- **Goal:** Optimize model with expanded feature space (alpha + interaction + regime + objective knobs)
+- **Workflow:** Same KEEP/DISCARD loop, but with 4 new knob categories
+- **Transition:** Auditor issues `ADD_ALPHA` → phase becomes `"building"` for new source
+
+### Phase C: Continuous Discovery
+- **Active:** All five agents cycle between building and research
+- **Goal:** Iterative build → research → discover → build more
+- **Trigger:** After Phase B stalls for 50+ iterations or achieves acceptance criteria
+
 ## Multi-Agent System
 
-Three agents operate on this research loop:
+Five agents operate on this system:
 
 | Agent | Model | Cadence | Role | Writes to |
 |-------|-------|---------|------|-----------|
-| `sentinel-researcher` | sonnet | every ~5 min | Run experiments, KEEP/DISCARD | knobs.json, best_knobs.json, results.tsv |
-| `sentinel-strategist` | sonnet | every ~5 iterations | Tactical analysis, priority queue | strategy.md |
-| `sentinel-auditor` | opus | every ~20 iterations | Deep analysis, macro directives | audit.md |
+| `sentinel-builder` | opus | Phase A: per invocation | Build alpha infra, quality workflow | src/qm/**, tests/**, build_progress.json |
+| `sentinel-researcher` | sonnet | Phase B: every ~5 min | Run experiments, KEEP/DISCARD | knobs.json, best_knobs.json, results.tsv |
+| `sentinel-strategist` | sonnet | Phase B: every ~5 iterations | Tactical analysis, priority queue | strategy.md |
+| `sentinel-auditor` | opus | Phase B: every ~20 iterations | Deep analysis, macro directives | audit.md, phase.json |
+| `sentinel-analyst` | sonnet | Any phase: on demand | Read-only progress reports | (none) |
 
 **All loops run in ONE session** (serial execution prevents git conflicts).
 
 ### Communication Protocol
 
-1. Strategist reads results.tsv → writes `strategy.md` with priority queue + blacklist
-2. Auditor reads results.tsv + strategy.md → writes `audit.md` with CONTINUE/RESET/SWITCH/ESCALATE/WIDEN
-3. Researcher reads strategy.md + audit.md → follows directives, falls back to autonomous mode if stale
+1. Builder reads build_plan.tsv → implements code → updates build_progress.json
+2. Strategist reads results.tsv → writes `strategy.md` with priority queue + blacklist
+3. Auditor reads results.tsv + strategy.md → writes `audit.md` with directives (CONTINUE/RESET/SWITCH/ESCALATE/WIDEN/ADD_ALPHA/RETRAIN_BASELINE)
+4. Researcher reads strategy.md + audit.md → follows directives, falls back to autonomous mode if stale
 
 ### File Ownership (strict — prevents conflicts)
 
-| File | Written by | Read by |
-|------|-----------|---------|
-| knobs.json | researcher | all |
-| best_knobs.json | researcher | researcher |
-| results.tsv | researcher | all |
-| strategy.md | strategist | researcher |
-| audit.md | auditor | researcher, strategist |
-| researcher_ack.txt | researcher | strategist, auditor |
-| last_run.log | training script | strategist |
+| File | Written by | Read by | Phase |
+|------|-----------|---------|-------|
+| phase.json | builder, auditor | all | all |
+| build_plan.tsv | builder | builder, analyst | A |
+| build_progress.json | builder | all | A |
+| alpha_request.md | auditor | builder | C |
+| knobs.json | researcher | all | B, C |
+| best_knobs.json | researcher | researcher | B, C |
+| results.tsv | researcher | all | B, C |
+| strategy.md | strategist | researcher | B, C |
+| audit.md | auditor | researcher, strategist | B, C |
+| researcher_ack.txt | researcher | strategist, auditor | B, C |
+| last_run.log | training script | strategist | B, C |
+| src/qm/**/*.py | builder ONLY | all | A |
+| tests/unit/**/*.py | builder ONLY | all | A |
+
+### Enriched knobs.json Schema (Phase B)
+
+New sections added to knobs.json after Phase A completes:
+- `alpha_features` — dict of feature groups, each a list of feature names to include
+- `interaction_features` — `{"enabled": bool, "pairs": [list of interaction names]}`
+- `regime_params` — `{"enabled": bool, "vol_window": int, "lookback_window": int, ...}`
+- `objective` — `{"primary": "sharpe"|"brier", "brier_threshold": float, ...}`
 
 ## Operational Constraints
 

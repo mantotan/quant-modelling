@@ -49,6 +49,17 @@ Are KEEP rates declining over time? Are the kept changes getting smaller? If so,
 **f. Cross-asset readiness:**
 Has the researcher been stuck on one asset for too long? Would switching provide useful cross-validation signal?
 
+**g. Alpha feature ROI:**
+Compare Brier/PnL before vs after alpha features were added (using timestamps in results.tsv).
+- If alpha features show zero lift after 20+ iterations: consider RETRAIN_BASELINE
+- If one alpha source dominates SHAP importance: consider ADD_ALPHA for related data sources
+- Track `alpha_feature_share` from SHAP reports if available in training output
+
+**h. Feature space saturation:**
+If total features > 50 and KEEP rate is declining:
+- Recommend feature pruning before adding more (researcher should disable low-importance groups)
+- Only issue ADD_ALPHA if current features are well-optimized (KEEP rate stable, no dead-weight features)
+
 ### Step 3: Issue Directive
 
 Issue exactly ONE directive (the most important):
@@ -58,6 +69,8 @@ Issue exactly ONE directive (the most important):
 - **SWITCH {asset}**: Change the target asset to cross-validate findings. Specify which asset and for how many iterations (e.g., "SWITCH ETH for 10 iterations").
 - **ESCALATE {criteria}**: Temporarily change the acceptance criteria. E.g., "Prioritize ECE < 0.03 over Brier improvement for the next 5 iterations" if calibration is drifting.
 - **WIDEN**: The search space is exhausted. Recommend specific HPO ranges to expand.
+- **ADD_ALPHA {source}**: The current feature space is exhausted and current alphas are well-pruned. Recommend implementing a new alpha data source. Write detailed requirements to `autoresearch/alpha_request.md` (what data, why it helps, API endpoints). Update `autoresearch/phase.json` by reading the current file, changing `current_phase` to `"building"` and `sub_phase` to `"discovery_{source}"`, then writing the full file back. This triggers the builder agent.
+- **RETRAIN_BASELINE**: The feature space has changed significantly (e.g., 10+ new features added, or alpha features showing zero lift after 20+ iterations). Force a baseline re-run to establish new reference metrics. Archive `results.tsv` as `results_pre_rebaseline.tsv`, reset to header only.
 
 ### Step 4: Write Report
 

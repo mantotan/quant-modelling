@@ -58,6 +58,19 @@ When invoked, produce a concise progress report on the autoresearch experiments.
 1. [suggestion based on pattern analysis]
 2. [suggestion based on pattern analysis]
 3. [suggestion based on pattern analysis]
+
+## Alpha Feature Analysis (if alpha_features present in knobs.json)
+- Alpha feature groups in config: {list groups + feature counts}
+- Top alpha features by importance (from training output if available): {list}
+- Interaction features enabled: {list of enabled pairs}
+- Regime detection: {on/off}, vol_window: {N}, lookback: {N}
+- Objective config: primary={metric}, brier_threshold={N}
+
+## Build Progress (if autoresearch/phase.json exists)
+- Current phase: {current_phase}
+- Build plan: {N/M units complete}
+- Blocked units: {list or "none"}
+- Next work unit: {description}
 ```
 
 ## Rules
