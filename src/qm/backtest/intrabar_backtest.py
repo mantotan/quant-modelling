@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import math
+from collections import defaultdict
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -171,12 +172,25 @@ class IntraBarBacktester:
             return self._empty_metrics()
 
         traded_pnl = pnl_per_bet[traded]
-        win_rate = float((traded_pnl > 0).mean())
-        pnl_std = traded_pnl.std()
-        sharpe = float(traded_pnl.mean() / (pnl_std + 1e-10) * np.sqrt(self._annualization))
 
-        peak = np.maximum.accumulate(cum_pnl)
-        max_dd = float((peak - cum_pnl).max())
+        # Aggregate to bar level for Sharpe, win_rate, max_dd
+        # (same pattern as BothSidesBacktester.evaluate_fast)
+        traded_bar_indices = bar_indices[traded]
+        unique_traded_bars = np.unique(traded_bar_indices)
+        bar_idx_local = np.searchsorted(unique_traded_bars, traded_bar_indices)
+        bar_pnl = np.bincount(bar_idx_local, weights=traded_pnl,
+                              minlength=len(unique_traded_bars))
+        n_bars_traded = len(bar_pnl)
+
+        # Bar-level metrics (correct annualization unit)
+        win_rate = float((bar_pnl > 0).mean())
+        bar_pnl_std = float(bar_pnl.std())
+        sharpe = float(bar_pnl.mean() / (bar_pnl_std + 1e-10) * np.sqrt(self._annualization))
+
+        # Bar-level drawdown (avoid intra-bar noise)
+        bar_cum_pnl = np.cumsum(bar_pnl)
+        bar_peak = np.maximum.accumulate(bar_cum_pnl)
+        max_dd = float((bar_peak - bar_cum_pnl).max())
 
         brier = float(np.mean((model_probs - targets) ** 2))
         accuracy = float(np.mean((model_probs > 0.5) == (targets == 1)))
@@ -210,8 +224,10 @@ class IntraBarBacktester:
             "total_pnl": float(cum_pnl[-1]),
             "max_dd": max_dd,
             "n_trades": n_trades,
+            "n_bars_traded": n_bars_traded,
             "win_rate": win_rate,
             "avg_pnl_per_trade": float(traded_pnl.mean()),
+            "avg_pnl_per_bar": float(bar_pnl.mean()),
             "time_buckets": time_bucket_metrics,
         }
 
@@ -333,13 +349,23 @@ class IntraBarBacktester:
 
         if trade_log:
             traded_pnls = np.array([t["pnl"] for t in trade_log])
+
+            # Aggregate to bar level for Sharpe/win_rate
+            bar_pnl_dict: dict[int, float] = defaultdict(float)
+            for t in trade_log:
+                bar_pnl_dict[t["bar_idx"]] += t["pnl"]
+            bar_pnl_arr = np.array(list(bar_pnl_dict.values()))
+
+            bar_pnl_std = float(bar_pnl_arr.std())
             result.metrics = {
                 "total_pnl": float(cum_pnl),
                 "n_trades": len(trade_log),
-                "win_rate": float((traded_pnls > 0).mean()),
+                "n_bars_traded": len(bar_pnl_arr),
+                "win_rate": float((bar_pnl_arr > 0).mean()),
                 "avg_pnl_per_trade": float(traded_pnls.mean()),
+                "avg_pnl_per_bar": float(bar_pnl_arr.mean()),
                 "sharpe": float(
-                    traded_pnls.mean() / (traded_pnls.std() + 1e-10)
+                    bar_pnl_arr.mean() / (bar_pnl_std + 1e-10)
                     * np.sqrt(self._annualization)
                 ),
             }
@@ -374,6 +400,7 @@ class IntraBarBacktester:
         return {
             "sharpe": 0.0, "brier": 0.25, "accuracy": 0.5,
             "total_pnl": 0.0, "max_dd": 0.0, "n_trades": 0,
-            "win_rate": 0.0, "avg_pnl_per_trade": 0.0,
+            "n_bars_traded": 0, "win_rate": 0.0,
+            "avg_pnl_per_trade": 0.0, "avg_pnl_per_bar": 0.0,
             "time_buckets": {},
         }

@@ -207,6 +207,53 @@ class TestFullSimulation:
             assert result.trade_log[0]["impact"] >= 0
 
 
+class TestBarLevelMetrics:
+    def test_n_bars_traded_counts_bars_not_samples(self):
+        """n_bars_traded should count unique bars, not individual samples."""
+        bt = IntraBarBacktester(
+            fee_bps=0, spread=0.0, min_edge=0.01,
+            impact_bps=0, max_trades_per_bar=10, max_daily_trades=10_000,
+            fixed_bet_usd=50.0,
+        )
+        n_bars, samples_per_bar = 10, 3
+        n = n_bars * samples_per_bar
+        metrics = bt.evaluate_fast(
+            model_probs=np.full(n, 0.85),
+            targets=np.ones(n),
+            market_probs=np.full(n, 0.50),
+            time_pcts=np.tile([0.10, 0.30, 0.50], n_bars),
+            bar_indices=np.repeat(np.arange(n_bars), samples_per_bar),
+        )
+        assert metrics["n_bars_traded"] <= n_bars
+        assert metrics["n_trades"] >= metrics["n_bars_traded"]
+
+    def test_sharpe_invariant_to_samples_per_bar(self):
+        """Sharpe should not scale with number of samples per bar."""
+        def run_with_spb(spb):
+            bt = IntraBarBacktester(
+                fee_bps=0, spread=0.0, min_edge=0.01,
+                impact_bps=0, max_trades_per_bar=spb + 1,
+                max_daily_trades=10_000, fixed_bet_usd=50.0,
+            )
+            n_bars = 50
+            rng = np.random.default_rng(42)
+            targets = np.repeat(rng.integers(0, 2, n_bars).astype(float), spb)
+            model_probs = targets * 0.85 + (1 - targets) * 0.15
+            time_pcts = np.tile(np.linspace(0.10, 0.80, spb), n_bars)
+            bar_indices = np.repeat(np.arange(n_bars), spb)
+            market_probs = np.full(n_bars * spb, 0.50)
+            return bt.evaluate_fast(
+                model_probs, targets, market_probs, time_pcts, bar_indices,
+            )
+
+        m2 = run_with_spb(2)
+        m5 = run_with_spb(5)
+        # Sharpe should be in same order of magnitude, not 2.5x different
+        if m2["sharpe"] > 0 and m5["sharpe"] > 0:
+            ratio = m5["sharpe"] / m2["sharpe"]
+            assert 0.3 < ratio < 3.0, f"Sharpe ratio {ratio} suggests sample-level bias"
+
+
 class TestFixedBetMode:
     def test_fixed_bet_uses_exact_amount(self):
         bt = IntraBarBacktester(

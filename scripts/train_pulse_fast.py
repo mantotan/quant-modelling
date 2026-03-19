@@ -307,6 +307,9 @@ def run(args: argparse.Namespace) -> dict:
     ece = expected_calibration_error(cal_test, y_test)
 
     # ── Backtest (maker-only: fee_bps=0, impact_bps=0) ───────────
+    # NOTE: Single-side PnL is normalized (fixed_bet_usd / 10,000 per trade).
+    # Both-sides PnL is in raw USD (fixed_bet_usd per order).
+    # The two are not directly comparable in absolute dollar terms.
     bt = BACKTEST
     backtester = IntraBarBacktester(
         fee_bps=bt["fee_bps"],
