@@ -1,0 +1,19 @@
+[Unit]
+Description=QM Trading System
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=qm
+WorkingDirectory=/opt/qm
+EnvironmentFile=/opt/qm/.env
+ExecStart=/opt/qm/.venv/bin/python scripts/trade.py --mode paper --asset BTC --bankroll 5000
+Restart=always
+RestartSec=10
+WatchdogSec=300
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
