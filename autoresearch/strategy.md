@@ -1,29 +1,35 @@
 # Strategy Directive
-Updated: 2026-03-19T10:00:00Z
-After iteration: 8
+Updated: 2026-03-19T11:00:00Z
+After iteration: 12
 
 ## Priority Queue
-1. **Drop 0.05 from time_pcts** — continue the proven pruning strategy. Currently [0.05, 0.10, 0.20, 0.30, 0.40, 0.60, 0.80]. The 5% point (~15s into 5m bar) has partial tick info but still weak. Each prior time_pcts drop improved Brier: -3.34% (drop 0.003), -4.72% (drop 0.01). Diminishing returns expected but still the highest-probability KEEP. If this fails, the pruning path is exhausted.
-2. **Add 0.50 time point** — try [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.80]. Denser coverage in the 40-60% range where the model transitions from tick-dominated to history-dominated features. Different from pruning — this ADDS data rather than removing it.
-3. **Walk-forward: increase n_splits from 5 to 8** — more CV folds give lower-variance Brier estimates during HPO. test_bars=2000 was a KEEP; more folds is the same category. Evidence: HPO still converges to identical params → the evaluation signal needs more stability, not different params.
-4. **Switch to ETH** — 8 consecutive iterations on BTC. Per researcher rules, after 15+ iterations switch assets. But trying ETH early could validate whether the time_pcts + test_bars improvements transfer across assets. If ETH also improves → the changes are universal, not BTC-specific.
-5. **Try brier-primary objective** — switch objective.primary from "sharpe" to "brier" for 1-2 iterations. The sharpe-primary objective always returns 0.0 (even with threshold=0.20). A brier-primary run would directly optimize for calibration, potentially finding a different HPO optimum. Evidence: all 8 runs converge to identical best_params — changing the objective function is the only way to break out of this convergence.
+1. **Drop 0.10 from time_pcts** — the pruning strategy has 75% KEEP rate (3/4). Current time_pcts [0.10, 0.20, 0.30, 0.40, 0.60, 0.80]. At 10% elapsed (~30s into 5m), tick features are still weak. Each prior drop yielded: -3.3%, -4.7%, -5.8% Brier improvement. Risk: 0.10 has real tick signal (partial range, trade intensity). If this DISCARDs, the pruning strategy is exhausted.
+2. **Walk-forward n_splits 5→8** — more CV folds with brier-primary should give even more stable Brier estimates. test_bars=2000 was a KEEP. The brier-primary objective now actually differentiates trials (hpo_objective=0.168, no longer 0.0). More folds should help further.
+3. **Lower learning_rate upper bound to 0.05** — the brier-primary optimum found lr=0.005 (the floor). The HPO still explores up to 0.1 which wastes trials. Narrowing lr [0.005, 0.05] concentrates search near the productive low-learning-rate regime. NOTE: this is range narrowing, which was blacklisted for reg/tree params — but those failed because the sharpe-primary optimum was stuck. The brier-primary optimum is fundamentally different, so HPO narrowing may now help.
+4. **Increase min_child_samples lower bound to 500** — brier-primary optimum found min_child=726-951. The current range [100, 1000] wastes trials on low values. Narrowing to [500, 1000] concentrates search in the productive high-regularization regime.
+5. **Try ETH asset** — 12 consecutive BTC iterations. The time_pcts + brier-primary improvements should transfer to ETH. Run `--asset ETH` to validate universality. If ETH also benefits → the changes are structural, not BTC-specific overfitting.
 
 ## Observations
-- **KEEP rates**: Sampling density: 2/2 (100%), Walk-forward: 1/1 (100%), Objective: 1/1 (100%), Feature selection: 0/1 (0%), HPO range: 0/2 (0%)
-- **Brier trajectory decelerating**: -3.34% → -4.72% → -0.36% → -0.002%. The 8.2% total improvement from baseline is almost entirely from time_pcts pruning (iters 4-5). Walk-forward and objective tuning gave marginal gains.
-- **ECE dramatically improved**: 0.0461 → 0.0342 (-25.8%). The calibration quality improvement comes mostly from test_bars=2000 (iter 7), not time_pcts changes. ECE is now well below the 0.05 acceptance threshold.
-- **Best params fully converged**: All 8 runs find n_estimators=624, lr=0.086, max_depth=5, num_leaves=83. The TPE sampler is in a local optimum. Only changing the objective function or the data itself (features, sampling) can break this.
-- **Both-sides strategy stabilized**: After volatile early iterations (-$470K to +$358K), recent runs consistently show $750K-$1.04M. The both-sides PnL tracks single-side improvements but with 10-30x amplification.
-- **Alpha features still inactive**: Need to run `download_funding.py` and `download_deribit_iv.py` to populate alpha stores, then regenerate the .npz cache. This is the biggest untapped improvement vector.
-- **Single-side Sharpe is unrealistically high**: 36.03 at iter 8. This likely reflects the fixed-bet backtester structure rather than true risk-adjusted returns. Do not optimize for Sharpe — focus on Brier and ECE.
+- **Two-phase discovery**: Phase 1 (sharpe-primary) optimized via data quality (time_pcts pruning). Phase 2 (brier-primary) optimized via model structure (slow learning, simple trees). Both independently productive.
+- **KEEP rates**: Objective tuning 2/2 (100%), walk-forward 1/1 (100%), sampling density 3/4 (75%), feature selection 0/1 (0%), HPO range changes 0/3 (0%)
+- **Brier trajectory**: 0.2055 → 0.1989 → 0.1893 → 0.1886 → 0.1777 → 0.1759. Accelerated in phase 2 — the brier-primary change was transformative.
+- **ECE trajectory**: 0.0461 → 0.0474 → 0.0402 → 0.0342 → 0.0300 → **0.0071**. Dramatic improvement when switching to brier-primary. ECE 0.007 is exceptional — well below 0.05 acceptance.
+- **Best params shifted radically**: sharpe-primary found fast-learning big-tree models (lr=0.086, leaves=83). brier-primary found slow-learning simple-tree models (lr=0.005, leaves=33). The model is fundamentally different — simpler, more regularized, better calibrated.
+- **HPO range changes remain unproductive (0/3)**: Both narrowing (iters 2-3) and widening (iter 12) failed. The TPE sampler finds good params regardless. Only data and objective changes create real improvement.
+- **Both-sides PnL tracking single-side**: $86K → $358K → $758K → $1.03M → $1.17M → $1.82M. Consistent amplification but highly sensitive to model changes.
+- **Alpha features still inactive**: All 30 alpha features are in the code but the data hasn't been downloaded. Running `scripts/download_funding.py` and regenerating the .npz cache is the next major capability uplift.
+- **Researcher compliance**: Excellent. Followed all strategist priorities in order (skipped #2 initially, came back to it). Autonomous iteration (n_estimators widening) was a reasonable but unproductive choice — consistent with the pattern that HPO range changes don't help.
 
 ## Blacklist
-- HPO range narrowing (regularization): iter 2 DISCARD
+- HPO range narrowing (regularization): iters 2 DISCARD
 - HPO range narrowing (tree structure): iter 3 DISCARD
-- Feature selection (drop hour_sin/cos): iter 6 DISCARD — marginal, not worth revisiting
-- Any HPO range narrowing: generic blacklist — params are converged, narrowing only hurts
+- HPO range widening (n_estimators to 3000): iter 12 DISCARD
+- Time_pcts densification (adding 0.50): iter 10 DISCARD — neutral
+- Feature selection (drop hour_sin/cos): iter 6 DISCARD — neutral
+- **Generic: any HPO range change** — 0/3 across all attempts. The search space is fine.
 
 ## HPO Range Recommendations
-- **No changes** — ranges are fine. The TPE sampler converges to the same optimum regardless. Research leverage is in data and objective changes.
-- **Future direction**: Once alpha features are in the cache (after data download + regen), the feature space will change from 23 to ~50 features. This will break the current HPO convergence and create real optimization surface to explore. That's when HPO range tuning becomes relevant again.
+- **learning_rate**: Consider [0.005, 0.05] — brier-primary finds lr=0.005, but only recommend this AFTER one more brier-primary iteration confirms convergence
+- **min_child_samples**: Consider [500, 1000] — same caveat: wait for convergence confirmation
+- Do NOT widen any range — iter 12 showed widening n_estimators was counterproductive
+- The n_estimators range [100, 1500] is correct — the brier-primary optimum uses ~1400, giving headroom but not waste
