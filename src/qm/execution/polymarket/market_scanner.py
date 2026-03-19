@@ -168,17 +168,31 @@ class MarketScanner:
         return self._cache.get(asset)
 
     async def get_market_status(
-        self, condition_id: str,
+        self,
+        condition_id: str,
+        asset: Asset | None = None,
+        entry_time: datetime | None = None,
     ) -> dict[str, Any] | None:
         """Check if a market has resolved via Gamma API slug lookup.
 
         The Gamma API condition_id query param doesn't reliably return
-        the correct market. Instead, we cache the slug at discovery time
-        and query by slug for resolution checks.
+        the correct market. Uses cached slug from discovery, or derives
+        it from asset + entry_time if not cached.
         """
         slug = self._slug_cache.get(condition_id)
+        if not slug and asset and entry_time:
+            # Derive slug from asset + entry_time
+            tf_cfg = _TF_CONFIG.get(self._timeframe)
+            if tf_cfg:
+                tf_suffix, bar_seconds, _ = tf_cfg
+                slug_prefix = _SLUG_ASSET.get(asset)
+                if slug_prefix:
+                    bar_start = int(entry_time.timestamp())
+                    bar_start = (bar_start // bar_seconds) * bar_seconds
+                    slug = f"{slug_prefix}-updown-{tf_suffix}-{bar_start}"
+                    self._slug_cache[condition_id] = slug
         if not slug:
-            logger.debug("No slug cached for %s", condition_id[:16])
+            logger.debug("No slug for %s", condition_id[:16])
             return None
 
         try:

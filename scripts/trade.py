@@ -224,6 +224,8 @@ async def resolution_monitor(
             # Poll Gamma API for actual resolution
             market_info = await scanner.get_market_status(
                 pos.condition_id,
+                asset=pos.asset,
+                entry_time=pos.entry_time,
             )
             if market_info is None:
                 if age > 600:  # > 10 min, warn
