@@ -33,6 +33,7 @@ from qm.backtest.metrics.calibration import brier_score, expected_calibration_er
 from qm.backtest.validation.walk_forward import WalkForwardSplitter
 from qm.core.types import Timeframe
 from qm.model.calibration.calibrator import IsotonicCalibrator
+from qm.model.objective import ObjectiveConfig, compute_objective
 from qm.model.targets.intrabar import IntraBarDataset
 from qm.model.trainers.device import detect_device
 
@@ -88,6 +89,22 @@ def run(args: argparse.Namespace) -> dict:
     HPO_SEARCH_SPACE = {k: tuple(v) for k, v in knobs["hpo_search_space"].items()}
     WALK_FORWARD = knobs["walk_forward"]
     BACKTEST = knobs["backtest"]
+
+    # ── Objective config (enriched knobs) ───────────────────────
+    obj_cfg_raw = knobs.get("objective", {})
+    obj_config = ObjectiveConfig(
+        primary=obj_cfg_raw.get("primary", "brier"),
+        brier_threshold=obj_cfg_raw.get("brier_threshold", 0.25),
+        brier_penalty_weight=obj_cfg_raw.get("brier_penalty_weight", 10.0),
+        min_trades=obj_cfg_raw.get("min_trades", 50),
+        trade_penalty_weight=obj_cfg_raw.get("trade_penalty_weight", 5.0),
+        max_drawdown_threshold=obj_cfg_raw.get("max_drawdown_threshold", 0.30),
+        drawdown_penalty_weight=obj_cfg_raw.get("drawdown_penalty_weight", 5.0),
+    )
+    logger.info(
+        "Objective: primary=%s, brier_threshold=%.2f",
+        obj_config.primary, obj_config.brier_threshold,
+    )
 
     tf_map = {"5m": Timeframe.M5, "15m": Timeframe.M15, "1h": Timeframe.H1}
     tf = tf_map[args.timeframe]
@@ -200,7 +217,8 @@ def run(args: argparse.Namespace) -> dict:
             if alias in params:
                 params[real] = params.pop(alias)
 
-        briers = []
+        fold_briers = []
+        fold_n_trades = []
         for bar_train_idx, bar_test_idx in splitter.split(n_train_bars):
             bars_tr = train_unique_bars[bar_train_idx]
             bars_te = train_unique_bars[bar_test_idx]
@@ -222,16 +240,27 @@ def run(args: argparse.Namespace) -> dict:
                 callbacks=[lgb.early_stopping(50, verbose=False)],
             )
             preds = model.predict(X_train[te_mask])
-            briers.append(float(np.mean((preds - y_train[te_mask]) ** 2)))
+            fold_briers.append(float(np.mean((preds - y_train[te_mask]) ** 2)))
+            fold_n_trades.append(int(te_mask.sum()))
 
-        return float(np.mean(briers)) if briers else 1.0
+        if not fold_briers:
+            return 1.0
+
+        # Use configurable objective instead of raw Brier
+        avg_metrics = {
+            "brier": float(np.mean(fold_briers)),
+            "sharpe": 0.0,  # not available in CV folds
+            "n_trades": int(np.mean(fold_n_trades)),
+            "max_dd": 0.0,
+        }
+        return compute_objective(avg_metrics, obj_config)
 
     study = optuna.create_study(direction="minimize",
                                 sampler=optuna.samplers.TPESampler(seed=args.seed))
     study.optimize(objective, n_trials=n_trials, n_jobs=1, timeout=hpo_timeout)
 
-    logger.info("Best HPO Brier: %.6f (%d/%d trials, %s mode)",
-                study.best_value, len(study.trials), n_trials, args.mode)
+    logger.info("Best HPO objective: %.6f (%s-primary, %d/%d trials, %s mode)",
+                study.best_value, obj_config.primary, len(study.trials), n_trials, args.mode)
 
     # ── Retrain best ──────────────────────────────────────────────
     bp = study.best_params.copy()
@@ -337,7 +366,8 @@ def run(args: argparse.Namespace) -> dict:
         "n_bars_train": split_bar_idx,
         "n_bars_test": n_bars - split_bar_idx,
         "base_rate": round(base_rate, 4),
-        "hpo_brier": round(study.best_value, 6),
+        "hpo_objective": round(study.best_value, 6),
+        "hpo_objective_primary": obj_config.primary,
         "hpo_trials": len(study.trials),
         "oos_accuracy": round(acc, 4),
         "oos_brier": round(brier, 6),
