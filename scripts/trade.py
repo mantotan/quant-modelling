@@ -27,6 +27,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+import aiohttp
 import lightgbm as lgb
 import numpy as np
 
@@ -50,6 +51,12 @@ from qm.risk.manager import RiskManager
 from qm.strategy.filter import TradeFilter
 from qm.strategy.portfolio import Portfolio
 from qm.strategy.sizing.kelly import KellySizer
+
+# Binance futures price endpoint (for live tick feed)
+_BINANCE_SYMBOLS: dict[str, str] = {
+    "BTC": "BTCUSDT", "ETH": "ETHUSDT", "SOL": "SOLUSDT", "XRP": "XRPUSDT",
+}
+BINANCE_TICKER_URL = "https://fapi.binance.com/fapi/v1/ticker/price"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -254,6 +261,36 @@ async def resolution_monitor(
                 )
 
 
+async def price_feed(
+    asset: Asset,
+    bar_builder: BarBuilder,
+    running_flag: list[bool],
+    poll_interval: float = 1.0,
+) -> None:
+    """Poll Binance futures for the latest price and feed into BarBuilder.
+
+    Lightweight REST poller — 1 HTTP call per second.
+    Feeds synthetic trades into the BarBuilder to keep partial bars alive.
+    """
+    symbol = _BINANCE_SYMBOLS.get(asset.value, f"{asset.value}USDT")
+    url = f"{BINANCE_TICKER_URL}?symbol={symbol}"
+    logger.info("Price feed started: %s (%s)", asset.value, symbol)
+
+    while running_flag[0]:
+        try:
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as session, session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    price = float(data["price"])
+                    now = datetime.now(UTC)
+                    bar_builder.on_trade(asset, price, 0.001, now)
+        except Exception:
+            pass  # Non-critical — next poll will retry
+        await asyncio.sleep(poll_interval)
+
+
 def save_state(portfolio: Portfolio, stats: dict) -> None:
     """Save portfolio state for crash recovery."""
     state = {
@@ -346,8 +383,11 @@ async def main_loop(args: argparse.Namespace) -> None:
     # ── Market scanner (cached, 10s TTL) ────────────────────────
     scanner = MarketScanner(assets={asset}, timeframe=tf)
 
-    # ── Start resolution monitor ────────────────────────────────
-    running_flag = [True]  # mutable list so coroutine can check
+    # ── Start background tasks ─────────────────────────────────
+    running_flag = [True]  # mutable list so coroutines can check
+    asyncio.create_task(
+        price_feed(asset, bar_builder, running_flag),
+    )
     asyncio.create_task(
         resolution_monitor(
             portfolio, trading_loop, scanner, running_flag, trade_logger,
