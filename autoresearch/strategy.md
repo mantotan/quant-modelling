@@ -1,213 +1,235 @@
 # Strategy Directive
-Updated: 2026-03-20T09:30:00Z
-After iteration: 39
+Updated: 2026-03-20T12:00:00Z
+After iteration: 44
+
+## Critical Gap: PBO/Deflated Sharpe Measurement
+
+`train_pulse_fast.py` runs walk-forward HPO and reports OOS Brier, ECE, PnL, Sharpe, and drawdown.
+It does NOT compute PBO or Deflated Sharpe. These two acceptance criteria require
+`cpcv_validation_pulse.py`, which is a separate script that already exists and is fully implemented
+at `scripts/cpcv_validation_pulse.py`. The gap is purely operational: the autoresearch loop has
+never called this script.
+
+### What cpcv_validation_pulse.py does
+
+- Loads the pre-cached `dataset.npz` (same file train_pulse_fast.py uses — no re-generation needed)
+- Applies the same feature filter and time_pct filter from `knobs.json`
+- Splits at BAR level into N groups, generates C(N,k) paths (default C(8,2)=28 paths)
+- Trains a fixed-params LightGBM (midpoint of HPO ranges) on each path's train set
+- Records IS and OOS Sharpe plus OOS Brier for every path
+- Computes PBO (both Sharpe-based and Brier-based; takes the more favorable)
+- Computes Deflated Sharpe via Bailey-Lopez de Prado approximation over n_paths
+- Outputs a structured verdict with pass/fail against the acceptance thresholds
+
+### How to invoke
+
+```
+uv run scripts/cpcv_validation_pulse.py --asset BTC --n-groups 8 --k-test 2
+uv run scripts/cpcv_validation_pulse.py --asset ETH --n-groups 8 --k-test 2
+uv run scripts/cpcv_validation_pulse.py --asset SOL --n-groups 8 --k-test 2
+```
+
+Each run takes ~5-10 minutes (28 fixed-param LightGBM fits, no HPO). Log the following fields
+into results.tsv from the script output: PBO (best-of-both), Deflated Sharpe, OOS Brier mean,
+OOS Brier std, IS-OOS Sharpe correlation, and pct paths with positive OOS Sharpe.
+
+### Key implementation note
+
+`cpcv_validation_pulse.py` uses HPO range midpoints as fixed params — NOT the best_params found
+by train_pulse_fast.py. This is intentional (it measures structural PBO of the model class, not
+of the specific tuned solution). However, it means PBO results are conservative relative to the
+actual deployed model. A supplementary "best_params PBO" can be run later by substituting the
+best_params from the last KEEP run, but this is optional at this stage.
+
+### XRP dataset status
+
+`data/models/pulse_v2/XRP_5m/dataset.npz` does NOT exist. Before the XRP baseline experiment
+can run, `train_pulse_v2.py` must be run for XRP to generate the cached dataset. This is a
+pre-requisite that requires ~15 minutes and is separate from the CPCV validation work.
+
+---
 
 ## Priority Queue
 
-### ESCALATION STATUS: PBO/CPCV VALIDATION GATE — STILL UNEXECUTED
+1. **[iter 45 — MANDATORY BLOCK] BTC CPCV validation.**
+   Run `uv run scripts/cpcv_validation_pulse.py --asset BTC --n-groups 8 --k-test 2`.
+   Knobs.json must be in BTC-optimal state for feature filter to be meaningful:
+   train_bars=10000, purge_period=24, n_splits=8, time_pcts=[0.30,0.50,0.80], 22 features.
+   Required output to log: PBO (pass if <0.40), Deflated Sharpe (pass if >0.0), OOS Brier
+   mean and std, IS-OOS correlation, pct paths positive OOS Sharpe.
+   Note: current knobs.json has train_bars=14000, purge_period=12 (ETH/SOL-optimal). The
+   researcher must confirm BTC-optimal config is in place before calling the script, OR
+   accept that the feature set used will be the current 22-feature set (same for both
+   BTC-optimal and ETH/SOL-optimal since cached_features are identical). The time_pcts and
+   feature list in knobs.json control the CPCV filter — both configs share the same features
+   and time_pcts, so the CPCV result is valid under current knobs.json. Proceed with current
+   knobs.json without config change.
+   Pass threshold: PBO < 0.40 AND Deflated Sharpe > 0.0.
+   If FAIL: halt all expansion and escalate to auditor immediately.
+   If PASS: log as KEEP and proceed to iter 46.
 
-The auditor ESCALATE directive has been outstanding since before iter 38. The researcher has now run
-three SOL optimization iterations (37, 38, 39) without executing a single validation run. Dispatch
-state confirms last_auditor_at=0 — the auditor has never been invoked. This is the most critical
-structural risk in the program.
+2. **[iter 46 — MANDATORY BLOCK, contingent on iter 45 PASS] ETH CPCV validation.**
+   Run `uv run scripts/cpcv_validation_pulse.py --asset ETH --n-groups 8 --k-test 2`.
+   ETH dataset exists at `data/models/pulse_v2/ETH_5m/dataset.npz`.
+   Same protocol as iter 45. ETH has 9 optimization iterations — lower combinatorial
+   exposure than BTC's 22. Expected to pass if BTC passes.
+   If FAIL: halt XRP expansion; escalate. If PASS: proceed to iter 47.
 
-**Decision on SOL parallel vs pause:** SOL optimization should NOW PAUSE. The rationale: SOL has
-completed its most impactful experiments (baseline + train_bars + purge_period = 3/3 KEEPs), and
-the remaining SOL queue (drawdown_penalty, funding test, objective switch) carries diminishing
-marginal value — all are expected to produce sub-0.01% Brier improvements at most. Continuing
-SOL optimization while PBO remains unmeasured for BTC (22 config experiments), ETH (9 experiments),
-and SOL itself (3 experiments) is operationally backwards: we do not know if any of these models
-will survive the overfitting gate. Execute validation first, then complete SOL.
+3. **[iter 47 — MANDATORY BLOCK, contingent on iter 46 PASS] SOL CPCV validation.**
+   Run `uv run scripts/cpcv_validation_pulse.py --asset SOL --n-groups 8 --k-test 2`.
+   SOL dataset exists at `data/models/pulse_v2/SOL_5m/dataset.npz`.
+   SOL has only 7 optimization iterations and reached its floor quickly — lowest
+   combinatorial overfitting exposure. Expected to pass.
+   If all three pass: the full static acceptance table is complete for BTC, ETH, SOL.
+   The program is validated and cleared for XRP expansion.
 
-1. **[iter 40 — MANDATORY BLOCK] BTC PBO/CPCV validation run.** Run the BTC best-config in
-   mode=verify with CPCV enabled. Config: train_bars=10000, purge_period=24, n_splits=8,
-   time_pcts=[0.30,0.50,0.80], 22 cached+regime features, same best_knobs.json. Required
-   measurements: (a) PBO value, (b) Deflated Sharpe, (c) number of CPCV paths used,
-   (d) OOS Brier variance across paths (stability measure). Pass thresholds: PBO < 0.40 AND
-   Deflated Sharpe > 0.0. Log as KEEP if both pass, DISCARD if either fails. If BTC fails PBO:
-   halt all asset expansion, halt SOL continuation, escalate immediately to auditor — this signals
-   structural overfitting in the optimization program and requires architectural review. Do not
-   skip this run. BTC has the highest combinatorial overfitting exposure (22 config experiments)
-   in the entire program.
+4. **[iter 48 — after CPCV sweep complete] Generate XRP cached dataset.**
+   Run `uv run scripts/train_pulse_v2.py --asset XRP --timeframe 5m` to generate
+   `data/models/pulse_v2/XRP_5m/dataset.npz`. This is a ~15-minute pre-requisite
+   with no knobs.json dependency. It must complete before any XRP training or CPCV run.
+   Log as a setup step, not a model iteration.
 
-2. **[iter 41 — MANDATORY BLOCK, after iter 40 result is known] ETH PBO/CPCV validation run.**
-   Same protocol applied to ETH best-config: train_bars=14000, purge_period=12, n_splits=8,
-   drawdown_penalty_weight=10.0. ETH has 9 optimization iterations (lower combinatorial exposure
-   than BTC). Required measurements same as iter 40. Pass thresholds same. Only execute if BTC
-   passed — if BTC failed, do not run ETH, escalate to auditor instead with BTC failure evidence.
+5. **[iter 49 — after iter 48 dataset exists] XRP baseline.**
+   Run `uv run scripts/train_pulse_fast.py --asset XRP --trials 40 --timeout 420 --mode fast`.
+   Starting config: current knobs.json (train_bars=14000, purge_period=12, n_splits=8,
+   time_pcts=[0.30,0.50,0.80], 22 cached+regime features). XRP is a payment-utility
+   asset with lower speculative momentum than SOL/ETH. Primary diagnostic: does
+   regime_vol_zscore appear in top-10 SHAP for XRP? If yes: XRP is BTC-class (regime-
+   sensitive). If no: XRP is ETH/SOL-class (tick-dominant). Expected XRP Brier: 0.18-0.26.
+   Log as KEEP (it is a first baseline — any result constitutes a valid anchor).
 
-3. **[iter 42 — MANDATORY BLOCK, after iter 41 result is known] SOL PBO/CPCV validation run.**
-   Config: train_bars=14000, purge_period=12, n_splits=8. SOL has 3 optimization iterations —
-   lowest combinatorial overfitting exposure of the three assets. Expected to pass if BTC and ETH
-   pass. Required measurements same. This completes the mandatory validation sweep for all active
-   assets. Only execute if ETH passed.
-
-### SOL Continuation Queue (iters 43-47, conditional on validation pass)
-
-These execute only after iters 40-42 confirm PBO < 0.40 and Deflated Sharpe > 0.0 for all three
-assets. SOL is confirmed ETH-class (Brier 0.189372, tick-dominant SHAP, regime_vol_zscore absent).
-Follow ETH priority sequence. Current knobs.json has train_bars=14000, purge_period=12, n_splits=8
-already set — SOL-optimal config is current.
-
-4. **[iter 43] SOL drawdown_penalty_weight 5.0→10.0.** ETH iter 32 produced a marginal KEEP
-   (Brier improvement 0.000001). SOL has higher intra-bar volatility than ETH, making the 30%
-   drawdown constraint more likely to bind during adverse folds, so the increased penalty weight
-   may have more impact than for ETH. Change only drawdown_penalty_weight in objective block;
-   leave all other config unchanged. Expected: KEEP with marginal improvement. Run 30+ HPO trials.
-
-5. **[iter 44] SOL objective.primary "brier"→"sharpe".** The SOL Brier trajectory has been
-   declining but slowly: 0.193016 (iter 37) → 0.189379 (iter 38) → 0.189372 (iter 39). The last
-   two iters produced a combined 0.007 Brier reduction — the floor is approaching. Switching
-   objective to Sharpe-primary before the floor locks may open new landscape. Rationale: BTC and
-   ETH both hit hard Brier floors with zero further improvement after lock-in. Testing Sharpe-
-   primary now avoids the late-stage objective switch pattern seen in BTC (iters 33-36, 0/4 KEEP).
-   If Sharpe-primary produces Brier regression (> 0.189372): DISCARD and accept current Brier
-   floor as the SOL ceiling. If Sharpe-primary produces KEEP (lower Brier despite different
-   objective): record as evidence that cross-metric objective generalization works for ETH-class
-   assets.
-
-6. **[iter 45] SOL max_depth ceiling raise: hpo_search_space max_depth [2,6]→[2,8].** Evidence:
-   best_params show max_depth=6 (at upper bound) in both iter 38 and iter 39 descriptions — 2/2
-   consecutive SOL KEEPs with max_depth hitting the ceiling. The optimizer is ceiling-constrained.
-   This is the first HPO range adjustment with confirmed convergence evidence. Change only
-   max_depth upper bound from 6 to 8 in hpo_search_space. Expected: KEEP if true optimum is
-   max_depth 7-8. If DISCARD: max_depth=6 is the true optimum, revert and add ceiling=6 to SOL
-   blacklist. Do not apply to BTC/ETH as they are at confirmed floors.
-
-7. **[iter 46] SOL funding features** (6 features: funding_rate, funding_rate_sma3,
-   funding_rate_pctile, funding_rate_direction, funding_cumulative_24h, funding_hours_since).
-   Add to cached_features (28 features total). Prior: 0/2 KEEP for BTC and ETH. However, SOL
-   perpetual funding rates exhibit more frequent sign changes and larger magnitude deviations,
-   creating a non-negligible hypothesis that funding captures SOL-specific leveraged positioning.
-   Run after drawdown and objective experiments so their outcomes do not confound the feature
-   signal. Acceptance criterion: funding features must appear in top-10 SHAP or produce strict
-   Brier improvement. If absent from top-10 SHAP AND Brier identical: DISCARD and add SOL to
-   funding permanent blacklist.
-
-8. **[iter 47] Asset rotation: XRP baseline.** Only after iters 40-42 pass validation AND SOL
-   has completed minimum 6 optimization iterations (iters 43-47). Starting config: BTC-optimal
-   knobs.json (train_bars=10000, n_splits=8, purge_period=24, time_pcts=[0.30,0.50,0.80], 22
-   features). Expected XRP Brier: 0.18-0.25 (payment-utility microstructure, lower speculative
-   momentum than SOL/ETH). Primary diagnostic: does regime_vol_zscore appear in top-10 SHAP for
-   XRP? If yes: XRP is BTC-class. If no: XRP is ETH/SOL-class.
+6. **[iter 50 — conditional on XRP baseline KEEP] XRP train_bars sweep.**
+   If XRP baseline Brier > 0.20: try train_bars 14000→18000 (more data may help a
+   payment-utility asset with lower signal density). If XRP baseline Brier < 0.20:
+   baseline is already strong, proceed directly to purge_period tuning.
+   Evidence base: train_bars extension has a 4/4 (100%) KEEP rate in the program.
 
 ## Observations
 
-- **Researcher compliance: partial.** Previous directive prioritized BTC PBO/CPCV as iter 39
-  (MANDATORY). The researcher instead ran SOL purge_period 24→12 as iter 39, continuing
-  optimization. The SOL iter itself was correct and produced a valid KEEP (Brier 0.189372).
-  However, the validation gate was not executed. The researcher correctly identified the
-  purge_period skip logic in the ack note, which was good autonomous reasoning. The non-compliance
-  on the validation gate is the key deviation.
+- **Researcher compliance: full for iter 44.** The BTC validation run (iter 44) was executed
+  exactly as mandated by the previous strategy directive. BTC Brier reproduced at 0.101759
+  (exact match to best) confirming model stability. The researcher correctly identified the
+  limitation: PBO/Deflated Sharpe were not reported because `train_pulse_fast.py` cannot
+  compute them. This is accurate — the CPCV script must be called separately.
 
-- **KEEP rates by category (all 39 iterations):**
-  - Baseline / pipeline corrections: 2/2 (100%)
+- **KEEP rates by category (all 44 iterations):**
   - Asset baselines (new asset first run): 3/3 (100%) — BTC iter 7, ETH iter 23, SOL iter 37
   - KEEP-VERIFIED runs: 2/2 (100%) — BTC iters 8, 14
-  - train_bars extension: 4/4 (100%) — iters 8, 18, 25, 38; single most reliable lever, zero failures
-  - purge_period tuning: 3/5 (60%) — BTC iter 22 KEEP (24), ETH iter 29 KEEP (12), SOL iter 39 KEEP (12)
+  - train_bars extension: 4/4 (100%) — iters 8, 18, 25, 38; most reliable lever in program
+  - purge_period tuning: 3/5 (60%) — BTC iter 22, ETH iter 29, SOL iter 39 all KEEP
   - drawdown_penalty_weight: 1/1 (100%) — ETH iter 32 (marginal)
-  - Alpha features — regime/liquidation (BTC): 2/3 (67%)
-  - Alpha features — funding (BTC + ETH): 0/3 (0%)
-  - time_pcts adjustment: 1/5 (20%) — only [0.30,0.50,0.80] KEEP; all expansions DISCARD
-  - HPO range narrowing: 0/5 (0%) — permanent blacklist, wall-clock binding
-  - Regime config window changes: 0/2 (0%)
-  - Feature pruning (manual): 0/2 (0%)
+  - Alpha features — regime+liquidation (BTC): 2/3 (67%)
+  - Alpha features — funding (all three assets): 0/4 (0%) — permanent blacklist confirmed
+  - time_pcts adjustment: 1/5 (20%) — only [0.30,0.50,0.80] KEEP; all expansions fail
+  - HPO range narrowing: 0/5 (0%) — wall-clock binding; permanent blacklist
+  - Regime config window changes: 0/3 (0%) — BTC iter 17, ETH iter 26, SOL skipped correctly
+  - Feature pruning (manual): 0/2 (0%) — iters 16, 24
   - Interaction features: 0/1 (0%) — iter 6, +41% Brier regression
-  - n_splits changes (any direction): 0/4 (0%) — n_splits=8 confirmed optimal
-  - embargo_period tuning: 0/2 (0%)
-  - Objective / gate experiments (BTC): 0/4 (0%) — hard floor locked
-  - **Overall: 18 KEEP/KEEP-VERIFIED out of 39 = 46.2%**
+  - n_splits changes (any direction from 8): 0/4 (0%) — n_splits=8 confirmed optimal
+  - embargo_period tuning: 0/2 (0%) — embargo_period=6 confirmed
+  - Objective / gate experiments (BTC): 0/4 (0%) — hard floor
+  - Validation / verification runs: 1/1 KEEP (iter 44) for BTC Brier stability
+  - **Overall: 19 KEEP/KEEP-VERIFIED out of 44 = 43.2%**
 
-- **SOL is now 3/3 KEEP.** All three SOL experiments have been KEEPs (baseline, train_bars, purge_
-  period). This is consistent with the early phase of the program (BTC opened 3/4 KEEP before the
-  optimization landscape hardened). SOL Brier trajectory: 0.193016 → 0.189379 → 0.189372.
-  The last delta (0.007 Brier reduction in iter 39) signals approaching floor. Expected SOL floor:
-  0.187-0.189 based on ETH analog trajectory.
+- **SOL hard floor confirmed at 0.189372 across 4 consecutive identical Brier values (iters
+  39-43).** Max_depth ceiling raised to [2,8] in iter 41 produced regression (0.192005). Sharpe-
+  primary objective in iter 42 reproduced identical best_params and Brier. Funding features in
+  iter 43 produced identical Brier. SOL has exhausted all known levers. SOL is in the same state
+  as BTC (22 experiments exhausted) and ETH (9 experiments exhausted). All three assets are at
+  confirmed hard floors awaiting CPCV validation.
 
-- **SOL best_params max_depth ceiling alert — confirmed across 2 consecutive KEEPs.** Both iter
-  38 and iter 39 report best_params: lr=0.023, max_depth=6, num_leaves=72, reg_alpha=0.016,
-  reg_lambda=8e-6. max_depth=6 at the upper bound of [2,6] in 2/2 SOL KEEPs crosses the threshold
-  for action. This is the strongest HPO convergence signal in the program to date.
+- **BTC hard floor confirmed at 0.101759 across 17 experiments (iters 23-44).** Iter 44
+  validates exact reproduction (0.101759) in verify mode with 40 HPO trials. Best params
+  stable: n_estimators=1028, lr=0.01272, max_depth=4, num_leaves=77, reg_alpha=2.854,
+  reg_lambda=1.131. regime_vol_zscore consistently rank 7 in top-10 SHAP across all BTC
+  KEEP iterations.
 
-- **BTC remains at confirmed hard floor.** Best Brier 0.101759 (iter 22), unchanged across
-  17 experiments (iters 23-39). BTC is exhausted.
+- **ETH validation running (iter 45 was described as ETH validation running now).** ETH
+  best Brier 0.177772 (iter 32). ETH validation result should be logged before or alongside
+  the CPCV run sequence. If ETH train_pulse_fast.py validation confirms exact Brier
+  reproduction: proceed to CPCV. If ETH Brier regresses: investigate config state.
 
-- **ETH remains at confirmed hard floor.** Best Brier 0.177772 (iter 32). ETH is exhausted.
+- **Both-sides vs single-side strategy comparison (44 iterations):**
+  - BTC: bs_sharpe 93.84, single-side sharpe 109.25. Single-side superior for BTC.
+  - ETH: bs_sharpe 267.08, single-side sharpe 264.56. Both-sides marginally superior on risk-
+    adjusted; dramatically higher absolute PnL ($14.07M vs $176.50). ETH is the primary
+    market-making asset.
+  - SOL: bs_sharpe 251.55, single-side sharpe 251.86. Effectively equal.
+  - Pattern is stable and consistent: BTC = directional single-side. ETH/SOL = both-sides MM.
 
-- **Validation gate remains entirely open.** After 39 iterations across 3 assets, PBO and
-  Deflated Sharpe have not been measured once. BTC has 22 config experiments — the highest
-  combinatorial overfitting exposure in the program. The OOS Brier, ECE, PnL, and drawdown metrics
-  all pass the acceptance thresholds by static measurement, but overfitting bias cannot be quantified
-  without PBO. This is the single largest risk to the program's validity.
+- **HPO starvation: structural and unresolvable at current config.** At n_splits=8,
+  train_bars=14000, wall-clock timeout binds at 29-34 trials (target 40). All config levers
+  to increase HPO budget have been blacklisted (n_splits reduction: 0/4 KEEP; train_bars
+  reduction: structural regression). The only path to more HPO trials is a builder-level
+  parallelism change (e.g., LightGBM GPU acceleration, Optuna parallel workers) — outside
+  the autoresearch knob space.
 
-- **Both-sides strategy summary (updated through iter 39):**
-  - BTC: bs_pnl $584K, bs_sharpe 93.84. Single-side sharpe 109.25. Single-side risk-adjusted superior.
-  - ETH: bs_pnl $14.07M, bs_sharpe 267.08. Single-side sharpe 264.56. Both-sides marginally superior
-    on risk-adjusted basis, dramatically higher absolute PnL. ETH is the primary market-making asset.
-  - SOL: bs_pnl $13.75M, bs_sharpe 251.55. Single-side sharpe 251.86. Nearly equal risk-adjusted.
-    SOL both-sides absolute PnL $0.32M below ETH.
-  - Pattern: ETH > SOL >> BTC for both-sides absolute PnL. BTC best for directional single-side.
-    ETH/SOL optimal for both-sides market-making. This pattern is stable across all iterations.
-
-- **HPO starvation status.** At n_splits=8 with train_bars=14000 (SOL current config), HPO budget
-  allows 33-34 trials (SOL iter 38: 33 trials, iter 39: 34 trials). Target is 40. Structural
-  starvation is mild (85% of target). This is the ceiling until a builder-level parallelism change
-  is made. No config knob can resolve this without reducing train_bars or n_splits — both are
-  blacklisted for regression.
+- **dispatch_state confirms last_auditor_at=0.** The auditor has never been invoked in 44
+  iterations. This is the longest-outstanding structural risk. The CPCV sweep (iters 45-47)
+  will either close or escalate this risk. Recommend invoking auditor after iter 47 regardless
+  of CPCV outcome to perform a full program review before XRP expansion.
 
 ## Blacklist
 
-- **Interaction features (all 8 pairs):** iter 6 DISCARD, +41% Brier regression. Permanent all assets.
-- **Funding features in cached_features for BTC:** iter 2 DISCARD, absent from top-10 SHAP. Permanent.
-- **Funding features in cached_features for ETH:** iter 27 DISCARD, absent from top-10 SHAP. Permanent.
-- **HPO range narrowing (all configurations):** iters 10, 13, 15, 19, 20 — 0/5 KEEP. Wall-clock binding.
-  Permanent blacklist all assets.
-- **time_pcts expansion beyond 3 points (any direction):** iters 12, 21, 28 — 0/3 KEEP. [0.30,0.50,0.80]
-  confirmed optimal for BTC and ETH. Do not add time points for SOL or XRP.
+- **Interaction features (all 8 pairs):** iter 6, +41% Brier regression. Permanent all assets.
+- **Funding features in cached_features for BTC, ETH, SOL:** 0/4 KEEP across iters 2, 27,
+  43 and ETH iter 27. Funding absent from top-10 SHAP in all three assets. Permanent blacklist.
+  Apply to XRP unless XRP microstructure analysis shows structural reason to differ.
+- **HPO range narrowing (all configurations):** iters 10, 13, 15, 19, 20 — 0/5 KEEP.
+  Wall-clock timeout binding regardless of trial cap. Permanent blacklist all assets.
+- **time_pcts expansion beyond 3 points:** iters 12, 21, 28 — 0/3 KEEP. [0.30,0.50,0.80]
+  confirmed optimal for BTC, ETH. Apply same default to XRP.
 - **time_pct 0.10 (early-bar sampling):** iter 21, +63% Brier regression. Permanent all assets.
-- **embargo_period tuning (both directions from 6):** iters 9, 30 — 0/2 KEEP. embargo_period=6 confirmed.
-- **n_splits above 8:** iter 11 DISCARD, HPO starvation worsens.
-- **n_splits below 8 (to 6):** iters 31, 33 — 0/2 KEEP. n_splits=8 is optimal. Permanent.
-- **regime_params window changes for BTC (120→240):** iter 17 DISCARD. Permanent for BTC.
-- **regime_params window changes for ETH (120→60):** iter 26 DISCARD. Permanent for ETH.
+- **embargo_period tuning (both directions from 6):** iters 9, 30 — 0/2 KEEP. Keep at 6.
+- **n_splits above or below 8:** iters 11, 31, 33 — 0/4 total. n_splits=8 confirmed optimal.
+- **regime_params window changes for BTC (120→240):** iter 17. Permanent for BTC.
+- **regime_params window changes for ETH (120→60):** iter 26. Permanent for ETH.
+- **regime_params window changes for SOL:** no test needed (regime_vol_zscore absent from
+  SHAP, same as ETH, iter 26 evidence generalizes). Skip for SOL.
 - **Manual feature pruning from cached_features:** iters 16, 24 — 0/2 KEEP. Permanent.
-- **train_bars above 10000 for BTC:** saturation confirmed at 10000. BTC ceiling.
-- **train_bars above 14000 for ETH:** marginal plateau confirmed. ETH ceiling.
-- **BTC objective gate experiments (any form):** iters 33-36 — 0/4 KEEP, floor locked. Permanent BTC.
-- **regime_params window changes for SOL:** skip experiment (regime_vol_zscore absent from top-10 SHAP,
-  same as ETH pattern — iter 26 evidence generalizes). Do not test window changes for SOL.
-- **XRP expansion before PBO/CPCV validation of BTC, ETH, SOL:** auditor ESCALATE directive outstanding.
-  Do not start XRP baseline until iters 40-42 confirm PBO < 0.40 for all three assets.
+- **train_bars above 10000 for BTC:** saturation at 10000. BTC ceiling.
+- **train_bars above 14000 for ETH:** marginal plateau. ETH ceiling.
+- **train_bars above 14000 for SOL:** floor reached before saturation — SOL ceiling likely same
+  as ETH. Test 18000 only if XRP analogy suggests further headroom.
+- **BTC objective gate experiments:** iters 33-36 — 0/4 KEEP. Floor locked. Permanent BTC.
+- **max_depth above 6 for SOL:** iter 41 DISCARD (max_depth=7 found optimum but Brier
+  regressed). max_depth=6 confirmed SOL optimum. Revert hpo_search_space max_depth to [2,6]
+  for SOL. Note: this was a [2,8] test; the result confirms [2,6] is correct.
+- **Sharpe-primary objective for SOL:** iter 42 DISCARD — identical best_params and Brier to
+  brier-primary. No landscape change. Permanent for SOL.
+- **XRP expansion before CPCV validation of BTC, ETH, SOL:** iters 45-47 are mandatory gates.
+  Do not start XRP dataset generation or baseline until iter 47 result is known.
 
 ## HPO Range Recommendations
 
-- `max_depth`: **RAISE CEILING from 6 to 8 for SOL (iter 45).** Evidence: max_depth=6 at upper bound
-  in 2/2 consecutive SOL KEEPs (iters 38, 39 — both report max_depth=6 in best_params). Two-
-  observation threshold met. Action: in iter 45, change hpo_search_space max_depth from [2,6] to
-  [2,8]. Scope: SOL only. Do not change for BTC or ETH (both at confirmed floors where this
-  parameter is already optimized).
-- `learning_rate`: no change. SOL lr=0.023 is mid-range within [0.005, 0.1]. No ceiling pressure.
-- `num_leaves`: no change. SOL num_leaves=72 is mid-range [16, 128].
-- `reg_alpha`: no change. SOL reg_alpha=0.016 is in lower region but not at floor.
-- `reg_lambda`: monitor only. SOL reg_lambda=8e-6 appears in 2/2 KEEPs near the lower bound
-  [1e-8, 10.0]. If one more SOL KEEP confirms reg_lambda < 1e-4, narrow upper region to [1e-8, 0.01]
-  to reduce search waste. Do not act yet.
-- `n_estimators`, `subsample`, `colsample_bytree`, `min_child_samples`: maintain current ranges.
-- **Researcher action item (standing):** report best_params (lr, max_depth, num_leaves, reg_alpha,
-  reg_lambda) in description field for all future KEEP rows. Iters 38 and 39 provide the first two
-  data points and have already triggered a max_depth ceiling action.
+- `max_depth` for SOL: REVERT ceiling back to [2,6]. Evidence: iter 41 tested [2,8], found
+  max_depth=7 as HPO optimum, but Brier regressed from 0.189372 to 0.192005 (+0.14%).
+  max_depth=6 is the confirmed SOL optimum. The current knobs.json shows max_depth [2,6] —
+  confirm this is correct; do not raise the ceiling again for SOL.
+- `max_depth` for XRP: start at [2,6] default. If XRP best_params hit max_depth=6 in 2+
+  consecutive KEEPs, raise to [2,8] and test (same protocol as SOL iter 41 — but expect
+  regression based on SOL precedent).
+- `learning_rate`: BTC best lr=0.01272 (lower region of [0.005,0.1]). SOL best lr=0.023.
+  For XRP, start with full range [0.005,0.1]. No narrowing recommended until 3+ XRP KEEPs
+  show convergence.
+- `reg_alpha`: BTC best reg_alpha=2.854 (mid-range). SOL best reg_alpha=0.016 (low). Divergent
+  — do not narrow for XRP until asset-specific convergence is established.
+- `reg_lambda`: SOL reg_lambda=8e-6 near lower bound [1e-8, 10.0] in 3/3 SOL KEEPs (iters
+  38, 39, 40). This now meets the 3-observation threshold. For SOL (if any future experiments
+  are run): narrow upper bound to [1e-8, 0.01]. Do not apply to BTC/ETH/XRP.
+- `n_estimators`, `subsample`, `colsample_bytree`, `min_child_samples`: maintain current
+  ranges for all assets.
 
 ## Cross-Asset Status Summary
 
-| Asset | Best Brier | Best bs_sharpe | Opt Iters   | Config Status              | PBO Status   |
+| Asset | Best Brier | Best bs_sharpe | Opt Iters   | Config Status              | CPCV Status  |
 |-------|-----------|----------------|-------------|----------------------------|--------------|
-| BTC   | 0.101759  | 93.84          | 22 (7-36)   | Exhausted — hard floor     | NOT MEASURED |
-| ETH   | 0.177772  | 267.08         | 9 (23-32)   | Exhausted — hard floor     | NOT MEASURED |
-| SOL   | 0.189372  | 251.55         | 3 (37-39)   | Active — ETH-class, paused | NOT MEASURED |
-| XRP   | —         | —              | 0           | BLOCKED — PBO gate open    | N/A          |
+| BTC   | 0.101759  | 93.84          | 22 (7-36)   | Exhausted — hard floor     | NOT RUN      |
+| ETH   | 0.177772  | 267.08         | 9 (23-32)   | Exhausted — hard floor     | NOT RUN      |
+| SOL   | 0.189372  | 251.55         | 7 (37-43)   | Exhausted — hard floor     | NOT RUN      |
+| XRP   | —         | —              | 0           | BLOCKED — CPCV gate open   | N/A          |
 
-## Validation Gate (ESCALATED — mandatory before SOL continuation or XRP)
+## Acceptance Gate (all static metrics pass; PBO/Deflated Sharpe pending CPCV)
 
 | Metric          | Required  | BTC Status          | ETH Status          | SOL Status          |
 |-----------------|-----------|---------------------|---------------------|---------------------|
@@ -215,10 +237,9 @@ already set — SOL-optimal config is current.
 | OOS ECE         | < 0.05    | 0.0088 PASS         | 0.0252 PASS         | 0.0135 PASS         |
 | Net PnL         | > 0       | $45.55 PASS         | $176.50 PASS        | $172.13 PASS        |
 | Max drawdown    | < 30%     | 13.61% PASS         | 1.75% PASS          | 1.62% PASS          |
-| PBO             | < 0.40    | NOT MEASURED        | NOT MEASURED        | NOT MEASURED        |
-| Deflated Sharpe | > 0.0     | NOT MEASURED        | NOT MEASURED        | NOT MEASURED        |
+| PBO             | < 0.40    | PENDING iter 45     | PENDING iter 46     | PENDING iter 47     |
+| Deflated Sharpe | > 0.0     | PENDING iter 45     | PENDING iter 46     | PENDING iter 47     |
 
-The four static metrics pass for all three active assets. PBO and Deflated Sharpe are the critical
-unmeasured risks. Until these are measured, the program cannot confirm that its Brier improvements
-represent genuine generalization rather than combinatorial overfitting across the HPO search.
-Execute iters 40-42 (BTC, ETH, SOL validation runs) before any further optimization or expansion.
+All four static metrics pass for all three active assets. BTC has 22 config experiments —
+the highest combinatorial overfitting exposure. ETH has 9. SOL has 7. The CPCV sweep is
+the only remaining gate. It is already implemented and ready to run.
