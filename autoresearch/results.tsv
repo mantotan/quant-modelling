@@ -1,2 +1,2 @@
 iteration	timestamp	asset	status	oos_brier	oos_ece	backtest_pnl	backtest_sharpe	description	commit	bs_pnl	bs_sharpe
-1	2026-03-19T17:07:00	BTC	KEEP	0.143872	0.0042	67.36	73.27	alpha baseline — 50-feature dataset, same knobs (funding features in data but not in cached_features yet)	PENDING	1412453.37	81.40
+1	2026-03-19T17:07:00	BTC	KEEP	0.143872	0.0042	67.36	73.27	alpha baseline — 50-feature dataset, same knobs (funding features in data but not in cached_features yet)	199901c	1412453.37	81.40
