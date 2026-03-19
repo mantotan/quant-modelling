@@ -1,0 +1,280 @@
+#!/usr/bin/env python
+"""CPCV validation for the Pulse intra-bar model.
+
+Runs Combinatorial Purged Cross-Validation on the cached .npz dataset
+to compute PBO (Probability of Backtest Overfitting).
+
+Critical: splits happen at the BAR level to avoid leakage — each bar
+has multiple intra-bar samples (one per time_pct) that share a target.
+
+PBO < 0.40 = acceptable (pass acceptance criteria)
+PBO < 0.20 = good
+PBO > 0.50 = likely overfit
+
+Usage:
+    uv run scripts/cpcv_validation_pulse.py --asset BTC
+    uv run scripts/cpcv_validation_pulse.py --asset ETH
+    uv run scripts/cpcv_validation_pulse.py --asset BTC --n-groups 10 --k-test 2
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import sys
+import time
+from pathlib import Path
+
+import lightgbm as lgb
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from qm.backtest.intrabar_backtest import IntraBarBacktester
+from qm.backtest.metrics.calibration import brier_score
+from qm.backtest.validation.cpcv import CombPurgedKFoldCV
+from qm.core.types import Timeframe
+from qm.model.targets.intrabar import IntraBarDataset
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger("cpcv_pulse")
+
+CONFIG_PATH = Path("autoresearch/knobs.json")
+N_TICK_FEATURES = 8
+
+
+def load_knobs() -> dict:
+    with open(CONFIG_PATH) as f:
+        return json.load(f)
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="CPCV PBO validation for Pulse model")
+    p.add_argument("--asset", required=True, choices=["BTC", "ETH", "SOL", "XRP"])
+    p.add_argument("--timeframe", default="5m", choices=["5m", "15m", "1h"])
+    p.add_argument("--n-groups", type=int, default=8, help="CPCV groups (default 8)")
+    p.add_argument("--k-test", type=int, default=2, help="Test groups per path (default 2)")
+    p.add_argument("--seed", type=int, default=42)
+    return p.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    t0 = time.time()
+
+    # ── Load knobs ──────────────────────────────────────────────
+    knobs = load_knobs()
+    cached_features = set(knobs["cached_features"])
+    time_pcts_cfg = knobs["time_pcts"]
+    backtest_cfg = knobs["backtest"]
+
+    tf_map = {"5m": Timeframe.M5, "15m": Timeframe.M15, "1h": Timeframe.H1}
+    tf = tf_map[args.timeframe]
+
+    # ── Load cached dataset ─────────────────────────────────────
+    cache_path = Path(f"data/models/pulse_v2/{args.asset}_{args.timeframe}/dataset.npz")
+    if not cache_path.exists():
+        logger.error("No cached dataset at %s. Run train_pulse_v2.py first.", cache_path)
+        sys.exit(1)
+
+    dataset = IntraBarDataset.load(cache_path)
+    logger.info(
+        "Loaded: %d samples, %d features, %d bars",
+        len(dataset.y), dataset.X.shape[1],
+        len(np.unique(dataset.bar_indices)),
+    )
+
+    # ── Feature filtering (same as train_pulse_fast.py) ─────────
+    all_names = dataset.feature_names
+    keep_indices = list(range(N_TICK_FEATURES))
+    for i in range(N_TICK_FEATURES, len(all_names)):
+        if all_names[i] in cached_features:
+            keep_indices.append(i)
+    feature_names_used = [all_names[i] for i in keep_indices]
+
+    # ── Time-pct filtering ──────────────────────────────────────
+    tp_set = np.array(time_pcts_cfg)
+    tp_mask = np.zeros(len(dataset.time_pcts), dtype=bool)
+    for tp in tp_set:
+        tp_mask |= np.isclose(dataset.time_pcts, tp, atol=1e-6)
+
+    X = dataset.X[tp_mask][:, keep_indices]
+    y = dataset.y[tp_mask]
+    bar_indices = dataset.bar_indices[tp_mask]
+    market_probs = dataset.market_probs[tp_mask]
+    time_pcts = dataset.time_pcts[tp_mask]
+
+    logger.info(
+        "After filtering: %d samples, %d features, %d time_pcts",
+        len(y), len(feature_names_used), len(tp_set),
+    )
+
+    # ── Bar-level CPCV ──────────────────────────────────────────
+    # CRITICAL: split at BAR level, not sample level, to avoid leakage
+    unique_bars = np.unique(bar_indices)
+    n_bars = len(unique_bars)
+    logger.info("Unique bars: %d", n_bars)
+
+    cv = CombPurgedKFoldCV(
+        n_groups=args.n_groups,
+        k_test_groups=args.k_test,
+        purge_period=24,  # 24 bars = 2h at 5m cadence
+        embargo_pct=0.01,
+    )
+    logger.info("Running CPCV with %d paths (C(%d,%d))...", cv.n_paths, args.n_groups, args.k_test)
+
+    # ── Backtester for evaluation ───────────────────────────────
+    backtester = IntraBarBacktester(
+        fee_bps=backtest_cfg.get("fee_bps", 0),
+        spread=backtest_cfg.get("spread", 0.02),
+        min_edge=backtest_cfg.get("min_edge", 0.01),
+        max_trades_per_bar=backtest_cfg.get("max_trades_per_bar", 15),
+        max_daily_trades=backtest_cfg.get("max_daily_trades", 500),
+        fixed_bet_usd=backtest_cfg.get("fixed_bet_usd", 100.0),
+        timeframe=tf,
+    )
+
+    # ── Run each CPCV path ──────────────────────────────────────
+    is_sharpes = []
+    oos_sharpes = []
+    oos_briers = []
+
+    for i, (bar_train_idx, bar_test_idx) in enumerate(cv.split(n_bars)):
+        # Map bar-level indices → sample-level indices
+        train_bars = unique_bars[bar_train_idx]
+        test_bars = unique_bars[bar_test_idx]
+        train_mask = np.isin(bar_indices, train_bars)
+        test_mask = np.isin(bar_indices, test_bars)
+
+        if train_mask.sum() == 0 or test_mask.sum() == 0:
+            logger.warning("  Path %d: empty split, skipping", i + 1)
+            continue
+
+        # Train LightGBM on this fold
+        ds = lgb.Dataset(
+            X[train_mask], y[train_mask],
+            feature_name=feature_names_used,
+        )
+        params = {
+            "objective": "binary",
+            "metric": "binary_logloss",
+            "verbosity": -1,
+            "max_depth": 5,
+            "num_leaves": 70,
+            "min_child_samples": 700,
+            "learning_rate": 0.02,
+            "subsample": 0.8,
+            "colsample_bytree": 0.7,
+            "reg_alpha": 0.001,
+            "reg_lambda": 0.001,
+            "seed": args.seed,
+        }
+        model = lgb.train(params, ds, num_boost_round=1200)
+
+        # In-sample evaluation
+        is_probs = model.predict(X[train_mask])
+        is_metrics = backtester.evaluate_fast(
+            is_probs, y[train_mask], market_probs[train_mask],
+            time_pcts[train_mask], bar_indices[train_mask],
+        )
+        is_sharpes.append(is_metrics.get("sharpe", 0.0))
+
+        # Out-of-sample evaluation
+        oos_probs = model.predict(X[test_mask])
+        oos_metrics = backtester.evaluate_fast(
+            oos_probs, y[test_mask], market_probs[test_mask],
+            time_pcts[test_mask], bar_indices[test_mask],
+        )
+        oos_sharpes.append(oos_metrics.get("sharpe", 0.0))
+        oos_briers.append(brier_score(oos_probs, y[test_mask]))
+
+        logger.info(
+            "  Path %2d/%d: IS=%.2f OOS=%.2f Brier=%.4f (%d/%d samples)",
+            i + 1, cv.n_paths,
+            is_metrics.get("sharpe", 0.0),
+            oos_metrics.get("sharpe", 0.0),
+            oos_briers[-1],
+            train_mask.sum(), test_mask.sum(),
+        )
+
+    if not is_sharpes:
+        logger.error("No valid CPCV paths. Check data size vs n_groups.")
+        sys.exit(1)
+
+    is_arr = np.array(is_sharpes)
+    oos_arr = np.array(oos_sharpes)
+    brier_arr = np.array(oos_briers)
+
+    # ── Compute PBO ─────────────────────────────────────────────
+    pbo = cv.probability_of_backtest_overfitting(is_arr, oos_arr)
+
+    # ── Deflated Sharpe ratio ───────────────────────────────────
+    # Haircut the best Sharpe by the number of trials
+    n_paths = len(oos_arr)
+    best_oos_sharpe = oos_arr.max()
+    # Bailey & López de Prado (2014) approximation
+    deflated_sharpe = best_oos_sharpe - np.sqrt(2 * np.log(n_paths)) / np.sqrt(n_paths)
+
+    elapsed = time.time() - t0
+
+    # ── Report ──────────────────────────────────────────────────
+    logger.info("")
+    logger.info("=" * 70)
+    logger.info("CPCV RESULTS — Pulse %s %s (%d paths, %.1fs)",
+                args.asset, args.timeframe, n_paths, elapsed)
+    logger.info("=" * 70)
+    logger.info("  IS Sharpe:       mean=%6.2f  std=%5.2f", is_arr.mean(), is_arr.std())
+    logger.info("  OOS Sharpe:      mean=%6.2f  std=%5.2f", oos_arr.mean(), oos_arr.std())
+    logger.info("  OOS Brier:       mean=%.4f  std=%.4f", brier_arr.mean(), brier_arr.std())
+    logger.info("")
+    logger.info("  PBO (Prob of Backtest Overfitting): %.4f", pbo)
+    logger.info("  Deflated Sharpe:                    %.4f", deflated_sharpe)
+    logger.info("")
+
+    if pbo < 0.20:
+        verdict = "EXCELLENT — very low overfitting risk"
+    elif pbo < 0.40:
+        verdict = "ACCEPTABLE — passes acceptance criteria (PBO < 0.40)"
+    elif pbo < 0.50:
+        verdict = "CONCERNING — high overfitting risk"
+    else:
+        verdict = "LIKELY OVERFIT — do NOT deploy"
+
+    logger.info("  VERDICT: %s", verdict)
+    logger.info("")
+
+    # Correlation between IS and OOS
+    if len(is_arr) > 2:
+        corr = np.corrcoef(is_arr, oos_arr)[0, 1]
+        logger.info("  IS-OOS Sharpe correlation: %.4f", corr)
+        logger.info("  (>0.5 = generalizes well, <0.2 = overfitting)")
+
+    # OOS consistency
+    pct_positive = (oos_arr > 0).mean()
+    logger.info(
+        "  OOS paths with positive Sharpe: %.0f%% (%d/%d)",
+        pct_positive * 100, int((oos_arr > 0).sum()), n_paths,
+    )
+
+    logger.info("=" * 70)
+
+    # ── Acceptance gate ─────────────────────────────────────────
+    if pbo < 0.40 and deflated_sharpe > 0:
+        logger.info(
+            "ACCEPTANCE: PASS — PBO %.4f < 0.40, Deflated Sharpe %.4f > 0",
+            pbo, deflated_sharpe,
+        )
+    else:
+        logger.warning(
+            "ACCEPTANCE: FAIL — PBO %.4f (need <0.40), DeflSharpe %.4f (need >0)",
+            pbo, deflated_sharpe,
+        )
+
+
+if __name__ == "__main__":
+    main()
