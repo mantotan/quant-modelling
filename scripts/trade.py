@@ -52,11 +52,11 @@ from qm.strategy.filter import TradeFilter
 from qm.strategy.portfolio import Portfolio
 from qm.strategy.sizing.kelly import KellySizer
 
-# Binance futures price endpoint (for live tick feed)
-_BINANCE_SYMBOLS: dict[str, str] = {
-    "BTC": "BTCUSDT", "ETH": "ETHUSDT", "SOL": "SOLUSDT", "XRP": "XRPUSDT",
+# CoinGecko IDs for live price feed
+_COINGECKO_IDS: dict[str, str] = {
+    "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana", "XRP": "ripple",
 }
-BINANCE_TICKER_URL = "https://fapi.binance.com/fapi/v1/ticker/price"
+COINGECKO_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -265,16 +265,16 @@ async def price_feed(
     asset: Asset,
     bar_builder: BarBuilder,
     running_flag: list[bool],
-    poll_interval: float = 1.0,
+    poll_interval: float = 3.0,
 ) -> None:
-    """Poll Binance futures for the latest price and feed into BarBuilder.
+    """Poll CoinGecko for the latest price and feed into BarBuilder.
 
-    Lightweight REST poller — 1 HTTP call per second.
+    Lightweight REST poller — 1 call every 3s (within free tier limits).
     Feeds synthetic trades into the BarBuilder to keep partial bars alive.
     """
-    symbol = _BINANCE_SYMBOLS.get(asset.value, f"{asset.value}USDT")
-    url = f"{BINANCE_TICKER_URL}?symbol={symbol}"
-    logger.info("Price feed started: %s (%s)", asset.value, symbol)
+    cg_id = _COINGECKO_IDS.get(asset.value, asset.value.lower())
+    url = f"{COINGECKO_PRICE_URL}?ids={cg_id}&vs_currencies=usd"
+    logger.info("Price feed started: %s (CoinGecko/%s)", asset.value, cg_id)
 
     while running_flag[0]:
         try:
@@ -283,9 +283,10 @@ async def price_feed(
             ) as session, session.get(url) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    price = float(data["price"])
-                    now = datetime.now(UTC)
-                    bar_builder.on_trade(asset, price, 0.001, now)
+                    price = data.get(cg_id, {}).get("usd")
+                    if price is not None:
+                        now = datetime.now(UTC)
+                        bar_builder.on_trade(asset, float(price), 0.001, now)
         except Exception:
             pass  # Non-critical — next poll will retry
         await asyncio.sleep(poll_interval)
