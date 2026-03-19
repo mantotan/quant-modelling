@@ -39,7 +39,7 @@
   },
   "objective": {
     "primary": "sharpe",
-    "brier_threshold": 0.25,
+    "brier_threshold": 0.20,
     "brier_penalty_weight": 10.0,
     "min_trades": 50,
     "trade_penalty_weight": 5.0,
