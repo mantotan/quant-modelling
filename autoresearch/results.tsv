@@ -4,3 +4,4 @@ iteration	timestamp	asset	status	oos_brier	oos_ece	backtest_pnl	backtest_sharpe	
 3	2026-03-19T17:37:00	BTC	KEEP	0.143858	0.0040	67.94	74.30	add 3 regime features (regime_vol_zscore in top-10! first alpha signal)	03da25d	1398416.93	81.20	-	-	-	-	-
 4	2026-03-19T17:52:00	BTC	KEEP	0.143854	0.0042	68.33	74.87	add 4 liquidation features (30 features, regime_vol_zscore still top-10)	1013a68	1398008.97	81.12	-	-	-	-	-
 6	2026-03-19T18:30:00	BTC	DISCARD	0.2028	-	-	-	add 3 interaction features (regime_x_funding, funding_x_vol, leverage_x_proximity) — massive Brier regression	-	-	-	-	-	-	-	-
+7	2026-03-19T18:49:00	BTC	KEEP	0.1982	-	5302.55	26.26	NEW BASELINE — corrected pipeline (knobs.json controls features + WF params, n_splits=8, test_bars=2000, 18/22 features, real tick data 1.86M samples)	-	-	-	-	1700	0.6818	0.6649	0.1972
