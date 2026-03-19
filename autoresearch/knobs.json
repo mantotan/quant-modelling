@@ -24,7 +24,7 @@
     ]
   },
   "interaction_features": {
-    "enabled": true,
+    "enabled": false,
     "pairs": [
       "funding_x_rsi", "funding_x_vol", "oi_div_x_momentum", "iv_skew_x_return",
       "leverage_x_proximity", "regime_x_funding", "btc_lead_x_funding", "pm_imbalance_x_vol"
