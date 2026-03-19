@@ -3,3 +3,4 @@ iteration	timestamp	asset	status	oos_brier	oos_ece	backtest_pnl	backtest_sharpe	
 2	2026-03-19T08:07:00	BTC	DISCARD	0.205517	0.0422	11.64	10.75	narrow reg_alpha [0.01,5.0] + reg_lambda [0.0001,1.0] (HPO regularization range)	5dfe2b7	80145.51	1.42
 3	2026-03-19T08:22:00	BTC	DISCARD	0.206776	0.0477	5.51	5.06	narrow max_depth [4,6] + num_leaves [31,128] (deeper trees only)	6560499	-469875.09	-7.70
 4	2026-03-19T08:37:00	BTC	KEEP-VERIFIED	0.198617	0.0474	19.77	18.54	time_pcts: drop 0.003 add 0.30 (denser mid-range sampling)	b39676f	357596.03	7.00
+5	2026-03-19T09:02:00	BTC	KEEP	0.189246	0.0402	29.54	28.46	strategist #1: drop 0.01 from time_pcts (7 points remaining)	PENDING	758495.69	17.59
