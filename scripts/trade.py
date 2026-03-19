@@ -57,8 +57,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("trade")
 
-# Time thresholds for Pulse predictions (fraction of bar elapsed)
-TIME_PCTS = [0.30, 0.40, 0.60, 0.80]
+# Time thresholds for Pulse predictions — must match training config
+_KNOBS_PATH = Path("autoresearch/best_knobs.json")
+if _KNOBS_PATH.exists():
+    with open(_KNOBS_PATH) as _f:
+        TIME_PCTS = json.loads(_f.read()).get("time_pcts", [0.80])
+else:
+    TIME_PCTS = [0.80]
 
 # State file for crash recovery
 STATE_FILE = Path("data/trade_state.json")

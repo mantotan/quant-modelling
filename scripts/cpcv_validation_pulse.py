@@ -64,6 +64,72 @@ def load_knobs() -> dict:
         return json.load(f)
 
 
+def _resolve_params(knobs: dict, args: argparse.Namespace) -> tuple[dict, int]:
+    """Resolve LightGBM params: CLI --best-params > saved model > HPO midpoints."""
+    bp = None
+
+    # Priority 1: CLI --best-params JSON string
+    if args.best_params:
+        bp = json.loads(args.best_params)
+        logger.info("Using best_params from --best-params CLI argument")
+
+    # Priority 2: Load from saved model.lgb file
+    if bp is None:
+        model_dir = Path(f"data/models/pulse_v2/{args.asset}_{args.timeframe}")
+        model_path = model_dir / "model.lgb"
+        if model_path.exists():
+            saved = lgb.Booster(model_file=str(model_path))
+            saved_params = saved.params
+            bp = {
+                "n_estimators": saved.num_trees(),
+                "lr": float(saved_params.get("learning_rate", 0.02)),
+                "max_depth": int(saved_params.get("max_depth", 5)),
+                "num_leaves": int(saved_params.get("num_leaves", 70)),
+                "min_child": int(saved_params.get("min_child_samples", 550)),
+                "subsample": float(saved_params.get("bagging_fraction", 0.8)),
+                "colsample": float(saved_params.get("feature_fraction", 0.7)),
+                "reg_alpha": float(saved_params.get("lambda_l1", 0.001)),
+                "reg_lambda": float(saved_params.get("lambda_l2", 0.001)),
+            }
+            logger.info(
+                "Using best_params from saved model: %s (lr=%.4f, depth=%d, n_est=%d)",
+                model_path, bp["lr"], bp["max_depth"], bp["n_estimators"],
+            )
+
+    # Priority 3: Fall back to HPO midpoints (legacy behavior)
+    if bp is None:
+        hpo = knobs.get("hpo_search_space", {})
+        bp = {
+            "n_estimators": _midpoint(hpo, "n_estimators", 800, as_int=True),
+            "lr": _midpoint(hpo, "learning_rate", 0.02),
+            "max_depth": _midpoint(hpo, "max_depth", 5, as_int=True),
+            "num_leaves": _midpoint(hpo, "num_leaves", 70, as_int=True),
+            "min_child": _midpoint(hpo, "min_child_samples", 550, as_int=True),
+            "subsample": _midpoint(hpo, "subsample", 0.8),
+            "colsample": _midpoint(hpo, "colsample_bytree", 0.7),
+            "reg_alpha": _midpoint(hpo, "reg_alpha", 0.001),
+            "reg_lambda": _midpoint(hpo, "reg_lambda", 0.001),
+        }
+        logger.warning("No saved model found — falling back to HPO midpoints (UNRELIABLE for PBO)")
+
+    n_est = bp.get("n_estimators", 800)
+    params = {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "verbosity": -1,
+        "max_depth": int(bp.get("max_depth", 5)),
+        "num_leaves": int(bp.get("num_leaves", 70)),
+        "min_child_samples": int(bp.get("min_child", 550)),
+        "learning_rate": float(bp.get("lr", 0.02)),
+        "subsample": float(bp.get("subsample", 0.8)),
+        "colsample_bytree": float(bp.get("colsample", 0.7)),
+        "reg_alpha": float(bp.get("reg_alpha", 0.001)),
+        "reg_lambda": float(bp.get("reg_lambda", 0.001)),
+        "seed": args.seed,
+    }
+    return params, int(n_est)
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="CPCV PBO validation for Pulse model")
     p.add_argument("--asset", required=True, choices=["BTC", "ETH", "SOL", "XRP"])
@@ -71,6 +137,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--n-groups", type=int, default=8, help="CPCV groups (default 8)")
     p.add_argument("--k-test", type=int, default=2, help="Test groups per path (default 2)")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument(
+        "--best-params", type=str, default=None,
+        help="JSON string of best_params from Optuna (overrides HPO midpoints). "
+             "If not provided, loads params from saved model.lgb file.",
+    )
     return p.parse_args()
 
 
@@ -120,9 +191,19 @@ def main() -> None:
     market_probs = dataset.market_probs[tp_mask]
     time_pcts = dataset.time_pcts[tp_mask]
 
+    actual_tps = sorted(set(float(round(t, 6)) for t in time_pcts))
+    if len(actual_tps) < len(tp_set):
+        unmatched = [
+            float(tp) for tp in tp_set
+            if not any(np.isclose(tp, a, atol=1e-6) for a in actual_tps)
+        ]
+        logger.warning(
+            "time_pcts MISMATCH: requested %s but only %s exist in dataset. "
+            "Unmatched: %s", list(tp_set), actual_tps, unmatched,
+        )
     logger.info(
-        "After filtering: %d samples, %d features, %d time_pcts",
-        len(y), len(feature_names_used), len(tp_set),
+        "After filtering: %d samples, %d features, %d/%d time_pcts matched",
+        len(y), len(feature_names_used), len(actual_tps), len(tp_set),
     )
 
     # ── Bar-level CPCV ──────────────────────────────────────────
@@ -167,29 +248,12 @@ def main() -> None:
             logger.warning("  Path %d: empty split, skipping", i + 1)
             continue
 
-        # Train LightGBM on this fold (params from knobs HPO midpoints)
+        # Train LightGBM on this fold
         ds = lgb.Dataset(
             X[train_mask], y[train_mask],
             feature_name=feature_names_used,
         )
-        hpo = knobs.get("hpo_search_space", {})
-        params = {
-            "objective": "binary",
-            "metric": "binary_logloss",
-            "verbosity": -1,
-            "max_depth": _midpoint(hpo, "max_depth", 5, as_int=True),
-            "num_leaves": _midpoint(hpo, "num_leaves", 70, as_int=True),
-            "min_child_samples": _midpoint(
-                hpo, "min_child_samples", 550, as_int=True,
-            ),
-            "learning_rate": _midpoint(hpo, "learning_rate", 0.02),
-            "subsample": _midpoint(hpo, "subsample", 0.8),
-            "colsample_bytree": _midpoint(hpo, "colsample_bytree", 0.7),
-            "reg_alpha": _midpoint(hpo, "reg_alpha", 0.001),
-            "reg_lambda": _midpoint(hpo, "reg_lambda", 0.001),
-            "seed": args.seed,
-        }
-        n_est = _midpoint(hpo, "n_estimators", 800, as_int=True)
+        params, n_est = _resolve_params(knobs, args)
         model = lgb.train(params, ds, num_boost_round=n_est)
 
         # In-sample evaluation

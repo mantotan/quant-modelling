@@ -154,8 +154,18 @@ def run(args: argparse.Namespace) -> dict:
     market_probs = dataset.market_probs[tp_mask]
     time_pcts = dataset.time_pcts[tp_mask]
 
-    logger.info("After filtering: %d samples, %d features, %d time_pcts",
-                len(y), len(feature_names_used), len(tp_set))
+    actual_tps = sorted(set(float(round(t, 6)) for t in time_pcts))
+    if len(actual_tps) < len(tp_set):
+        unmatched = [
+            float(tp) for tp in tp_set
+            if not any(np.isclose(tp, a, atol=1e-6) for a in actual_tps)
+        ]
+        logger.warning(
+            "time_pcts MISMATCH: requested %s but only %s exist in dataset. "
+            "Unmatched: %s", list(tp_set), actual_tps, unmatched,
+        )
+    logger.info("After filtering: %d samples, %d features, %d/%d time_pcts matched",
+                len(y), len(feature_names_used), len(actual_tps), len(tp_set))
 
     # ── 80/20 bar-level temporal split ────────────────────────────
     unique_bars = np.unique(bar_indices)
