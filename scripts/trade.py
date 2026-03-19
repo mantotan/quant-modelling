@@ -24,7 +24,7 @@ import logging
 import signal
 import sys
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 import lightgbm as lgb
@@ -32,17 +32,13 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from qm.core.types import Asset, MarketType, Outcome, PolymarketMarket, Timeframe
-from qm.data.connectors.polymarket_recorder import (
-    _extract_prices,
-    _is_binary_up_down,
-    _match_asset,
-)
+from qm.core.types import Asset, Outcome, Timeframe
 from qm.data.ingestion.bar_builder import BarBuilder
 from qm.data.storage.parquet import ParquetStore
 from qm.execution.audit import AuditWriter
 from qm.execution.loop import TradingLoop
 from qm.execution.paper.engine import PaperExecutor
+from qm.execution.polymarket.market_scanner import MarketScanner
 from qm.features.live_cache import RUST_AVAILABLE, get_feature_calculator
 from qm.features.pipeline import FeaturePipeline
 from qm.model.calibration.calibrator import IsotonicCalibrator
@@ -181,93 +177,68 @@ def create_executor(mode: str):
         return PaperExecutor()
 
 
-async def discover_markets(asset: Asset) -> PolymarketMarket | None:
-    """Find an active Polymarket 5m binary crypto market.
-
-    Uses the same logic as PolymarketOddsRecorder._discover_markets().
-    Returns None if no active market found.
-    """
-    import aiohttp
-
-    url = "https://gamma-api.polymarket.com/markets"
-    try:
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=10),
-        ) as session, session.get(
-            url, params={"active": "true", "closed": "false"},
-        ) as resp:
-            if resp.status != 200:
-                return None
-            markets = await resp.json()
-    except Exception:
-        logger.debug("Gamma API unreachable")
-        return None
-
-    for m in markets:
-        tokens = m.get("tokens", [])
-        if not _is_binary_up_down(tokens):
-            continue
-        matched = _match_asset(m.get("question", ""))
-        if matched != asset:
-            continue
-
-        price_up, price_down = _extract_prices(tokens)
-        if price_up is None:
-            continue
-
-        return PolymarketMarket(
-            condition_id=m.get("condition_id", ""),
-            token_id_up=tokens[0].get("token_id", ""),
-            token_id_down=tokens[1].get("token_id", ""),
-            asset=asset,
-            market_type=MarketType.FIVE_MIN,
-            window_start=datetime.now(UTC),
-            window_end=datetime.now(UTC) + timedelta(minutes=5),
-            mid_up=price_up or 0.5,
-            spread=abs(1.0 - (price_up or 0.5) - (price_down or 0.5)),
-            volume=float(m.get("volume", 0) or 0),
-        )
-
-    return None
-
-
 async def resolution_monitor(
-    portfolio: Portfolio, trading_loop: TradingLoop,
+    portfolio: Portfolio,
+    trading_loop: TradingLoop,
+    scanner: MarketScanner,
+    running_flag: list[bool],
 ) -> None:
-    """Poll for market resolutions every 30s."""
-    while True:
+    """Poll Gamma API for market resolutions every 30s.
+
+    Uses MarketScanner.get_market_status() to check actual outcomes,
+    NOT random resolution. This ensures paper PnL reflects real
+    market outcomes.
+    """
+    while running_flag[0]:
         await asyncio.sleep(30.0)
-        positions = list(portfolio._positions.values())
+        positions = portfolio.get_open_positions()
         if not positions:
             continue
 
         for pos in positions:
-            # Check if past expected resolution time
             age = (datetime.now(UTC) - pos.entry_time).total_seconds()
-            if age > 360:  # > 6 min (5m bar + 1m buffer)
-                # Resolve based on whether market moved in our direction
-                # In paper mode, use 50/50 random resolution
-                # In live mode, poll Gamma API (Phase 3 G)
-                import random
-                won = random.random() < 0.5
-                outcome = pos.side if won else (
-                    Outcome.DOWN if pos.side == Outcome.UP else Outcome.UP
-                )
-                pnl = await trading_loop.on_market_resolution(
-                    pos.condition_id, outcome,
-                )
-                logger.info(
-                    "Resolved %s %s: %s → PnL $%.2f",
-                    pos.asset.value, pos.side.value,
-                    "WIN" if won else "LOSS", pnl,
-                )
+            if age < 300:  # wait at least 5 min before checking
+                continue
+
+            # Poll Gamma API for actual resolution
+            market_info = await scanner.get_market_status(
+                pos.condition_id,
+            )
+            if market_info is None:
+                if age > 600:  # > 10 min, warn
+                    logger.warning(
+                        "Position %s age %.0fs, no resolution yet",
+                        pos.condition_id[:12], age,
+                    )
+                continue
+
+            if not market_info.get("resolved", False):
+                continue
+
+            # Determine actual outcome from Gamma API
+            outcome_str = market_info.get("outcome", "")
+            outcome = (
+                Outcome.UP
+                if outcome_str.lower() in ("up", "yes")
+                else Outcome.DOWN
+            )
+
+            pnl = await trading_loop.on_market_resolution(
+                pos.condition_id, outcome,
+            )
+            won = pnl > 0
+            logger.info(
+                "Resolved %s %s: %s → PnL $%.2f",
+                pos.asset.value, pos.side.value,
+                "WIN" if won else "LOSS", pnl,
+            )
 
 
 def save_state(portfolio: Portfolio, stats: dict) -> None:
     """Save portfolio state for crash recovery."""
     state = {
         "bankroll": portfolio.bankroll.to_dict(),
-        "n_positions": len(portfolio._positions),
+        "n_positions": len(portfolio.get_open_positions()),
         "stats": stats,
         "saved_at": datetime.now(UTC).isoformat(),
     }
@@ -347,8 +318,14 @@ async def main_loop(args: argparse.Namespace) -> None:
         "start_time": datetime.now(UTC).isoformat(),
     }
 
+    # ── Market scanner (cached, 10s TTL) ────────────────────────
+    scanner = MarketScanner(assets={asset})
+
     # ── Start resolution monitor ────────────────────────────────
-    asyncio.create_task(resolution_monitor(portfolio, trading_loop))
+    running_flag = [True]  # mutable list so coroutine can check
+    asyncio.create_task(
+        resolution_monitor(portfolio, trading_loop, scanner, running_flag),
+    )
 
     # ── Main polling loop ───────────────────────────────────────
     last_triggered: dict[Asset, set[float]] = {}
@@ -359,26 +336,22 @@ async def main_loop(args: argparse.Namespace) -> None:
     logger.info("Starting main loop (1s polling)...")
     logger.info("Waiting for Polymarket market discovery...")
 
-    running = True
-
-    def handle_shutdown(sig, frame):
-        nonlocal running
+    def handle_shutdown(sig_num, frame):
+        nonlocal running_flag
         logger.info("Shutdown signal received")
-        running = False
+        running_flag[0] = False
 
     signal.signal(signal.SIGINT, handle_shutdown)
     signal.signal(signal.SIGTERM, handle_shutdown)
 
-    while running:
+    while running_flag[0]:
         await asyncio.sleep(1.0)
 
         # Get partial bar snapshot
         partial = bar_builder.get_partial_bar(asset, tf)
 
         if partial is None:
-            # No bar data yet — try to simulate a tick to prime the builder
-            # In production, ticks come from CcxtWebsocketConnector
-            # For now, just wait
+            # No bar data yet — ticks come from CcxtWebsocketConnector
             continue
 
         bar_id = int(partial.window_start.timestamp())
@@ -397,8 +370,8 @@ async def main_loop(args: argparse.Namespace) -> None:
 
             last_triggered.setdefault(asset, set()).add(threshold)
 
-            # Discover active Polymarket market
-            market = await discover_markets(asset)
+            # Discover active market (cached, 10s TTL)
+            market = await scanner.get_active_market(asset)
             if market is None:
                 logger.debug("No active market for %s", asset.value)
                 continue

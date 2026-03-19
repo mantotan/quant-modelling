@@ -48,6 +48,17 @@ CONFIG_PATH = Path("autoresearch/knobs.json")
 N_TICK_FEATURES = 8
 
 
+def _midpoint(
+    hpo: dict, key: str, default: float, *, as_int: bool = False,
+) -> float | int:
+    """Get midpoint of HPO range, or default if key missing."""
+    r = hpo.get(key)
+    if r and len(r) == 2:
+        val = (r[0] + r[1]) / 2
+        return int(val) if as_int else val
+    return int(default) if as_int else default
+
+
 def load_knobs() -> dict:
     with open(CONFIG_PATH) as f:
         return json.load(f)
@@ -156,26 +167,30 @@ def main() -> None:
             logger.warning("  Path %d: empty split, skipping", i + 1)
             continue
 
-        # Train LightGBM on this fold
+        # Train LightGBM on this fold (params from knobs HPO midpoints)
         ds = lgb.Dataset(
             X[train_mask], y[train_mask],
             feature_name=feature_names_used,
         )
+        hpo = knobs.get("hpo_search_space", {})
         params = {
             "objective": "binary",
             "metric": "binary_logloss",
             "verbosity": -1,
-            "max_depth": 5,
-            "num_leaves": 70,
-            "min_child_samples": 700,
-            "learning_rate": 0.02,
-            "subsample": 0.8,
-            "colsample_bytree": 0.7,
-            "reg_alpha": 0.001,
-            "reg_lambda": 0.001,
+            "max_depth": _midpoint(hpo, "max_depth", 5, as_int=True),
+            "num_leaves": _midpoint(hpo, "num_leaves", 70, as_int=True),
+            "min_child_samples": _midpoint(
+                hpo, "min_child_samples", 550, as_int=True,
+            ),
+            "learning_rate": _midpoint(hpo, "learning_rate", 0.02),
+            "subsample": _midpoint(hpo, "subsample", 0.8),
+            "colsample_bytree": _midpoint(hpo, "colsample_bytree", 0.7),
+            "reg_alpha": _midpoint(hpo, "reg_alpha", 0.001),
+            "reg_lambda": _midpoint(hpo, "reg_lambda", 0.001),
             "seed": args.seed,
         }
-        model = lgb.train(params, ds, num_boost_round=1200)
+        n_est = _midpoint(hpo, "n_estimators", 800, as_int=True)
+        model = lgb.train(params, ds, num_boost_round=n_est)
 
         # In-sample evaluation
         is_probs = model.predict(X[train_mask])

@@ -51,7 +51,7 @@ class PositionTracker:
         }
 
         # Check local positions against API
-        local_positions = list(self._portfolio._positions.values())
+        local_positions = self._portfolio.get_open_positions()
 
         for pos in local_positions:
             if pos.condition_id in api_order_ids:

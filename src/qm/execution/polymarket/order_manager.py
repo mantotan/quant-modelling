@@ -71,6 +71,7 @@ class OrderManager:
         self._max_slippage = max_slippage
         self._active_orders: dict[str, ManagedOrder] = {}
         self._fill_count = 0
+        self._running = True
 
     async def submit(
         self,
@@ -134,11 +135,18 @@ class OrderManager:
         # Monitor until filled, cancelled, or timed out
         return await self._monitor(order)
 
+    def stop(self) -> None:
+        """Signal all monitoring loops to exit."""
+        self._running = False
+
     async def _monitor(self, order: ManagedOrder) -> ManagedOrder:
-        """Monitor order until terminal state."""
+        """Monitor order until terminal state or shutdown."""
         original_price = order.price
 
-        while order.status in (OrderStatus.PLACED, OrderStatus.PARTIALLY_FILLED):
+        while (
+            self._running
+            and order.status in (OrderStatus.PLACED, OrderStatus.PARTIALLY_FILLED)
+        ):
             await asyncio.sleep(self._heartbeat_interval)
             elapsed = time.monotonic() - order.placed_at
 

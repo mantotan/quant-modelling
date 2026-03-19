@@ -74,7 +74,7 @@ async def reconcile_on_startup(
 
     # 3. Check for offline resolutions
     if scanner is not None:
-        positions = list(portfolio._positions.values())
+        positions = portfolio.get_open_positions()
         for pos in positions:
             try:
                 market_info = await scanner.get_market_status(

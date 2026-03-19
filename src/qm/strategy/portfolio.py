@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import logging
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from qm.core.types import Asset, Outcome
@@ -62,6 +62,10 @@ class Portfolio:
     def open_position_count(self) -> int:
         return len(self._positions)
 
+    def get_open_positions(self) -> list:
+        """Return a list of all open positions."""
+        return list(self._positions.values())
+
     @property
     def available_cash(self) -> float:
         committed = sum(p.size_usd for p in self._positions.values())
@@ -111,7 +115,7 @@ class Portfolio:
             entry_price=fill_price,
             size_usd=size_usd,
             shares=shares,
-            entry_time=datetime.now(timezone.utc),
+            entry_time=datetime.now(UTC),
             condition_id=condition_id,
         )
         self._positions[pos_id] = position
@@ -156,7 +160,7 @@ class Portfolio:
                 "outcome": outcome.value,
                 "won": won,
                 "pnl": pnl,
-                "resolved_at": datetime.now(timezone.utc).isoformat(),
+                "resolved_at": datetime.now(UTC).isoformat(),
             })
 
             logger.info(
