@@ -16,7 +16,7 @@ id	phase	work_unit	description	dependencies	status
 15	4A	enriched_knobs	Create enriched knobs.json schema	14	DONE
 16	4B	training_script_update	Update train_pulse_fast.py to support enriched knobs	15	DONE
 17	4B	cache_regeneration	Regenerate .npz dataset with all new features	16	DONE
-18	4B	baseline_run	Run baseline with enriched features, verify acceptance	17	PENDING
+18	4B	baseline_run	Run baseline with enriched features, verify acceptance	17	DONE
 19	5A	shap_monitor	SHAPMonitor with alpha_feature_share tracking + tests	14	PENDING
 20	5B	logreg_trainer	LogRegTrainer + stacked ensemble + tests	9	PENDING
 21	6A	alpha_validator	AlphaValidator standalone signal validation + tests	3,4,12	PENDING

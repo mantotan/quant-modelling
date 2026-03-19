@@ -1,0 +1,2 @@
+iteration	timestamp	asset	status	oos_brier	oos_ece	backtest_pnl	backtest_sharpe	description	commit	bs_pnl	bs_sharpe
+1	2026-03-19T04:23:00	BTC	KEEP	0.202468	0.0261	5.10	50.22	baseline — Pulse V2 default knobs, cached dataset	6d89c94	-	-
