@@ -17,12 +17,18 @@ from qm.features.registry import GLOBAL_REGISTRY
 logger = logging.getLogger(__name__)
 
 # Import all feature groups to trigger auto-registration
-import qm.features.groups.price  # noqa: F401
-import qm.features.groups.volatility  # noqa: F401
-import qm.features.groups.momentum  # noqa: F401
-import qm.features.groups.volume  # noqa: F401
-import qm.features.groups.time_features  # noqa: F401
-import qm.features.groups.derivatives  # noqa: F401
+import qm.features.groups.derivatives  # noqa: F401, E402
+import qm.features.groups.funding  # noqa: F401, E402
+import qm.features.groups.interactions  # noqa: F401, E402
+import qm.features.groups.liquidation  # noqa: F401, E402
+import qm.features.groups.momentum  # noqa: F401, E402
+import qm.features.groups.options_iv  # noqa: F401, E402
+import qm.features.groups.polymarket  # noqa: F401, E402
+import qm.features.groups.price  # noqa: F401, E402
+import qm.features.groups.regime  # noqa: F401, E402
+import qm.features.groups.time_features  # noqa: F401, E402
+import qm.features.groups.volatility  # noqa: F401, E402
+import qm.features.groups.volume  # noqa: F401, E402
 
 
 def _get_calculators() -> dict[str, FeatureCalculatorBase]:
