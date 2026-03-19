@@ -6,3 +6,4 @@ iteration	timestamp	asset	status	oos_brier	oos_ece	backtest_pnl	backtest_sharpe	
 6	2026-03-19T18:30:00	BTC	DISCARD	0.2028	-	-	-	add 3 interaction features (regime_x_funding, funding_x_vol, leverage_x_proximity) — massive Brier regression	-	-	-	-	-	-	-	-
 7	2026-03-19T18:49:00	BTC	KEEP	0.1982	-	5302.55	26.26	NEW BASELINE — corrected pipeline (knobs.json controls features + WF params, n_splits=8, test_bars=2000, 18/22 features, real tick data 1.86M samples)	de351a0	-	-	-	1700	0.6818	0.6649	0.1972
 8	2026-03-19T19:10:00	BTC	KEEP-VERIFIED	0.143724	0.0044	68.17	74.48	train_bars 5000→8000 — 27.5% Brier improvement (0.1982→0.143722), verified at 0.143724 with 100 trials	46f2e64	1432399.86	85.30	0.3276	80812	0.7998	0.7902	0.13137
+9	2026-03-19T19:30:00	BTC	DISCARD	0.143727	0.0051	68.91	75.61	embargo_period 6→12 — Brier 0.143727 vs best 0.143724, no improvement (noise-level difference)	-	1419014.63	86.45	0.3645	80806	0.8044	0.7903	0.13141
