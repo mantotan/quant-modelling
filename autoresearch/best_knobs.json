@@ -58,7 +58,7 @@
       "leverage_x_", "regime_x_", "btc_lead_x_", "pm_imbalance_x_"
     ]
   },
-  "time_pcts": [0.10, 0.20, 0.30, 0.40, 0.60, 0.80],
+  "time_pcts": [0.20, 0.30, 0.40, 0.60, 0.80],
   "hpo_search_space": {
     "n_estimators": [100, 1500],
     "learning_rate": [0.005, 0.1],
