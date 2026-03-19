@@ -1,10 +1,10 @@
 """Binance perpetual funding rate downloader.
 
-Downloads historical funding rates from the Binance Futures REST API.
-Funding rates are published every 8 hours (00:00, 08:00, 16:00 UTC).
+Two download backends:
+1. REST API (BinanceFundingRateDownloader) — uses fapi.binance.com
+2. Binance Vision (BinanceVisionFundingDownloader) — uses data.binance.vision
 
-API endpoint: GET /fapi/v1/fundingRate
-Rate limit: 2400 requests/minute on /fapi/v1/*
+Funding rates are published every 8 hours (00:00, 08:00, 16:00 UTC).
 
 Storage: Hive-partitioned Parquet at data/raw/funding/asset=X/date=Y/data.parquet
 """
@@ -12,7 +12,10 @@ Storage: Hive-partitioned Parquet at data/raw/funding/asset=X/date=Y/data.parque
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import io
 import logging
+import zipfile
 from datetime import UTC, date, datetime, timedelta
 
 import aiohttp
@@ -248,3 +251,231 @@ class BinanceFundingRateDownloader:
         df = df.unique(subset=["time"]).sort("time")
 
         return df
+
+
+# ── Binance Vision funding rate downloader ───────────────────────
+
+BINANCE_VISION_BASE = "https://data.binance.vision"
+
+# Vision data availability starts later than REST API
+VISION_START_DATES: dict[str, date] = {
+    "BTCUSDT": date(2020, 1, 1),
+    "ETHUSDT": date(2020, 1, 1),
+    "SOLUSDT": date(2021, 8, 1),
+    "XRPUSDT": date(2020, 1, 1),
+}
+
+
+class BinanceVisionFundingDownloader:
+    """Downloads funding rates from Binance Vision (data.binance.vision).
+
+    Uses monthly ZIP archives — no API key required, not rate-limited.
+    Useful when the Futures REST API (fapi.binance.com) is blocked.
+
+    CSV format: calc_time,funding_interval_hours,last_funding_rate
+    (no mark_price column — only available via REST API)
+
+    Usage:
+        store = ParquetStore(Path("data/raw/funding"))
+        dl = BinanceVisionFundingDownloader(store)
+        stats = await dl.download_all([Asset.BTC, Asset.ETH])
+    """
+
+    def __init__(
+        self,
+        store: ParquetStore,
+        max_concurrent: int = 4,
+        timeout_seconds: float = 30.0,
+    ) -> None:
+        self._store = store
+        self._semaphore = asyncio.Semaphore(max_concurrent)
+        self._timeout = aiohttp.ClientTimeout(total=timeout_seconds)
+
+    async def download_all(
+        self,
+        assets: list[Asset] | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict[str, int]:
+        """Download funding rates for all specified assets.
+
+        Returns:
+            Dict with keys: downloaded, skipped, failed, rows.
+        """
+        assets = assets or list(ASSET_TO_SYMBOL.keys())
+        # Vision only has complete months — end at last complete month
+        end_date = end_date or date(
+            date.today().year,
+            date.today().month,
+            1,
+        ) - timedelta(days=1)
+
+        stats: dict[str, int] = {
+            "downloaded": 0, "skipped": 0, "failed": 0, "rows": 0,
+        }
+
+        async with aiohttp.ClientSession(timeout=self._timeout) as session:
+            for asset in assets:
+                symbol = ASSET_TO_SYMBOL[asset]
+                sym_start = start_date or VISION_START_DATES.get(
+                    symbol, date(2020, 1, 1),
+                )
+                logger.info(
+                    "Downloading funding rates (Vision) for %s (%s) "
+                    "from %s to %s",
+                    asset.value, symbol, sym_start, end_date,
+                )
+                asset_stats = await self._download_symbol(
+                    session, asset, symbol, sym_start, end_date,
+                )
+                for k in stats:
+                    stats[k] += asset_stats.get(k, 0)
+
+        logger.info(
+            "Vision funding download: %d months, %d skipped, "
+            "%d failed, %d rows",
+            stats["downloaded"], stats["skipped"],
+            stats["failed"], stats["rows"],
+        )
+        return stats
+
+    async def _download_symbol(
+        self,
+        session: aiohttp.ClientSession,
+        asset: Asset,
+        symbol: str,
+        start_date: date,
+        end_date: date,
+    ) -> dict[str, int]:
+        """Download all monthly ZIPs for a single symbol."""
+        stats: dict[str, int] = {
+            "downloaded": 0, "skipped": 0, "failed": 0, "rows": 0,
+        }
+        all_rows: list[dict] = []
+
+        # Iterate month by month
+        current = date(start_date.year, start_date.month, 1)
+        while current <= end_date:
+            year_month = current.strftime("%Y-%m")
+            url = (
+                f"{BINANCE_VISION_BASE}/data/futures/um/monthly/"
+                f"fundingRate/{symbol}/"
+                f"{symbol}-fundingRate-{year_month}.zip"
+            )
+
+            async with self._semaphore:
+                try:
+                    rows = await self._download_month(
+                        session, url, symbol,
+                    )
+                    if rows:
+                        all_rows.extend(rows)
+                        stats["downloaded"] += 1
+                    else:
+                        stats["skipped"] += 1
+                except Exception:
+                    logger.warning(
+                        "Failed to download %s %s",
+                        symbol, year_month,
+                    )
+                    stats["failed"] += 1
+
+            # Next month
+            if current.month == 12:
+                current = date(current.year + 1, 1, 1)
+            else:
+                current = date(current.year, current.month + 1, 1)
+
+        if not all_rows:
+            logger.info("No Vision funding data for %s", symbol)
+            return stats
+
+        df = self._parse_vision_csv(all_rows)
+        stats["rows"] = len(df)
+
+        self._store.write_metrics(df, asset)
+        logger.info(
+            "Stored %d funding rate records for %s (Vision)",
+            len(df), asset.value,
+        )
+        return stats
+
+    async def _download_month(
+        self,
+        session: aiohttp.ClientSession,
+        url: str,
+        symbol: str,
+    ) -> list[dict]:
+        """Download and extract a single monthly ZIP."""
+        # Download ZIP
+        async with session.get(url) as resp:
+            if resp.status == 404:
+                return []
+            resp.raise_for_status()
+            zip_bytes = await resp.read()
+
+        # Verify checksum if available
+        checksum_url = url + ".CHECKSUM"
+        try:
+            async with session.get(checksum_url) as cs_resp:
+                if cs_resp.status == 200:
+                    expected = (await cs_resp.text()).strip().split()[0]
+                    actual = hashlib.sha256(zip_bytes).hexdigest()
+                    if actual != expected:
+                        logger.warning(
+                            "Checksum mismatch for %s: %s != %s",
+                            url, actual[:12], expected[:12],
+                        )
+                        return []
+        except Exception:
+            pass  # checksum verification is best-effort
+
+        # Extract CSV from ZIP
+        rows = []
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            for name in zf.namelist():
+                if not name.endswith(".csv"):
+                    continue
+                with zf.open(name) as f:
+                    lines = (
+                        f.read().decode("utf-8").strip().split("\n")
+                    )
+                    # Skip header
+                    for line in lines[1:]:
+                        parts = line.strip().split(",")
+                        if len(parts) < 3:
+                            continue
+                        rows.append({
+                            "calc_time": int(parts[0]),
+                            "funding_rate": float(parts[2]),
+                        })
+
+        return rows
+
+    @staticmethod
+    def _parse_vision_csv(rows: list[dict]) -> pl.DataFrame:
+        """Parse Vision CSV rows into the same schema as REST.
+
+        Vision CSV: calc_time, funding_interval_hours, last_funding_rate
+        Output: time (Datetime UTC), funding_rate (Float64), mark_price (None)
+        """
+        parsed = []
+        for r in rows:
+            parsed.append({
+                "time": datetime.fromtimestamp(
+                    r["calc_time"] / 1000, tz=UTC,
+                ),
+                "funding_rate": r["funding_rate"],
+                "mark_price": None,
+            })
+
+        if not parsed:
+            return pl.DataFrame()
+
+        df = pl.DataFrame(parsed)
+        df = df.cast({
+            "time": pl.Datetime("us", "UTC"),
+            "funding_rate": pl.Float64,
+        })
+
+        return df.unique(subset=["time"]).sort("time")

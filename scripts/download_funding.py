@@ -1,10 +1,14 @@
 #!/usr/bin/env python
-"""Download historical funding rates from Binance Futures API.
+"""Download historical funding rates from Binance.
+
+Two backends:
+  vision (default): Binance Vision monthly ZIPs (no API key, not blocked)
+  api:              Binance Futures REST API (may be blocked by ISP/firewall)
 
 Usage:
-    python scripts/download_funding.py
-    python scripts/download_funding.py --assets BTC,ETH
-    python scripts/download_funding.py --start 2022-01-01 --end 2025-12-31
+    python scripts/download_funding.py --source vision
+    python scripts/download_funding.py --source vision --assets BTC,ETH
+    python scripts/download_funding.py --source api --assets BTC,ETH
 """
 
 from __future__ import annotations
@@ -17,11 +21,13 @@ import time
 from datetime import date
 from pathlib import Path
 
-# Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from qm.core.types import Asset
-from qm.data.historical.funding_rate import BinanceFundingRateDownloader
+from qm.data.historical.funding_rate import (
+    BinanceFundingRateDownloader,
+    BinanceVisionFundingDownloader,
+)
 from qm.data.storage.parquet import ParquetStore
 
 logging.basicConfig(
@@ -33,28 +39,34 @@ logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Download historical funding rates from Binance")
-    parser.add_argument(
+    p = argparse.ArgumentParser(
+        description="Download historical funding rates from Binance",
+    )
+    p.add_argument(
+        "--source", choices=["vision", "api"], default="vision",
+        help="Download backend: vision (default, unblocked) or api (REST)",
+    )
+    p.add_argument(
         "--assets", type=str, default="BTC,ETH,SOL,XRP",
         help="Comma-separated asset list (default: BTC,ETH,SOL,XRP)",
     )
-    parser.add_argument(
+    p.add_argument(
         "--start", type=str, default=None,
         help="Start date YYYY-MM-DD (default: symbol launch date)",
     )
-    parser.add_argument(
+    p.add_argument(
         "--end", type=str, default=None,
-        help="End date YYYY-MM-DD (default: yesterday)",
+        help="End date YYYY-MM-DD (default: last complete month / yesterday)",
     )
-    parser.add_argument(
+    p.add_argument(
         "--data-dir", type=str, default="data/raw/funding",
-        help="Output directory for Parquet files (default: data/raw/funding)",
+        help="Output directory (default: data/raw/funding)",
     )
-    parser.add_argument(
+    p.add_argument(
         "--concurrent", type=int, default=4,
-        help="Max concurrent API requests (default: 4)",
+        help="Max concurrent downloads (default: 4)",
     )
-    return parser.parse_args()
+    return p.parse_args()
 
 
 async def main() -> None:
@@ -65,16 +77,24 @@ async def main() -> None:
     end_date = date.fromisoformat(args.end) if args.end else None
 
     store = ParquetStore(Path(args.data_dir))
-    downloader = BinanceFundingRateDownloader(
-        store, max_concurrent=args.concurrent
-    )
+
+    if args.source == "vision":
+        downloader = BinanceVisionFundingDownloader(
+            store, max_concurrent=args.concurrent,
+        )
+        logger.info("Using Binance Vision backend (monthly ZIPs)")
+    else:
+        downloader = BinanceFundingRateDownloader(
+            store, max_concurrent=args.concurrent,
+        )
+        logger.info("Using Binance REST API backend")
 
     t0 = time.monotonic()
     stats = await downloader.download_all(assets, start_date, end_date)
     elapsed = time.monotonic() - t0
 
     logger.info(
-        "Done in %.1fs — %d API pages, %d rows, %d skipped, %d failed",
+        "Done in %.1fs — %d downloaded, %d rows, %d skipped, %d failed",
         elapsed, stats["downloaded"], stats["rows"],
         stats["skipped"], stats["failed"],
     )
