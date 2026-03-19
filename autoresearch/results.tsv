@@ -14,4 +14,4 @@ iteration	timestamp	asset	status	oos_brier	oos_ece	backtest_pnl	backtest_sharpe	
 13	2026-03-19T11:10:00	BTC	KEEP-VERIFIED	0.163319	0.0210	57.61	59.53	strategist #1: drop 0.10 from time_pcts (5 points remaining)	f322e7c	1335758.85	52.01
 14	2026-03-19T11:27:00	BTC	KEEP	0.162044	0.0053	60.85	62.54	strategist #2: n_splits 5→8 (more CV folds)	b3154aa	1661289.87	77.54
 15	2026-03-19T11:42:00	BTC	KEEP-VERIFIED	0.143872	0.0041	67.26	73.06	drop 0.20 from time_pcts (4 points, aggressive pruning)	fd74e98	1414431.34	81.35
-16	2026-03-19T11:57:00	BTC	DISCARD	0.143890	0.0040	67.23	73.03	drop 0.30 from time_pcts (3 points — pruning floor found)	PENDING	1415104.76	81.35
+16	2026-03-19T11:57:00	BTC	DISCARD	0.143890	0.0040	67.23	73.03	drop 0.30 from time_pcts (3 points — pruning floor found)	215df90	1415104.76	81.35
