@@ -2,7 +2,7 @@
 
 > Original plan archived at `docs/archive/PULSE_MODEL_PLAN_COMPLETE.md`
 
-All 8 steps (A-H) are complete. The Pulse intra-bar prediction model is trained, backtested, and passes all acceptance criteria on BTC and ETH.
+All 8 steps (A-H) are complete. The Pulse model is a single-snapshot-at-t=0.80 predictor (not multi-snapshot as originally designed). Trained, backtested, and validated via CPCV. ETH passes PBO (0.18). BTC/SOL conditional-pass pending regime validation.
 
 ## Implemented Files
 

@@ -50,8 +50,9 @@ All fields in `autoresearch/knobs.json`:
 
 ### Pulse-Specific Rules
 - **Tick features (indices 0-7) are ALWAYS included** — they are the core signal. Never suggest removing them.
-- **min_child_samples must be >= 100** — Pulse has 8 correlated samples per bar; lower values cause overfitting.
+- **min_child_samples must be >= 100** — lower values cause overfitting.
 - Walk-forward splits operate at **bar level**, not sample level. The script handles this automatically.
+- **Architecture: single-snapshot at t=0.80.** Dataset time_pcts [0.003..0.80] don't include 0.30/0.50 from knobs.json — only 0.80 matches. This is accepted architecture per auditor ruling (2026-03-20). Do not regenerate datasets. Multi-snapshot exploration deferred to future research phase.
 
 ## System Phases
 

@@ -15,13 +15,13 @@ ML system predicting crypto price movements (BTC/ETH/XRP/SOL) on 5m/15m/1h timef
 | Name | Code Name | What It Does | When It Runs |
 |------|-----------|-------------|-------------|
 | **Sentinel** | `sentinel` | Bar-level: predicts NEXT bar direction from completed bars | Once per bar completion |
-| **Pulse** | `pulse` | Intra-bar: predicts CURRENT bar outcome from live tick data | Every ~0.5s during window |
+| **Pulse** | `pulse` | Late-bar: predicts CURRENT bar outcome from t=0.80 snapshot | Once at 80% of bar elapsed |
 
 - Scripts: `scripts/train_sentinel.py`, `scripts/train_pulse.py`
 - Model dirs: `data/models/sentinel/{ASSET}_{TF}/`, `data/models/pulse/{ASSET}_{TF}/`
 
-## Current Focus: Model Training + Backtesting
-The next priority is training profitable Sentinel and Pulse models and validating them through rigorous backtesting before building any execution infrastructure.
+## Current Focus: Deployment + Validation
+Optimization is complete for BTC/ETH/SOL (all at structural floors). ETH is cleared for deployment (PBO=0.18). BTC/SOL need regime-bucketed validation. XRP baseline in progress.
 
 ## Architecture
 - **Platform**: Python 3.11 (Windows dev/backtest, Ubuntu Linux production)
