@@ -1,37 +1,33 @@
 # Strategy Directive
-Updated: 2026-03-19T13:15:00Z
-After iteration: 20
+Updated: 2026-03-19T15:35:00Z
+After: Alpha feature activation (funding data downloaded, cache regenerated)
 
-## ETH Validation Complete — Return to BTC
+## Context
 
-The auditor's SWITCH ETH directive is fulfilled (4/5 runs complete, signal clear). ETH cross-validation **confirmed**: BTC-optimized config transfers perfectly (Brier 0.197±0.0005, all acceptance criteria pass, deterministic results). The 5th ETH iteration would be redundant — recommend returning to BTC immediately.
+Funding rate data (25,337 rows, 4 assets, 2020-2026) downloaded from Binance Vision and stored in `data/raw/funding/`. The .npz dataset cache is being regenerated with 6 new funding features. The model now has ~50 features (8 tick + 15 TA + 6 funding + 21 other alpha placeholders).
 
-**All acceptance criteria now pass on BOTH BTC and ETH.** The current configuration is production-ready.
+Previous 21 iterations archived as `results_pre_alpha_v2.tsv`. Fresh start for alpha-enriched research.
 
-## Priority Queue (Return to BTC, iterations 21+)
-1. **Download funding rate data + regenerate cache** — the single highest-value remaining action. Run `scripts/download_funding.py --assets BTC,ETH` to populate funding stores, then delete old .npz caches and run `scripts/train_pulse_v2.py --asset BTC --timeframe 5m` to regenerate with funding features. This adds 6 new features to training data. Evidence: the entire alpha infrastructure (units 1-18) was built for this purpose. NOTE: this requires internet access to the Binance Futures API. If the researcher cannot run the download, note as BLOCKED.
-2. **Drop 0.80 from time_pcts** — the pruning strategy found a floor at 0.30 (dropping below 0.30 was neutral). But what about pruning from the OTHER end? Try [0.30, 0.40, 0.60] — the 80% point may be too late in the bar, where the outcome is nearly determined and prediction is easy but not actionable (market may have already moved).
-3. **Increase purge_period 12→24** — with brier-primary, the model is more sensitive to data leakage between WF folds. Doubling the purge period provides stronger temporal separation. Category: walk-forward (2/2 KEEP rate).
-4. **Try subsample [0.70, 0.90]** — brier-primary optimums consistently find subsample ~0.80. Narrowing the range concentrates search (but HPO range changes are blacklisted — only try this if previous priorities are exhausted).
+## Priority Queue
+1. **Run baseline with alpha features** — NO knob changes. This establishes the reference Brier/ECE/PnL for the 50-feature model. Compare to pre-alpha best (Brier 0.1439).
+2. **Check funding feature importance** — if funding features appear in top-10 or top-20 feature importance, they're contributing. If not, the model may need different time_pcts or more data to leverage them.
+3. **Try enabling/disabling funding feature groups** — toggle entire groups in `alpha_features.funding` to measure funding-specific lift.
+4. **Try interaction features** — enable `funding_x_rsi`, `funding_x_vol`, `regime_x_funding` interactions. These cross alpha x TA signals for LightGBM to learn non-linear patterns.
+5. **Continue proven optimizations** — brier-primary objective, n_splits=8, test_bars=2000, time_pcts [0.30, 0.40, 0.60, 0.80] are carried forward.
 
-## Observations
-- **20 iterations complete**: 11 KEEPs (55%), 9 DISCARDs
-- **BTC final**: Brier 0.1439, ECE 0.0041, Accuracy 79%, PnL $67, DD 28.7%
-- **ETH validated**: Brier 0.1966, ECE 0.0214, PnL $309, DD 5.25% — all criteria pass
-- **Configuration is universal**: time_pcts [0.30, 0.40, 0.60, 0.80] + brier-primary + n_splits=8 + test_bars=2000 works on both BTC and ETH
-- **Alpha features are the next frontier**: 30 features built but inactive (no data). This is the biggest remaining improvement opportunity
-- **ETH has lower Brier-to-PnL ratio**: ETH Brier 0.197 but PnL $309 vs BTC Brier 0.144 but PnL $67. ETH may offer better trading economics despite less accurate predictions — worth investigating
+## Observations (from pre-alpha phase)
+- **Optimal time_pcts**: [0.30, 0.40, 0.60, 0.80] — floor at 0.30, ceiling at 0.80
+- **Brier-primary objective** found fundamentally different HPO optimum (slow learning, simple trees)
+- **HPO range changes are blacklisted** (0/3 success rate)
+- **Walk-forward tuning works** (2/2 KEEP rate)
+- **Both BTC and ETH pass acceptance** with the same config
 
-## Blacklist
-- HPO range narrowing (regularization): iter 2 DISCARD
-- HPO range narrowing (tree structure): iter 3 DISCARD
-- HPO range widening (n_estimators): iter 12 DISCARD
-- Time_pcts densification (add 0.50): iter 10 DISCARD
-- Feature selection (drop hour_sin/cos): iter 6 DISCARD
-- Time_pcts pruning below 0.30: iter 16 DISCARD
-- Any HPO range change: 0/3 generic blacklist
-- No knob changes during ETH validation: completed
+## Blacklist (carried forward)
+- HPO range narrowing/widening: 0/3 across all attempts
+- Time_pcts densification (adding points): neutral
+- Feature selection (drop hour_sin/cos): neutral
+- Time_pcts pruning below 0.30: floor found
 
 ## HPO Range Recommendations
-- No changes recommended. Current ranges are working well with brier-primary.
-- Post-alpha-data: if 30 new features are added, the HPO landscape will change fundamentally. Revisit all ranges after cache regeneration with alpha features.
+- Keep current ranges — they work well with brier-primary
+- After alpha features activate: revisit if HPO landscape changes fundamentally

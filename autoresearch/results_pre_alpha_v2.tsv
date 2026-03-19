@@ -1,0 +1,22 @@
+iteration	timestamp	asset	status	oos_brier	oos_ece	backtest_pnl	backtest_sharpe	description	commit	bs_pnl	bs_sharpe
+1	2026-03-19T07:52:00	BTC	KEEP	0.205489	0.0461	11.50	10.67	baseline — enriched knobs (sharpe-primary objective, 40 trials)	21c94e5	85923.79	1.56
+2	2026-03-19T08:07:00	BTC	DISCARD	0.205517	0.0422	11.64	10.75	narrow reg_alpha [0.01,5.0] + reg_lambda [0.0001,1.0] (HPO regularization range)	5dfe2b7	80145.51	1.42
+3	2026-03-19T08:22:00	BTC	DISCARD	0.206776	0.0477	5.51	5.06	narrow max_depth [4,6] + num_leaves [31,128] (deeper trees only)	6560499	-469875.09	-7.70
+4	2026-03-19T08:37:00	BTC	KEEP-VERIFIED	0.198617	0.0474	19.77	18.54	time_pcts: drop 0.003 add 0.30 (denser mid-range sampling)	b39676f	357596.03	7.00
+5	2026-03-19T09:02:00	BTC	KEEP-VERIFIED	0.189246	0.0402	29.54	28.46	strategist #1: drop 0.01 from time_pcts (7 points remaining)	9312079	758495.69	17.59
+6	2026-03-19T09:22:00	BTC	DISCARD	0.189358	0.0438	28.79	27.69	strategist #3: drop hour_sin + hour_cos (feature selection)	3643e5a	754312.20	17.42
+7	2026-03-19T09:37:00	BTC	KEEP	0.188563	0.0342	37.13	35.95	strategist #4: test_bars 1000→2000 (walk-forward tuning)	275fb4c	1030784.47	25.06
+8	2026-03-19T09:52:00	BTC	KEEP	0.188559	0.0342	37.23	36.03	brier_threshold 0.25→0.20 (objective tuning, activate penalty)	7a03da4	1039846.16	25.25
+9	2026-03-19T10:12:00	BTC	KEEP-VERIFIED	0.177679	0.0300	48.39	48.36	strategist #1: drop 0.05 from time_pcts (6 points remaining)	12100f2	1172827.12	35.53
+10	2026-03-19T10:27:00	BTC	DISCARD	0.177679	0.0301	48.39	48.36	strategist #2: add 0.50 time point (densify mid-range)	51c719a	1177096.16	35.70
+11	2026-03-19T10:42:00	BTC	KEEP	0.175872	0.0071	56.13	55.54	strategist #5: objective.primary sharpe→brier (new HPO optimum!)	d29d3d9	1821718.61	70.07
+12	2026-03-19T10:56:00	BTC	DISCARD	0.176090	0.0079	55.37	54.57	widen n_estimators [100,1500]→[100,3000] (HPO range expansion)	8b2c37e	1819245.72	71.73
+13	2026-03-19T11:10:00	BTC	KEEP-VERIFIED	0.163319	0.0210	57.61	59.53	strategist #1: drop 0.10 from time_pcts (5 points remaining)	f322e7c	1335758.85	52.01
+14	2026-03-19T11:27:00	BTC	KEEP	0.162044	0.0053	60.85	62.54	strategist #2: n_splits 5→8 (more CV folds)	b3154aa	1661289.87	77.54
+15	2026-03-19T11:42:00	BTC	KEEP-VERIFIED	0.143872	0.0041	67.26	73.06	drop 0.20 from time_pcts (4 points, aggressive pruning)	fd74e98	1414431.34	81.35
+16	2026-03-19T11:57:00	BTC	DISCARD	0.143890	0.0040	67.23	73.03	drop 0.30 from time_pcts (3 points — pruning floor found)	215df90	1415104.76	81.35
+17	2026-03-19T12:22:00	ETH	KEEP	0.196607	0.0216	309.08	248.10	SWITCH ETH: baseline with BTC-optimized knobs (config transfers!)	d6c38cb	41844185.71	245.33
+18	2026-03-19T12:37:00	ETH	DISCARD	0.196618	0.0214	309.14	248.14	SWITCH ETH 2/5: no-change stability rerun (reproducible)	68bded5	41854585.71	245.53
+19	2026-03-19T12:55:00	ETH	DISCARD	0.197055	0.0256	304.32	244.43	SWITCH ETH 3/5: verify mode 100 trials (config validated)	1793468	41882400.00	245.96
+20	2026-03-19T13:07:00	ETH	DISCARD	0.196618	0.0214	309.14	248.14	SWITCH ETH 4/5: stability run (deterministic, identical to run 2)	a7d7460	41854585.71	245.53
+21	2026-03-19T13:27:00	BTC	DISCARD	0.165109	0.0062	59.03	60.88	strategist #2: drop 0.80 from time_pcts (late-end pruning hurts!)	8a2215d	806336.93	64.83
