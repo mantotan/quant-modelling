@@ -19,4 +19,4 @@ iteration	timestamp	asset	status	oos_brier	oos_ece	backtest_pnl	backtest_sharpe	
 18	2026-03-19T12:37:00	ETH	DISCARD	0.196618	0.0214	309.14	248.14	SWITCH ETH 2/5: no-change stability rerun (reproducible)	68bded5	41854585.71	245.53
 19	2026-03-19T12:55:00	ETH	DISCARD	0.197055	0.0256	304.32	244.43	SWITCH ETH 3/5: verify mode 100 trials (config validated)	1793468	41882400.00	245.96
 20	2026-03-19T13:07:00	ETH	DISCARD	0.196618	0.0214	309.14	248.14	SWITCH ETH 4/5: stability run (deterministic, identical to run 2)	a7d7460	41854585.71	245.53
-21	2026-03-19T13:27:00	BTC	DISCARD	0.165109	0.0062	59.03	60.88	strategist #2: drop 0.80 from time_pcts (late-end pruning hurts!)	PENDING	806336.93	64.83
+21	2026-03-19T13:27:00	BTC	DISCARD	0.165109	0.0062	59.03	60.88	strategist #2: drop 0.80 from time_pcts (late-end pruning hurts!)	8a2215d	806336.93	64.83
