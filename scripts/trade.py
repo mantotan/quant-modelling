@@ -38,6 +38,7 @@ from qm.data.storage.parquet import ParquetStore
 from qm.execution.audit import AuditWriter
 from qm.execution.loop import TradingLoop
 from qm.execution.paper.engine import PaperExecutor
+from qm.execution.paper.trade_logger import PaperTradeLogger
 from qm.execution.polymarket.market_scanner import MarketScanner
 from qm.features.live_cache import RUST_AVAILABLE, get_feature_calculator
 from qm.features.pipeline import FeaturePipeline
@@ -192,6 +193,7 @@ async def resolution_monitor(
     trading_loop: TradingLoop,
     scanner: MarketScanner,
     running_flag: list[bool],
+    trade_logger: PaperTradeLogger | None = None,
 ) -> None:
     """Poll Gamma API for market resolutions every 30s.
 
@@ -242,6 +244,14 @@ async def resolution_monitor(
                 pos.asset.value, pos.side.value,
                 "WIN" if won else "LOSS", pnl,
             )
+
+            if trade_logger:
+                trade_logger.log_resolution(
+                    condition_id=pos.condition_id,
+                    outcome=outcome.value,
+                    pnl=float(pnl),
+                    was_correct=won,
+                )
 
 
 def save_state(portfolio: Portfolio, stats: dict) -> None:
@@ -309,6 +319,11 @@ async def main_loop(args: argparse.Namespace) -> None:
     trade_filter = TradeFilter(risk_manager=risk_manager)
     executor = create_executor(args.mode)
     audit = AuditWriter()
+    trade_logger = PaperTradeLogger(
+        base_dir=Path("data/paper_trades"),
+        asset=args.asset,
+        timeframe=args.timeframe,
+    )
 
     trading_loop = TradingLoop(
         signal_generator=signal_gen,
@@ -334,7 +349,9 @@ async def main_loop(args: argparse.Namespace) -> None:
     # ── Start resolution monitor ────────────────────────────────
     running_flag = [True]  # mutable list so coroutine can check
     asyncio.create_task(
-        resolution_monitor(portfolio, trading_loop, scanner, running_flag),
+        resolution_monitor(
+            portfolio, trading_loop, scanner, running_flag, trade_logger,
+        ),
     )
 
     # ── Main polling loop ───────────────────────────────────────
@@ -414,6 +431,22 @@ async def main_loop(args: argparse.Namespace) -> None:
                 partial, market, float(prob_up),
             )
 
+            # Log every prediction for reconciliation replay
+            trade_logger.log_prediction(
+                bar_id=bar_id,
+                elapsed_pct=elapsed_pct,
+                model_prob=float(prob_up),
+                market_prob=float(market.mid_up),
+                market_spread=float(market.spread),
+                condition_id=market.condition_id,
+                features=features.flatten().tolist(),
+                signal_edge=float(abs(prob_up - market.mid_up)),
+                signal_side="UP" if prob_up > 0.5 else "DOWN",
+                size_usd=float(fill.size_usd) if fill and fill.status == "filled" else 0,
+                fill_price=float(fill.price) if fill and fill.status == "filled" else 0,
+                fill_status=fill.status if fill else "no_trade",
+            )
+
             if fill and fill.status == "filled":
                 stats["trades"] += 1
                 logger.info(
@@ -438,6 +471,7 @@ async def main_loop(args: argparse.Namespace) -> None:
 
     # ── Shutdown ────────────────────────────────────────────────
     logger.info("Shutting down...")
+    trade_logger.close()
     save_state(portfolio, stats)
     logger.info(
         "Final: bankroll=$%.2f, trades=%d, PnL=$%.2f",

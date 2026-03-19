@@ -72,9 +72,16 @@ All agents read it; builder and auditor can write it.
 - **Transition:** Auditor issues `ADD_ALPHA` → phase becomes `"building"` for new source
 
 ### Phase C: Continuous Discovery
-- **Active:** All five agents cycle between building and research
+- **Active:** All research agents cycle between building and research
 - **Goal:** Iterative build → research → discover → build more
 - **Trigger:** After Phase B stalls for 50+ iterations or achieves acceptance criteria
+
+### Reconciliation Phase (runs independently)
+- **Active:** `sentinel-reconciler` (separate pm2 loop from research dispatch)
+- **Goal:** Ensure paper trading matches backtest — detect and fix divergences autonomously
+- **Workflow:** Reconciler runs `replay_backtest.py` → classifies trust → triggers builder FIX_* units if needed
+- **Coordination:** When reconciler triggers a fix, sets `phase.json → "building"` (pauses research). Builder implements fix → `phase.json → "reconciliation_revalidate"`. Reconciler re-validates → `phase.json → "research_enriched"` (unblocks research).
+- **Does NOT block research unless a fix is needed**
 
 ## Multi-Agent System
 
@@ -87,8 +94,11 @@ Five agents operate on this system:
 | `sentinel-strategist` | sonnet | Phase B: every ~5 iterations | Tactical analysis, priority queue | strategy.md |
 | `sentinel-auditor` | opus | Phase B: every ~20 iterations | Deep analysis, macro directives | audit.md, phase.json |
 | `sentinel-analyst` | sonnet | Any phase: on demand | Read-only progress reports | (none) |
+| `sentinel-reconciler` | sonnet | Recon: every 1-6h | Paper vs backtest validation | reconciliation.md, reconciliation_state.json |
+| `sentinel-reconciliation-dispatch` | haiku | Recon: every 1-6h | Dispatch for reconciliation loop | reconciliation_state.json |
 
-**All loops run in ONE session** (serial execution prevents git conflicts).
+**Research loop runs in ONE session** (serial execution prevents git conflicts).
+**Reconciliation loop runs independently** (separate pm2 process, coordinates via phase.json).
 
 ### Communication Protocol
 
@@ -114,6 +124,10 @@ Five agents operate on this system:
 | last_run.log | training script | strategist | B, C |
 | src/qm/**/*.py | builder ONLY | all | A |
 | tests/unit/**/*.py | builder ONLY | all | A |
+| reconciliation.md | reconciler | strategist, auditor | Recon |
+| reconciliation_state.json | reconciler | reconciler dispatch | Recon |
+| data/paper_trades/*/ | trade.py (pm2) | reconciler, replay_backtest | Recon |
+| data/reconciliation/*/ | replay_backtest.py | reconciler | Recon |
 
 ### Enriched knobs.json Schema (Phase B)
 

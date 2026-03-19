@@ -152,13 +152,46 @@ If NO: just exit. Enhancement units 19-22 can be built during Phase B (they only
 **Progress:** {completed}/{total} units done
 ```
 
+## Reconciliation Fix Work Units (FIX_*)
+
+These are added to `build_plan.tsv` by the reconciler agent when paper-vs-backtest divergence is detected. They follow the same PENDING → DONE lifecycle as regular work units.
+
+### FIX_SPREAD
+**Trigger:** Observed spread MAE > 0.01 vs backtest fixed spread
+**Action:** Make `IntraBarBacktester.__init__` accept an optional `spread` override. Update `scripts/train_pulse_fast.py` to read spread from `knobs.json["backtest"]["spread"]`.
+**Test:** Verify backtester uses configured spread, not hardcoded 0.02.
+
+### FIX_IMPACT
+**Trigger:** Fill price MAE > 0.005
+**Action:** Add sqrt market impact model to `PaperExecutor.execute()` matching the backtest's `impact_bps` parameter. Read impact_bps from `knobs.json["backtest"]["impact_bps"]`.
+**Test:** Verify paper fills include impact, matching backtest formula.
+
+### FIX_LIMITS
+**Trigger:** Trade count ratio < 0.8 or > 1.2
+**Action:** Add `max_trades_per_bar` and `max_daily_trades` counters to `TradeFilter` in `src/qm/strategy/filter.py`. Read limits from `knobs.json["backtest"]`.
+**Test:** Verify TradeFilter enforces per-bar and daily limits.
+
+### FIX_SIZING
+**Trigger:** Bet size ratio < 0.5
+**Action:** Add `fixed_bet_usd` to `knobs.json["backtest"]` section. Update both `TradingLoop` and `IntraBarBacktester` to use the same value.
+**Test:** Verify both paths produce same bet sizes for same edge.
+
+### FIX_EFFICIENCY
+**Trigger:** Market odds MAE > 0.03
+**Action:** Create `scripts/compute_efficiency.py` that reads paper trade JSONL, computes optimal `market_sim.efficiency` by minimizing `|synthetic_prob - real_prob|` over captured bars, updates `knobs.json["market_sim"]["efficiency"]`.
+**Test:** Verify computed efficiency reduces market odds MAE on held-out paper data.
+
+After completing any FIX_* unit:
+1. Set `phase.json` → `{"current_phase": "reconciliation_revalidate", ...}`
+2. This triggers the reconciler to re-run and verify the fix worked.
+
 ## Rules
 
 - **ONE work unit per invocation.** Do not batch multiple units.
-- **Never modify** `autoresearch/knobs.json`, `best_knobs.json`, or `results.tsv` (except during phase transition).
+- **Never modify** `autoresearch/knobs.json`, `best_knobs.json`, or `results.tsv` (except during phase transition or FIX_EFFICIENCY).
 - **Follow existing patterns exactly.** Read the reference files before writing.
 - **All features must use graceful no-op.** Check column existence before computing.
-- **Never break existing 227+ tests.** Run full suite before committing.
+- **Never break existing tests.** Run full suite before committing.
 - **If BLOCKED** (e.g., missing API key): log reason in build_progress.json, skip to next unit with satisfied deps.
 - **If FAILED after 2 retries:** log in build_progress.json, move to next independent unit.
 - **Always have something to do.** If current unit is blocked, find the next available one.
