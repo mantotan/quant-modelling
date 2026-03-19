@@ -46,7 +46,7 @@
     "min_trades": 50,
     "trade_penalty_weight": 5.0,
     "max_drawdown_threshold": 0.30,
-    "drawdown_penalty_weight": 5.0
+    "drawdown_penalty_weight": 10.0
   },
   "feature_selection": {
     "missing_threshold": 0.5,
