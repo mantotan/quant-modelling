@@ -2,4 +2,4 @@ iteration	timestamp	asset	status	oos_brier	oos_ece	backtest_pnl	backtest_sharpe	
 1	2026-03-19T17:07:00	BTC	KEEP	0.143872	0.0042	67.36	73.27	alpha baseline — 50-feature dataset, same knobs (funding features in data but not in cached_features yet)	199901c	1412453.37	81.40
 2	2026-03-19T17:22:00	BTC	DISCARD	0.143929	0.0054	67.34	73.56	add 6 funding features to cached_features (29 features — funding not in top-10)	f601685	1423567.02	87.84
 3	2026-03-19T17:37:00	BTC	KEEP	0.143858	0.0040	67.94	74.30	add 3 regime features (regime_vol_zscore in top-10! first alpha signal)	03da25d	1398416.93	81.20
-4	2026-03-19T17:52:00	BTC	KEEP	0.143854	0.0042	68.33	74.87	add 4 liquidation features (30 features, regime_vol_zscore still top-10)	PENDING	1398008.97	81.12
+4	2026-03-19T17:52:00	BTC	KEEP	0.143854	0.0042	68.33	74.87	add 4 liquidation features (30 features, regime_vol_zscore still top-10)	1013a68	1398008.97	81.12
