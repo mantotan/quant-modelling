@@ -148,6 +148,8 @@ class MarketScanner:
         self._cache: dict[Asset, PolymarketMarket] = {}
         self._cache_time: float = 0.0
         self._cache_ttl = 10.0  # refresh every 10s
+        # Map condition_id → slug for resolution lookups
+        self._slug_cache: dict[str, str] = {}
 
     async def get_active_market(
         self, asset: Asset,
@@ -168,19 +170,66 @@ class MarketScanner:
     async def get_market_status(
         self, condition_id: str,
     ) -> dict[str, Any] | None:
-        """Check if a market has resolved via Gamma API."""
-        url = f"{GAMMA_API_URL}?condition_id={condition_id}"
+        """Check if a market has resolved via Gamma API slug lookup.
+
+        The Gamma API condition_id query param doesn't reliably return
+        the correct market. Instead, we cache the slug at discovery time
+        and query by slug for resolution checks.
+        """
+        slug = self._slug_cache.get(condition_id)
+        if not slug:
+            logger.debug("No slug cached for %s", condition_id[:16])
+            return None
+
         try:
             async with aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=10),
-            ) as session, session.get(url) as resp:
+            ) as session, session.get(
+                GAMMA_API_URL, params={"slug": slug},
+            ) as resp:
                 if resp.status != 200:
                     return None
                 markets = await resp.json()
-                if markets and len(markets) > 0:
-                    return markets[0]
+                if not markets:
+                    return None
+
+                m = markets[0]
+                # Translate to resolution format expected by resolution_monitor
+                closed = m.get("closed", False)
+                if not closed:
+                    return m
+
+                # Determine outcome from outcomePrices
+                outcomes_raw = m.get("outcomes", "[]")
+                prices_raw = m.get("outcomePrices", "[]")
+                try:
+                    outcomes = (
+                        json.loads(outcomes_raw) if isinstance(outcomes_raw, str)
+                        else outcomes_raw
+                    )
+                    prices = (
+                        json.loads(prices_raw) if isinstance(prices_raw, str)
+                        else prices_raw
+                    )
+                except (json.JSONDecodeError, TypeError):
+                    return m
+
+                # outcomePrices=["1","0"] means first outcome won
+                outcome = None
+                for i, p in enumerate(prices):
+                    if float(p) >= 0.99:
+                        outcome = outcomes[i] if i < len(outcomes) else None
+                        break
+
+                if outcome:
+                    m["resolved"] = True
+                    m["outcome"] = outcome
+                else:
+                    m["resolved"] = closed  # closed but no clear winner?
+
+                return m
         except Exception:
-            logger.debug("Failed to check market status %s", condition_id[:12])
+            logger.debug("Failed to check market status for slug=%s", slug)
         return None
 
     async def _discover(self) -> list[PolymarketMarket]:
@@ -210,6 +259,7 @@ class MarketScanner:
 
                 best: PolymarketMarket | None = None
                 best_remaining = 0.0
+                best_slug = ""
 
                 # Try current bar first, then next bar
                 for bar_start in (current_bar, next_bar):
@@ -252,9 +302,11 @@ class MarketScanner:
                     if market is not None and remaining > best_remaining:
                         best = market
                         best_remaining = remaining
+                        best_slug = slug
 
                 if best is not None:
                     matched.append(best)
+                    self._slug_cache[best.condition_id] = best_slug
 
         if matched:
             logger.info(
