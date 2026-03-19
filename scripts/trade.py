@@ -89,7 +89,7 @@ def parse_args() -> argparse.Namespace:
 
 def load_model(model_dir: Path, asset: str, tf: str):
     """Load trained LightGBM model + calibrator."""
-    model_path = model_dir / f"{asset}_{tf}" / "model.txt"
+    model_path = model_dir / f"{asset}_{tf}" / "model.lgb"
     cal_path = model_dir / f"{asset}_{tf}" / "calibrator.pkl"
 
     if not model_path.exists():
@@ -103,7 +103,12 @@ def load_model(model_dir: Path, asset: str, tf: str):
     if cal_path.exists():
         import pickle
         with open(cal_path, "rb") as f:
-            calibrator = pickle.load(f)
+            cal_data = pickle.load(f)
+        # Handle both dict-wrapped and direct calibrator formats
+        if isinstance(cal_data, dict):
+            calibrator = cal_data["calibrator"]
+        else:
+            calibrator = cal_data
         logger.info("Loaded calibrator: %s", cal_path)
     else:
         calibrator = IsotonicCalibrator()
