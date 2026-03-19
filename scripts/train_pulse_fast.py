@@ -377,6 +377,8 @@ def run(args: argparse.Namespace) -> dict:
         "backtest_win_rate": round(bt_metrics.get("win_rate", 0), 4),
         "backtest_sharpe": round(bt_metrics.get("sharpe", 0), 2),
         "backtest_max_dd": round(bt_metrics.get("max_dd", 0), 4),
+        "backtest_avg_pnl_per_trade": round(bt_metrics.get("avg_pnl_per_trade", 0), 4),
+        "backtest_time_buckets": bt_metrics.get("time_buckets", {}),
         "top_features": [f[0] for f in top_features],
         "best_params": {k: round(v, 6) if isinstance(v, float) else v
                         for k, v in study.best_params.items()},

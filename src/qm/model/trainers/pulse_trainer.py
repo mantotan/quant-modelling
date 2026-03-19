@@ -45,9 +45,11 @@ class PulseTrainer:
     def __init__(
         self,
         n_trials: int = 80,
-        n_splits: int = 5,
+        n_splits: int = 8,
         train_bars: int = 5000,
-        test_bars: int = 1000,
+        test_bars: int = 2000,
+        purge_period: int = 12,
+        embargo_period: int = 6,
         seed: int = 42,
         use_gpu: bool = True,
     ) -> None:
@@ -55,6 +57,8 @@ class PulseTrainer:
         self.n_splits = n_splits
         self.train_bars = train_bars
         self.test_bars = test_bars
+        self.purge_period = purge_period
+        self.embargo_period = embargo_period
         self.seed = seed
         self._device = detect_device(prefer_gpu=use_gpu)
         self._model: lgb.Booster | None = None
@@ -85,8 +89,8 @@ class PulseTrainer:
             n_splits=self.n_splits,
             train_period=self.train_bars,
             test_period=self.test_bars,
-            purge_period=12,
-            embargo_period=6,
+            purge_period=self.purge_period,
+            embargo_period=self.embargo_period,
         )
 
         best_metrics: dict[str, float] = {}
@@ -230,8 +234,8 @@ class PulseTrainer:
             n_splits=self.n_splits,
             train_period=self.train_bars,
             test_period=self.test_bars,
-            purge_period=12,
-            embargo_period=6,
+            purge_period=self.purge_period,
+            embargo_period=self.embargo_period,
         )
 
         final_params = {

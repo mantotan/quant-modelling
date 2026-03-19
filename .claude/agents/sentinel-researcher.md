@@ -42,6 +42,14 @@ Read `autoresearch/phase.json` (if it exists).
 
 5. Update `autoresearch/researcher_ack.txt` with timestamps and current iteration number.
 
+### TSV Schema Migration
+If `results.tsv` header has fewer than 17 tab-separated columns (old 12-column format):
+1. Rewrite the header line to the 17-column format (see Phase 7 for column names)
+2. For each existing data row, append `\t-\t-\t-\t-\t-` (5 dashes for the 5 new columns)
+3. Log: "Migrated results.tsv from {old_count} to 17 columns"
+
+Even if the header already has 17 columns, check each data row: if any row has fewer than 17 columns, pad it with `\t-` until it reaches 17. This handles rows written by an older researcher session.
+
 ## Phase 2: Hypothesize
 
 Priority chain — first match wins:
@@ -104,8 +112,13 @@ If markers are not found → this is a CRASH.
 
 ## Phase 5: Evaluate
 
-Extract: `oos_brier`, `oos_ece`, `backtest_pnl`, `backtest_sharpe`.
-Also extract `bs_pnl` and `bs_sharpe` if present (both-sides strategy metrics — informational only, do NOT use for KEEP/DISCARD).
+Extract from JSON output:
+- Primary: `oos_brier`, `oos_ece`, `backtest_pnl`, `backtest_sharpe`
+- Risk: `backtest_max_dd`, `backtest_trades`, `backtest_win_rate`
+- Diagnostics: `oos_accuracy`, `hpo_objective`
+- Informational: `bs_pnl`, `bs_sharpe` (do NOT use for KEEP/DISCARD)
+
+If any key is missing from JSON, use `-` for that column in results.tsv.
 
 Find the best previous OOS Brier from results.tsv (lowest value among KEEP/KEEP-VERIFIED rows).
 
@@ -113,8 +126,23 @@ Find the best previous OOS Brier from results.tsv (lowest value among KEEP/KEEP-
 - `oos_brier` < best previous KEEP (or this is the baseline)
 - `oos_ece` < 0.05
 - `backtest_pnl` > 0 (relaxed for baseline: any value accepted)
+- `backtest_trades` >= 10 (prevent "1 lucky trade"; relaxed for baseline)
+- `backtest_max_dd` < `backtest_pnl` when `backtest_pnl` > 0 (drawdown must not exceed total profit; skip check when pnl <= 0 or on baseline)
 
-**DISCARD** otherwise.
+**DISCARD** otherwise. Note which criterion failed in the decision reason.
+
+### Sanity Check (informational — does NOT affect KEEP/DISCARD)
+
+After extracting metrics, check these thresholds (from src/qm/backtest/sanity.py):
+- Brier <= 0.25 ✓/✗
+- ECE <= 0.05 ✓/✗
+- Sharpe >= 0.0 ✓/✗
+- Trades >= 50 ✓/✗
+- Win rate <= 85% ✓/✗ (leakage check)
+- Sharpe <= 5.0 ✓/✗ (leakage check)
+
+Log pass/fail count in output. If any leakage check (win_rate or sharpe) fails, add a prominent WARNING.
+These checks are stricter than KEEP/DISCARD gates — they represent the full acceptance bar for live deployment.
 
 ### Verification Protocol
 
@@ -150,12 +178,19 @@ Same as DISCARD, but commit message: `"autoresearch: CRASH — {reason}"`
 
 ## Phase 7: Log Results
 
-Append one row to `autoresearch/results.tsv` (tab-separated):
+Append one row to `autoresearch/results.tsv` (17 tab-separated columns):
 ```
-{iteration}\t{timestamp}\t{asset}\t{status}\t{oos_brier}\t{oos_ece}\t{backtest_pnl}\t{backtest_sharpe}\t{description}\t{commit_hash}\t{bs_pnl}\t{bs_sharpe}
+{iteration}\t{timestamp}\t{asset}\t{status}\t{oos_brier}\t{oos_ece}\t{backtest_pnl}\t{backtest_sharpe}\t{description}\t{commit_hash}\t{bs_pnl}\t{bs_sharpe}\t{backtest_max_dd}\t{backtest_trades}\t{backtest_win_rate}\t{oos_accuracy}\t{hpo_objective}
 ```
 
-For `bs_pnl` and `bs_sharpe`: use the values from JSON output if present, otherwise use `-`.
+Columns 1-12: same as before. New columns 13-17:
+- `backtest_max_dd` — max drawdown in normalized dollars
+- `backtest_trades` — number of trades in OOS backtest
+- `backtest_win_rate` — fraction of profitable trades
+- `oos_accuracy` — simple directional accuracy on OOS set
+- `hpo_objective` — best HPO trial objective value (composite: brier + penalties)
+
+Use `-` for any missing value (CRASH rows, missing JSON keys, `bs_pnl`, `bs_sharpe` if absent).
 
 Status values: KEEP, DISCARD, CRASH, KEEP-VERIFIED, VERIFY-FAILED
 
@@ -165,8 +200,10 @@ Status values: KEEP, DISCARD, CRASH, KEEP-VERIFIED, VERIFY-FAILED
 ## Iteration N
 **Directive:** [strategist priority #N / auditor SWITCH ETH / autonomous]
 **Hypothesis:** [what you changed and why]
-**Result:** brier={X}, ece={X}, pnl=${X}, sharpe={X}
-**Both-sides:** pnl=${X}, sharpe={X} (or "n/a" if not available)
-**Decision:** KEEP / DISCARD / VERIFY — [reason]
+**Result:** brier={X}, ece={X}, pnl=${X}, sharpe={X}, max_dd=${X}, trades={N}, win_rate={X%}, accuracy={X%}
+**HPO:** objective={X} (primary={metric}), gap vs OOS brier={delta}
+**Both-sides:** pnl=${X}, sharpe={X} (or "n/a")
+**Sanity:** {N}/6 passed [list any FAILs or WARNINGs]
+**Decision:** KEEP / DISCARD — [reason, noting which criteria failed if DISCARD]
 **Best:** brier={X} (iter N)
 ```

@@ -18,6 +18,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+import json
+
 import numpy as np
 
 from qm.backtest.intrabar_backtest import IntraBarBacktester
@@ -108,9 +110,25 @@ def main() -> None:
 
     pipeline = FeaturePipeline()
     featured_df = pipeline.compute(bars_df)
-    available = [c for c in CACHED_FEATURE_NAMES if c in featured_df.columns]
+
+    # Use cached_features from knobs.json if available, otherwise fall back to CACHED_FEATURE_NAMES
+    knobs_path = Path("autoresearch/knobs.json")
+    if knobs_path.exists():
+        with open(knobs_path) as f:
+            knobs_data = json.load(f)
+        feature_list = knobs_data.get("cached_features", CACHED_FEATURE_NAMES)
+        logger.info("Feature list from knobs.json: %d features", len(feature_list))
+    else:
+        feature_list = CACHED_FEATURE_NAMES
+        logger.info("Feature list from CACHED_FEATURE_NAMES: %d features", len(feature_list))
+
+    available = [c for c in feature_list if c in featured_df.columns]
+    missing = [c for c in feature_list if c not in featured_df.columns]
+    if missing:
+        logger.warning("Features in knobs but missing from data: %s", missing)
     history_features = featured_df.select(available)
-    logger.info("Features computed in %.1fs", time.time() - t0)
+    logger.info("Using %d/%d cached features (computed in %.1fs)",
+                len(available), len(feature_list), time.time() - t0)
 
     # 3. Generate training data from REAL trades
     trades_store = ParquetStore(base_dir=Path(args.trades_dir))
@@ -145,11 +163,29 @@ def main() -> None:
 
     logger.info("Target balance: %.1f%% Up", dataset.y.mean() * 100)
 
-    # 4. Optuna HPO
+    # 4. Optuna HPO — read walk-forward params from knobs.json
+    knobs_path = Path("autoresearch/knobs.json")
+    if knobs_path.exists():
+        with open(knobs_path) as f:
+            knobs = json.load(f)
+        wf = knobs.get("walk_forward", {})
+        wf_n_splits = wf.get("n_splits", 8)
+        wf_train_bars = wf.get("train_bars", 5000)
+        wf_test_bars = wf.get("test_bars", 2000)
+        wf_purge = wf.get("purge_period", 12)
+        wf_embargo = wf.get("embargo_period", 6)
+        logger.info("Walk-forward from knobs.json: splits=%d train=%d test=%d purge=%d embargo=%d",
+                     wf_n_splits, wf_train_bars, wf_test_bars, wf_purge, wf_embargo)
+    else:
+        wf_n_splits, wf_train_bars, wf_test_bars = 8, 5000, 2000
+        wf_purge, wf_embargo = 12, 6
+
     t0 = time.time()
     trainer = PulseTrainer(
-        n_trials=args.n_trials, n_splits=5,
-        train_bars=5000, test_bars=1000, seed=args.seed,
+        n_trials=args.n_trials, n_splits=wf_n_splits,
+        train_bars=wf_train_bars, test_bars=wf_test_bars,
+        purge_period=wf_purge, embargo_period=wf_embargo,
+        seed=args.seed,
     )
     best_metrics = trainer.fit(dataset)
     logger.info("HPO complete in %.1fs", time.time() - t0)

@@ -63,6 +63,19 @@ Are optimal hyperparameters clustering in narrow ranges? If learning_rate best i
 **e. Check researcher compliance:**
 Did the researcher follow your last priority queue? If it deviated, note why (it may have had a good reason from the auditor).
 
+**e2. Risk profile analysis:**
+Track across KEEP rows (columns 13-15 in results.tsv):
+- `backtest_max_dd` trend: is drawdown growing while PnL stagnates?
+- `backtest_max_dd / backtest_pnl` ratio: should be < 1.0 and stable
+- `backtest_trades` range: sudden drops = model too conservative, sudden spikes = trading noise
+- `backtest_win_rate` stability: stable + improving Brier = good calibration; unstable = fragile
+- Skip rows where these columns are `-` (pre-migration data)
+
+**e3. HPO-OOS gap:**
+Compare `hpo_objective` (column 17) vs `oos_brier` (column 5) across iterations.
+NOTE: `hpo_objective` is a composite value (brier + trade_penalty). When primary="brier" and trade count is sufficient, hpo_objective ≈ brier. A widening gap suggests overfitting or trade penalty instability.
+Skip rows where hpo_objective is `-`.
+
 **f. Alpha feature contribution:**
 If training output includes `top_features` or SHAP data:
 - Track which alpha features (funding_*, liquidation_*, iv_*, pm_*) appear in top-10 across KEEP iterations
@@ -99,6 +112,12 @@ After iteration: {N}
 - {Feature importance trends across runs}
 - {Brier improvement trajectory: accelerating/decelerating}
 
+## Risk Profile
+- Max drawdown trend: {increasing/stable/decreasing} — latest: ${X}, ratio to PnL: {X}
+- Trade count range across KEEPs: {min}-{max} (target: 50+)
+- Win rate range across KEEPs: {min%}-{max%}
+- HPO-OOS gap: {latest delta}, trend: {stable/widening/narrowing}
+
 ## Blacklist
 - {specific change that consistently fails — include iteration numbers}
 
@@ -122,3 +141,4 @@ git commit -m "strategist: update after iteration {N}"
 - Prioritize by expected value: `KEEP_rate * average_improvement_when_KEEP`.
 - If there are fewer than 5 experiments, provide generic guidance based on ML best practices.
 - When `bs_pnl`/`bs_sharpe` columns are present in results.tsv (columns 11-12, after commit), compare single-side vs both-sides strategy performance across iterations. Note if one strategy consistently dominates.
+- When new columns (13-17) contain `-`, skip those rows in trend analysis rather than treating as zero.

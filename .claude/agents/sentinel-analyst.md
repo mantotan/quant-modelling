@@ -32,12 +32,15 @@ When invoked, produce a concise progress report on the autoresearch experiments.
 ## Acceptance Criteria Status
 | Metric     | Target  | Best   | Status |
 |------------|---------|--------|--------|
-| OOS Brier  | < 0.25  | X.XXX  | ✓/✗    |
-| OOS ECE    | < 0.05  | X.XXX  | ✓/✗    |
-| Backtest PnL | > 0   | $X.XX  | ✓/✗    |
-| Sharpe     | > 0.0   | X.XX   | ✓/✗    |
-| BS PnL     | > 0     | $X.XX  | ✓/✗ (informational) |
-| BS Sharpe  | > 0.0   | X.XX   | ✓/✗ (informational) |
+| OOS Brier    | < 0.25    | X.XXX  | ✓/✗    |
+| OOS ECE      | < 0.05    | X.XXX  | ✓/✗    |
+| Backtest PnL | > 0       | $X.XX  | ✓/✗    |
+| Sharpe       | > 0.0     | X.XX   | ✓/✗    |
+| Max Drawdown | < PnL     | $X.XX  | ✓/✗    |
+| Trade Count  | >= 10     | X      | ✓/✗    |
+| Win Rate     | 40-85%    | X.X%   | ✓/✗    |
+| BS PnL       | > 0       | $X.XX  | ✓/✗ (informational) |
+| BS Sharpe    | > 0.0     | X.XX   | ✓/✗ (informational) |
 
 ## Strategy Comparison (if bs_pnl/bs_sharpe columns present in results.tsv)
 | Strategy | Best PnL | Best Sharpe | Dominant? |
@@ -50,6 +53,13 @@ When invoked, produce a concise progress report on the autoresearch experiments.
 
 ## What Didn't Work (DISCARD changes)
 - [list patterns in DISCARD changes]
+
+## Risk Profile
+- Max drawdown range across KEEPs: $X — $X (ratio to PnL: X — X)
+- Trade count range: X — X
+- Win rate range: X% — X%
+- HPO-OOS gap trend: {widening/stable/narrowing}
+(Skip rows with `-` in columns 13-17 — these are pre-migration data)
 
 ## Current Config
 [show current RESEARCH KNOBS values]
@@ -78,3 +88,4 @@ When invoked, produce a concise progress report on the autoresearch experiments.
 - Be data-driven: back suggestions with evidence from results history
 - Flag if the agent appears stuck (many consecutive DISCARDs)
 - Flag if overfitting risk is high (improving Brier but degrading PnL)
+- When results.tsv columns 13-17 contain `-`, skip those rows in calculations. These are pre-migration data from before the schema expansion.
