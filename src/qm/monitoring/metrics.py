@@ -66,6 +66,38 @@ BRIER_SCORE = Gauge(
     ["asset"],
 )
 
+# ── Drift monitoring metrics ──────────────────────────────────────────
+
+DRIFT_BRIER_ROLLING = Gauge(
+    "qm_drift_brier_rolling",
+    "Rolling 30-day Brier score for drift detection",
+    ["asset"],
+)
+
+DRIFT_THRESHOLD = Gauge(
+    "qm_drift_threshold",
+    "Brier drift threshold (1.2x validation floor)",
+    ["asset"],
+)
+
+DRIFT_PREDICTIONS_COUNT = Gauge(
+    "qm_drift_predictions_count",
+    "Number of predictions in rolling window",
+    ["asset"],
+)
+
+DRIFT_DAYS_SINCE_RETRAIN = Gauge(
+    "qm_drift_days_since_retrain",
+    "Days since last model retrain",
+    ["asset"],
+)
+
+RETRAIN_TRIGGERS = Counter(
+    "qm_retrain_triggers_total",
+    "Retrain triggers fired",
+    ["asset", "reason"],
+)
+
 # ── Data metrics ────────────────────────────────────────────────────
 
 FEED_LATENCY_MS = Histogram(
