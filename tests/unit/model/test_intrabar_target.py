@@ -184,7 +184,7 @@ class TestRealPathGenerator:
 
         n_bars = len(np.unique(ds.bar_indices))
         n_tp = len(DEFAULT_TIME_PCTS)
-        assert ds.X.shape == (n_bars * n_tp, 23)
+        assert ds.X.shape == (n_bars * n_tp, 50)
         assert ds.y.shape == (n_bars * n_tp,)
         assert ds.market_probs.shape == (n_bars * n_tp,)
 

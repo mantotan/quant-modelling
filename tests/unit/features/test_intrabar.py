@@ -1,4 +1,4 @@
-"""Tests for IntraBarFeatureCalculator (23 features: 8 tick + 15 historical)."""
+"""Tests for IntraBarFeatureCalculator (50 features: 8 tick + 42 historical)."""
 
 from datetime import datetime, timezone
 
@@ -48,15 +48,15 @@ def calc() -> IntraBarFeatureCalculator:
 
 class TestFeatureCount:
     def test_feature_names_length(self, calc: IntraBarFeatureCalculator):
-        assert len(calc.feature_names) == 23
+        assert len(calc.feature_names) == 50
 
     def test_n_features(self, calc: IntraBarFeatureCalculator):
-        assert calc.n_features == 23
+        assert calc.n_features == 50
 
     def test_compute_output_shape(self, calc: IntraBarFeatureCalculator):
         partial = _make_partial()
         result = calc.compute(partial)
-        assert result.shape == (23,)
+        assert result.shape == (50,)
         assert result.dtype == np.float64
 
     def test_feature_names_match_all_names(self, calc: IntraBarFeatureCalculator):
@@ -198,6 +198,6 @@ class TestFeatureNamesConsistency:
         for name in CACHED_FEATURE_NAMES:
             assert name in CACHED_DEFAULTS, f"{name} missing from CACHED_DEFAULTS"
 
-    def test_all_features_23(self):
-        assert len(ALL_FEATURE_NAMES) == 23
-        assert len(set(ALL_FEATURE_NAMES)) == 23  # no duplicates
+    def test_all_features_50(self):
+        assert len(ALL_FEATURE_NAMES) == 50
+        assert len(set(ALL_FEATURE_NAMES)) == 50  # no duplicates

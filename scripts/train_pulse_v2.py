@@ -74,8 +74,38 @@ def main() -> None:
     bars_df = ohlcv_store.read_bars(asset, timeframe)
     logger.info("Loaded %d %s bars", len(bars_df), timeframe.value)
 
-    # 2. Compute Sentinel features
+    # 2. Join alpha stores if available, then compute features
     t0 = time.time()
+    from qm.features.cross_asset import join_alpha_asof
+
+    # Try joining funding rate data
+    funding_dir = Path("data/raw/funding")
+    if funding_dir.exists():
+        try:
+            funding_store = ParquetStore(base_dir=funding_dir)
+            funding_df = funding_store.read_metrics(asset)
+            if not funding_df.is_empty():
+                bars_df = join_alpha_asof(
+                    bars_df, funding_df, prefix="funding", tolerance="9h",
+                )
+                logger.info("Joined %d funding rate records", len(funding_df))
+        except Exception as e:
+            logger.warning("Could not join funding data: %s", e)
+
+    # Try joining options IV data (BTC/ETH only)
+    iv_dir = Path("data/raw/options_iv")
+    if iv_dir.exists():
+        try:
+            iv_store = ParquetStore(base_dir=iv_dir)
+            iv_df = iv_store.read_metrics(asset)
+            if not iv_df.is_empty():
+                bars_df = join_alpha_asof(
+                    bars_df, iv_df, prefix="options_iv",
+                )
+                logger.info("Joined %d IV records", len(iv_df))
+        except Exception as e:
+            logger.warning("Could not join IV data: %s", e)
+
     pipeline = FeaturePipeline()
     featured_df = pipeline.compute(bars_df)
     available = [c for c in CACHED_FEATURE_NAMES if c in featured_df.columns]

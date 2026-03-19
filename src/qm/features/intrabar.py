@@ -16,6 +16,7 @@ from qm.core.types import Asset, PartialBar
 
 # Historical features cached from the Sentinel pipeline output
 CACHED_FEATURE_NAMES: list[str] = [
+    # --- Core TA features ---
     "rsi_14",
     "rsi_7",
     "stoch_k",
@@ -31,10 +32,40 @@ CACHED_FEATURE_NAMES: list[str] = [
     "volume_sma_10",
     "hour_sin",
     "hour_cos",
+    # --- Alpha features (graceful: absent columns are skipped) ---
+    "funding_rate",
+    "funding_rate_sma3",
+    "funding_rate_pctile",
+    "funding_rate_direction",
+    "funding_cumulative_24h",
+    "funding_hours_since",
+    "liquidation_proximity",
+    "oi_price_divergence",
+    "oi_momentum",
+    "leverage_proxy",
+    "regime_vol_state",
+    "regime_vol_zscore",
+    "regime_trend_state",
+    "iv_atm",
+    "iv_skew",
+    "iv_term_spread",
+    "iv_change_1h",
+    "iv_percentile_30d",
+    "pm_bid_ask_spread",
+    "pm_order_imbalance",
+    "pm_trade_flow",
+    "pm_mid_momentum",
+    # --- Interaction features ---
+    "funding_x_rsi",
+    "funding_x_vol",
+    "oi_div_x_momentum",
+    "leverage_x_proximity",
+    "regime_x_funding",
 ]
 
 # Sensible mid-range defaults for the first bar before cache is populated
 CACHED_DEFAULTS: dict[str, float] = {
+    # Core TA
     "rsi_14": 50.0,
     "rsi_7": 50.0,
     "stoch_k": 50.0,
@@ -50,6 +81,35 @@ CACHED_DEFAULTS: dict[str, float] = {
     "volume_sma_10": 1.0,
     "hour_sin": 0.0,
     "hour_cos": 1.0,
+    # Alpha features (neutral defaults — LightGBM handles nulls natively)
+    "funding_rate": 0.0,
+    "funding_rate_sma3": 0.0,
+    "funding_rate_pctile": 0.5,
+    "funding_rate_direction": 0.0,
+    "funding_cumulative_24h": 0.0,
+    "funding_hours_since": 4.0,
+    "liquidation_proximity": 0.0,
+    "oi_price_divergence": 0.0,
+    "oi_momentum": 0.0,
+    "leverage_proxy": 100.0,
+    "regime_vol_state": 1.0,
+    "regime_vol_zscore": 0.0,
+    "regime_trend_state": 0.0,
+    "iv_atm": 0.5,
+    "iv_skew": 0.0,
+    "iv_term_spread": 0.0,
+    "iv_change_1h": 0.0,
+    "iv_percentile_30d": 0.5,
+    "pm_bid_ask_spread": 0.02,
+    "pm_order_imbalance": 0.0,
+    "pm_trade_flow": 0.0,
+    "pm_mid_momentum": 0.0,
+    # Interactions (neutral = 0)
+    "funding_x_rsi": 0.0,
+    "funding_x_vol": 0.0,
+    "oi_div_x_momentum": 0.0,
+    "leverage_x_proximity": 0.0,
+    "regime_x_funding": 0.0,
 }
 
 TICK_FEATURE_NAMES: list[str] = [
