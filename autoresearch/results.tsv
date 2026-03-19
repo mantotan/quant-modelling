@@ -10,4 +10,4 @@ iteration	timestamp	asset	status	oos_brier	oos_ece	backtest_pnl	backtest_sharpe	
 9	2026-03-19T10:12:00	BTC	KEEP-VERIFIED	0.177679	0.0300	48.39	48.36	strategist #1: drop 0.05 from time_pcts (6 points remaining)	12100f2	1172827.12	35.53
 10	2026-03-19T10:27:00	BTC	DISCARD	0.177679	0.0301	48.39	48.36	strategist #2: add 0.50 time point (densify mid-range)	51c719a	1177096.16	35.70
 11	2026-03-19T10:42:00	BTC	KEEP	0.175872	0.0071	56.13	55.54	strategist #5: objective.primary sharpe→brier (new HPO optimum!)	d29d3d9	1821718.61	70.07
-12	2026-03-19T10:56:00	BTC	DISCARD	0.176090	0.0079	55.37	54.57	widen n_estimators [100,1500]→[100,3000] (HPO range expansion)	PENDING	1819245.72	71.73
+12	2026-03-19T10:56:00	BTC	DISCARD	0.176090	0.0079	55.37	54.57	widen n_estimators [100,1500]→[100,3000] (HPO range expansion)	8b2c37e	1819245.72	71.73
