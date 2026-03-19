@@ -1,2 +1,3 @@
 iteration	timestamp	asset	status	oos_brier	oos_ece	backtest_pnl	backtest_sharpe	description	commit	bs_pnl	bs_sharpe
 1	2026-03-19T07:52:00	BTC	KEEP	0.205489	0.0461	11.50	10.67	baseline — enriched knobs (sharpe-primary objective, 40 trials)	21c94e5	85923.79	1.56
+2	2026-03-19T08:07:00	BTC	DISCARD	0.205517	0.0422	11.64	10.75	narrow reg_alpha [0.01,5.0] + reg_lambda [0.0001,1.0] (HPO regularization range)	PENDING	80145.51	1.42
