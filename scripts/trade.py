@@ -52,11 +52,12 @@ from qm.strategy.filter import TradeFilter
 from qm.strategy.portfolio import Portfolio
 from qm.strategy.sizing.kelly import KellySizer
 
-# CoinGecko IDs for live price feed
-_COINGECKO_IDS: dict[str, str] = {
-    "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana", "XRP": "ripple",
+# TradingView websocket for real-time tick data
+TV_WSS_URL = "wss://data.tradingview.com/socket.io/websocket"
+_TV_SYMBOLS: dict[str, str] = {
+    "BTC": "BINANCE:BTCUSDT", "ETH": "BINANCE:ETHUSDT",
+    "SOL": "BINANCE:SOLUSDT", "XRP": "BINANCE:XRPUSDT",
 }
-COINGECKO_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -261,35 +262,103 @@ async def resolution_monitor(
                 )
 
 
+def _tv_encode(msg: str) -> str:
+    return f"~m~{len(msg)}~m~{msg}"
+
+
+def _tv_decode(raw: str) -> list[str]:
+    msgs: list[str] = []
+    i = 0
+    while i < len(raw):
+        if raw[i : i + 3] == "~m~":
+            i += 3
+            j = raw.index("~m~", i)
+            length = int(raw[i:j])
+            i = j + 3
+            msgs.append(raw[i : i + length])
+            i += length
+        else:
+            break
+    return msgs
+
+
 async def price_feed(
     asset: Asset,
     bar_builder: BarBuilder,
     running_flag: list[bool],
-    poll_interval: float = 3.0,
 ) -> None:
-    """Poll CoinGecko for the latest price and feed into BarBuilder.
+    """Stream real-time ticks from TradingView websocket into BarBuilder.
 
-    Lightweight REST poller — 1 call every 3s (within free tier limits).
-    Feeds synthetic trades into the BarBuilder to keep partial bars alive.
+    Subscribes to BINANCE:{ASSET}USDT via TradingView's public quote feed.
+    Sub-second tick data with volume — much better than REST polling.
+    Auto-reconnects on disconnect.
     """
-    cg_id = _COINGECKO_IDS.get(asset.value, asset.value.lower())
-    url = f"{COINGECKO_PRICE_URL}?ids={cg_id}&vs_currencies=usd"
-    logger.info("Price feed started: %s (CoinGecko/%s)", asset.value, cg_id)
+    import random
+    import string
+
+    tv_symbol = _TV_SYMBOLS.get(asset.value, f"BINANCE:{asset.value}USDT")
+    logger.info("Price feed starting: %s via TradingView WSS", tv_symbol)
 
     while running_flag[0]:
         try:
-            async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=5),
-            ) as session, session.get(url) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    price = data.get(cg_id, {}).get("usd")
-                    if price is not None:
+            async with aiohttp.ClientSession() as session:
+                ws = await session.ws_connect(
+                    TV_WSS_URL,
+                    headers={"Origin": "https://www.tradingview.com"},
+                    heartbeat=30.0,
+                )
+                qs = "qs_" + "".join(random.choices(string.ascii_lowercase, k=12))
+
+                await ws.send_str(_tv_encode(json.dumps(
+                    {"m": "set_auth_token", "p": ["unauthorized_user_token"]},
+                )))
+                await ws.send_str(_tv_encode(json.dumps(
+                    {"m": "quote_create_session", "p": [qs]},
+                )))
+                await ws.send_str(_tv_encode(json.dumps(
+                    {"m": "quote_set_fields", "p": [qs, "lp", "volume"]},
+                )))
+                await ws.send_str(_tv_encode(json.dumps(
+                    {"m": "quote_add_symbols", "p": [qs, tv_symbol]},
+                )))
+
+                logger.info("Price feed connected: %s", tv_symbol)
+                tick_count = 0
+
+                async for msg in ws:
+                    if not running_flag[0]:
+                        break
+                    if msg.type != aiohttp.WSMsgType.TEXT:
+                        continue
+                    for m in _tv_decode(msg.data):
+                        if m.startswith("~h~"):
+                            await ws.send_str(_tv_encode(m))
+                            continue
+                        try:
+                            d = json.loads(m)
+                        except json.JSONDecodeError:
+                            continue
+                        if d.get("m") != "qsd":
+                            continue
+                        v = d.get("p", [None, {}])[1].get("v", {})
+                        lp = v.get("lp")
+                        if lp is None:
+                            continue
+                        vol = v.get("volume", 0)
                         now = datetime.now(UTC)
-                        bar_builder.on_trade(asset, float(price), 0.001, now)
+                        bar_builder.on_trade(
+                            asset, float(lp), float(vol) * 0.0001, now,
+                        )
+                        tick_count += 1
+                        if tick_count == 1:
+                            logger.info(
+                                "First tick: %s $%.2f", asset.value, lp,
+                            )
+
+                await ws.close()
         except Exception:
-            pass  # Non-critical — next poll will retry
-        await asyncio.sleep(poll_interval)
+            logger.warning("Price feed disconnected, reconnecting in 5s...")
+            await asyncio.sleep(5.0)
 
 
 def save_state(portfolio: Portfolio, stats: dict) -> None:
