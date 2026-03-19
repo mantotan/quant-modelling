@@ -270,6 +270,7 @@ class TradingLoop:
         )
         await self._audit.log_risk_check(signal, ok, reason)
         if not ok:
+            logger.info("on_partial_bar: filter rejected — %s", reason)
             return None
 
         # Execute

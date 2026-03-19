@@ -33,7 +33,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from qm.core.types import Asset, Outcome, Timeframe
+from qm.core.types import Asset, Outcome, PolymarketMarket, Timeframe
+from qm.data.connectors.polymarket_ws import PolymarketWSFeed
 from qm.data.ingestion.bar_builder import BarBuilder
 from qm.data.storage.parquet import ParquetStore
 from qm.execution.audit import AuditWriter
@@ -458,6 +459,11 @@ async def main_loop(args: argparse.Namespace) -> None:
     # ── Market scanner (cached, 10s TTL) ────────────────────────
     scanner = MarketScanner(assets={asset}, timeframe=tf)
 
+    # ── Polymarket WS orderbook feed ──────────────────────────
+    ws_feed = PolymarketWSFeed()
+    ws_feed_task: asyncio.Task | None = None
+    ws_subscribed_market: str = ""  # condition_id of currently subscribed market
+
     # ── Start background tasks ─────────────────────────────────
     running_flag = [True]  # mutable list so coroutines can check
     asyncio.create_task(
@@ -517,6 +523,39 @@ async def main_loop(args: argparse.Namespace) -> None:
             if market is None:
                 logger.debug("No active market for %s", asset.value)
                 continue
+
+            # Start/update WS orderbook feed for this market
+            if market.condition_id != ws_subscribed_market:
+                if ws_feed_task is not None:
+                    ws_feed.stop()
+                    ws_feed_task.cancel()
+                ws_feed = PolymarketWSFeed()
+                ws_feed_task = asyncio.create_task(
+                    ws_feed.connect_and_run(
+                        market.token_id_up, market.token_id_down, running_flag,
+                    ),
+                )
+                ws_subscribed_market = market.condition_id
+                logger.info(
+                    "WS feed subscribed: %s (up=%s...)",
+                    market.condition_id[:16], market.token_id_up[:16],
+                )
+                await asyncio.sleep(1.0)  # Wait for initial book snapshot
+
+            # Override market odds with live WS data
+            if ws_feed.mid_up > 0:
+                market = PolymarketMarket(
+                    condition_id=market.condition_id,
+                    token_id_up=market.token_id_up,
+                    token_id_down=market.token_id_down,
+                    asset=market.asset,
+                    market_type=market.market_type,
+                    window_start=market.window_start,
+                    window_end=market.window_end,
+                    mid_up=ws_feed.mid_up,
+                    spread=ws_feed.spread,
+                    volume=market.volume,
+                )
 
             # Compute features (Rust or Python)
             t0 = time.perf_counter_ns()
@@ -586,6 +625,7 @@ async def main_loop(args: argparse.Namespace) -> None:
 
     # ── Shutdown ────────────────────────────────────────────────
     logger.info("Shutting down...")
+    ws_feed.stop()
     trade_logger.close()
     save_state(portfolio, stats)
     logger.info(
