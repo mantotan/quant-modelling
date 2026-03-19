@@ -96,7 +96,7 @@ uv run scripts/train_pulse_fast.py --asset BTC --timeframe 5m --trials 40 --time
 
 **Pulse-specific rules:**
 - Never remove tick features (indices 0-7) — they ARE the signal
-- Never set min_child_samples below 100 (8 correlated samples per bar)
+- Never set min_child_samples below 100 (dataset has 1 sample per bar at t=0.80 — knobs.json [0.30,0.50,0.80] only matches 0.80 in dataset)
 - Never change fee_bps, impact_bps, or market_sim.efficiency (maker-only, baked into dataset)
 - Never change the `strategies` section (read-only, evaluated in parallel)
 - Never change `backtest.fixed_bet_usd`, `backtest.max_trades_per_bar`, `backtest.max_daily_trades`, `backtest.min_edge` (execution params set from trader analysis)
@@ -104,6 +104,10 @@ uv run scripts/train_pulse_fast.py --asset BTC --timeframe 5m --trials 40 --time
 - When disabling alpha features, also disable related interaction features that depend on them
 - Regime features toggle as a group (all 3 on or all 3 off)
 - Never change `objective.primary` without strategist recommendation — only tune weight parameters
+- **KNOWN ISSUES (2026-03-20):**
+  - time_pcts mismatch: dataset has [0.003..0.80], knobs.json requests [0.30,0.50,0.80], only 0.80 matches → single-snapshot model
+  - Sharpe in results.tsv iters 1-39 was inflated ~100x (per-sample annualization bug, fixed from iter 40+)
+  - CPCV results: ETH PBO=0.18 PASS, BTC PBO=0.96 FAIL, SOL PBO=0.64 FAIL (all OOS paths profitable)
 
 (Adjust `--asset` if a SWITCH directive is active.)
 

@@ -8,6 +8,11 @@ maxTurns: 10
 
 You are an ML research analyst reviewing the results of an automated model optimization loop.
 
+**Known issues (2026-03-20):**
+- Dataset time_pcts [0.003..0.80] don't include 0.30/0.50 from knobs.json — only 0.80 matches. Model is single-snapshot.
+- Sharpe in results.tsv iters 1-39 was inflated ~100x (per-sample annualization). Fixed from iter 40+. Do not compare pre/post Sharpe.
+- CPCV results: ETH PBO=0.18 PASS, BTC PBO=0.96 FAIL (regime IS-OOS seesaw), SOL PBO=0.64 FAIL.
+
 ## Your Task
 
 When invoked, produce a concise progress report on the autoresearch experiments.

@@ -8,6 +8,11 @@ maxTurns: 15
 
 You are a tactical ML research strategist. You analyze the experiment history of the Pulse intra-bar model researcher and write optimized strategy directives to guide its next experiments.
 
+**Known issues (2026-03-20):**
+- Dataset time_pcts [0.003..0.80] don't include 0.30/0.50 from knobs.json — only 0.80 matches. Model is single-snapshot.
+- Sharpe in results.tsv iters 1-39 was inflated ~100x (per-sample annualization). Fixed from iter 40+. Do not compare pre/post Sharpe.
+- CPCV results: ETH PBO=0.18 PASS, BTC PBO=0.96 FAIL (regime IS-OOS seesaw), SOL PBO=0.64 FAIL.
+
 **Pulse knob categories** (use these when grouping experiments):
 - Feature selection (`cached_features` — which of 15 historical features to include)
 - Alpha features (`alpha_features` — funding, liquidation, OI-derived feature groups)
