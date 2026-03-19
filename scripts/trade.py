@@ -158,14 +158,27 @@ def create_executor(mode: str):
     if mode == "paper":
         return PaperExecutor()
 
-    # dry-run and live need CLOB client (Phase 3 G)
-    # For now, fall back to paper with a warning
-    logger.warning(
-        "Mode '%s' requires CLOB integration (not yet built). "
-        "Falling back to PaperExecutor.",
-        mode,
-    )
-    return PaperExecutor()
+    # dry-run and live use the real CLOB integration
+    from qm.execution.polymarket.client import PolymarketClient
+    from qm.execution.polymarket.live_executor import LiveExecutor
+    from qm.execution.polymarket.order_manager import OrderManager
+
+    try:
+        client = PolymarketClient()
+        order_mgr = OrderManager(client)
+        submit = mode == "live"  # dry-run: submit=False
+        executor = LiveExecutor(client, order_mgr, submit=submit)
+        logger.info(
+            "Created %s executor (submit=%s)",
+            mode, submit,
+        )
+        return executor
+    except Exception as e:
+        logger.warning(
+            "Failed to create %s executor: %s. Falling back to paper.",
+            mode, e,
+        )
+        return PaperExecutor()
 
 
 async def discover_markets(asset: Asset) -> PolymarketMarket | None:
