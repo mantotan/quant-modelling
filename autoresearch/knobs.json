@@ -38,7 +38,7 @@
     "trend_window": 20
   },
   "objective": {
-    "primary": "sharpe",
+    "primary": "brier",
     "brier_threshold": 0.20,
     "brier_penalty_weight": 10.0,
     "min_trades": 50,
