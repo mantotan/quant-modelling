@@ -423,7 +423,12 @@ async def main_loop(args: argparse.Namespace) -> None:
         max_bet_usd=args.max_bet, min_bet_usd=1.0,
     )
     signal_gen = SignalGenerator(min_edge=args.min_edge)
-    trade_filter = TradeFilter(risk_manager=risk_manager)
+    trade_filter = TradeFilter(
+        risk_manager=risk_manager,
+        min_edge=args.min_edge,
+        min_time_remaining_sec=60.0,
+        min_liquidity_usd=0.0,  # No liquidity filter for paper trading
+    )
     executor = create_executor(args.mode)
     audit = AuditWriter()
     trade_logger = PaperTradeLogger(
