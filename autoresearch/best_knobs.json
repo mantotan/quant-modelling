@@ -71,7 +71,7 @@
     "reg_lambda": [1e-8, 10.0]
   },
   "walk_forward": {
-    "n_splits": 5,
+    "n_splits": 8,
     "train_bars": 5000,
     "test_bars": 2000,
     "purge_period": 12,
