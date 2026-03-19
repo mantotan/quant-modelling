@@ -5,7 +5,8 @@
     "roc_5", "realized_vol_10", "vol_ratio", "parkinson_vol_10",
     "bar_position", "body_ratio", "return_5", "volume_sma_10",
     "hour_sin", "hour_cos",
-    "regime_vol_state", "regime_vol_zscore", "regime_trend_state"
+    "regime_vol_state", "regime_vol_zscore", "regime_trend_state",
+    "liquidation_proximity", "oi_price_divergence", "oi_momentum", "leverage_proxy"
   ],
   "alpha_features": {
     "funding": [
