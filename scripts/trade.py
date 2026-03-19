@@ -344,7 +344,7 @@ async def main_loop(args: argparse.Namespace) -> None:
     }
 
     # ── Market scanner (cached, 10s TTL) ────────────────────────
-    scanner = MarketScanner(assets={asset})
+    scanner = MarketScanner(assets={asset}, timeframe=tf)
 
     # ── Start resolution monitor ────────────────────────────────
     running_flag = [True]  # mutable list so coroutine can check

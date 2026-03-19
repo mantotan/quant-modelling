@@ -1,53 +1,150 @@
 """Polymarket market scanner: discovers active binary crypto markets.
 
-Reuses PolymarketOddsRecorder discovery logic, adds depth/liquidity
-filtering via CLOB orderbook.
+Queries the Gamma API by deterministic slug pattern for 5m/15m/1h
+crypto Up/Down markets. Slug format: {asset}-updown-{tf}-{unix_ts}
+
+The Gamma API returns outcomes/prices as JSON strings (not token arrays),
+so this module parses them directly instead of using the recorder's helpers.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import aiohttp
 
-from qm.core.types import Asset, MarketType, PolymarketMarket
-from qm.data.connectors.polymarket_recorder import (
-    _extract_prices,
-    _extract_token_ids,
-    _is_binary_up_down,
-    _is_short_duration_market,
-    _match_asset,
-)
+from qm.core.types import Asset, MarketType, PolymarketMarket, Timeframe
 
 logger = logging.getLogger(__name__)
 
 GAMMA_API_URL = "https://gamma-api.polymarket.com/markets"
 
+# Slug prefixes per asset (lowercase)
+_SLUG_ASSET: dict[Asset, str] = {
+    Asset.BTC: "btc",
+    Asset.ETH: "eth",
+    Asset.SOL: "sol",
+    Asset.XRP: "xrp",
+}
+
+# Timeframe → (slug suffix, bar_seconds, MarketType)
+_TF_CONFIG: dict[Timeframe, tuple[str, int, MarketType]] = {
+    Timeframe.M5: ("5m", 300, MarketType.FIVE_MIN),
+    Timeframe.M15: ("15m", 900, MarketType.FIFTEEN_MIN),
+}
+
+
+def _current_bar_start(bar_seconds: int) -> int:
+    """Unix timestamp of the current bar's start."""
+    now = int(datetime.now(UTC).timestamp())
+    return (now // bar_seconds) * bar_seconds
+
+
+def _parse_market(
+    m: dict[str, Any], asset: Asset, market_type: MarketType,
+) -> PolymarketMarket | None:
+    """Parse a Gamma API market dict into PolymarketMarket.
+
+    The API returns outcomes/prices/tokenIds as JSON strings, not arrays.
+    """
+    # Parse outcomes
+    outcomes_raw = m.get("outcomes", "[]")
+    try:
+        outcomes = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else outcomes_raw
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+    outcomes_lower = [o.lower() for o in outcomes]
+    if "up" not in outcomes_lower or "down" not in outcomes_lower:
+        return None
+
+    up_idx = outcomes_lower.index("up")
+    down_idx = outcomes_lower.index("down")
+
+    # Parse prices
+    prices_raw = m.get("outcomePrices", "[]")
+    try:
+        prices = json.loads(prices_raw) if isinstance(prices_raw, str) else prices_raw
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+    if len(prices) <= max(up_idx, down_idx):
+        return None
+
+    try:
+        price_up = float(prices[up_idx])
+        price_down = float(prices[down_idx])
+    except (ValueError, TypeError, IndexError):
+        return None
+
+    # Parse token IDs
+    token_ids_raw = m.get("clobTokenIds", "[]")
+    try:
+        token_ids = json.loads(token_ids_raw) if isinstance(token_ids_raw, str) else token_ids_raw
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+    if len(token_ids) <= max(up_idx, down_idx):
+        return None
+
+    token_id_up = str(token_ids[up_idx])
+    token_id_down = str(token_ids[down_idx])
+
+    # Parse timestamps
+    end_str = m.get("endDate", "")
+    now = datetime.now(UTC)
+    try:
+        window_end = datetime.fromisoformat(
+            end_str.replace("Z", "+00:00"),
+        ) if end_str else now + timedelta(minutes=5)
+    except (ValueError, TypeError):
+        window_end = now + timedelta(minutes=5)
+
+    start_str = m.get("startDate", "")
+    try:
+        window_start = datetime.fromisoformat(
+            start_str.replace("Z", "+00:00"),
+        ) if start_str else now
+    except (ValueError, TypeError):
+        window_start = now
+
+    spread = abs(1.0 - price_up - price_down)
+    volume = float(m.get("volume", 0) or 0)
+
+    return PolymarketMarket(
+        condition_id=m.get("conditionId", "") or m.get("condition_id", ""),
+        token_id_up=token_id_up,
+        token_id_down=token_id_down,
+        asset=asset,
+        market_type=market_type,
+        window_start=window_start,
+        window_end=window_end,
+        mid_up=price_up,
+        spread=spread,
+        volume=volume,
+    )
+
 
 class MarketScanner:
-    """Discovers and filters active Polymarket binary crypto markets.
+    """Discovers active Polymarket crypto Up/Down markets by slug.
 
-    Filters:
-    - Asset match (BTC, ETH, SOL, XRP)
-    - Binary Up/Down structure
-    - Short duration (5m, 15m, 1h)
-    - Minimum time remaining (>60s)
-    - Minimum volume
+    Uses deterministic slug pattern: {asset}-updown-{tf}-{bar_start_unix}
+    Queries the current bar's market directly instead of filtering from
+    a generic active markets list.
     """
 
     def __init__(
         self,
         assets: set[Asset] | None = None,
+        timeframe: Timeframe = Timeframe.M5,
         min_time_remaining_sec: float = 60.0,
-        min_volume: float = 0.0,
-        max_duration_min: int = 60,
     ) -> None:
         self._assets = assets or {Asset.BTC, Asset.ETH}
+        self._timeframe = timeframe
         self._min_time_remaining = min_time_remaining_sec
-        self._min_volume = min_volume
-        self._max_duration_min = max_duration_min
         self._cache: dict[Asset, PolymarketMarket] = {}
         self._cache_time: float = 0.0
         self._cache_ttl = 10.0  # refresh every 10s
@@ -87,93 +184,82 @@ class MarketScanner:
         return None
 
     async def _discover(self) -> list[PolymarketMarket]:
-        """Query Gamma API for active crypto binary markets."""
-        try:
-            async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as session, session.get(
-                GAMMA_API_URL,
-                params={"active": "true", "closed": "false"},
-            ) as resp:
-                if resp.status != 200:
-                    return []
-                all_markets = await resp.json()
-        except Exception:
-            logger.debug("Gamma API unreachable")
+        """Query Gamma API for current + next bar markets by slug.
+
+        Checks both the current bar and the next bar, since Polymarket
+        creates markets ahead of time. Returns the one with most time left.
+        """
+        tf_cfg = _TF_CONFIG.get(self._timeframe)
+        if tf_cfg is None:
             return []
 
-        matched = []
+        tf_suffix, bar_seconds, market_type = tf_cfg
+        current_bar = _current_bar_start(bar_seconds)
+        next_bar = current_bar + bar_seconds
         now = datetime.now(UTC)
 
-        for m in all_markets:
-            tokens = m.get("tokens", [])
-            if not _is_binary_up_down(tokens):
-                continue
+        matched: list[PolymarketMarket] = []
 
-            asset = _match_asset(m.get("question", ""))
-            if asset is None or asset not in self._assets:
-                continue
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as session:
+            for asset in self._assets:
+                slug_prefix = _SLUG_ASSET.get(asset)
+                if slug_prefix is None:
+                    continue
 
-            if not _is_short_duration_market(m, self._max_duration_min):
-                continue
+                best: PolymarketMarket | None = None
+                best_remaining = 0.0
 
-            token_ids = _extract_token_ids(tokens)
-            if token_ids is None:
-                continue
+                # Try current bar first, then next bar
+                for bar_start in (current_bar, next_bar):
+                    slug = f"{slug_prefix}-updown-{tf_suffix}-{bar_start}"
 
-            price_up, price_down = _extract_prices(tokens)
-            if price_up is None:
-                continue
+                    try:
+                        async with session.get(
+                            GAMMA_API_URL, params={"slug": slug},
+                        ) as resp:
+                            if resp.status != 200:
+                                continue
+                            results = await resp.json()
+                    except Exception:
+                        logger.debug("Gamma API query failed for slug=%s", slug)
+                        continue
 
-            volume = float(m.get("volume", 0) or 0)
-            if volume < self._min_volume:
-                continue
+                    if not results:
+                        continue
 
-            # Parse window end for time-remaining filter
-            end_str = m.get("end_date_iso", "")
-            if end_str:
-                try:
-                    window_end = datetime.fromisoformat(
-                        end_str.replace("Z", "+00:00"),
-                    )
-                    remaining = (window_end - now).total_seconds()
+                    m = results[0]
+                    if not m.get("active", False) or m.get("closed", True):
+                        continue
+
+                    # Check time remaining
+                    end_str = m.get("endDate", "")
+                    remaining = 0.0
+                    if end_str:
+                        try:
+                            window_end = datetime.fromisoformat(
+                                end_str.replace("Z", "+00:00"),
+                            )
+                            remaining = (window_end - now).total_seconds()
+                        except (ValueError, TypeError):
+                            pass
+
                     if remaining < self._min_time_remaining:
                         continue
-                except (ValueError, TypeError):
-                    pass
 
-            start_str = (
-                m.get("game_start_time", "")
-                or m.get("start_date_iso", "")
+                    market = _parse_market(m, asset, market_type)
+                    if market is not None and remaining > best_remaining:
+                        best = market
+                        best_remaining = remaining
+
+                if best is not None:
+                    matched.append(best)
+
+        if matched:
+            logger.info(
+                "Discovered %d markets: %s",
+                len(matched),
+                ", ".join(f"{m.asset.value}@{m.mid_up:.3f}" for m in matched),
             )
-            try:
-                window_start = datetime.fromisoformat(
-                    start_str.replace("Z", "+00:00"),
-                ) if start_str else now
-            except (ValueError, TypeError):
-                window_start = now
-
-            try:
-                window_end_parsed = datetime.fromisoformat(
-                    end_str.replace("Z", "+00:00"),
-                ) if end_str else now + timedelta(minutes=5)
-            except (ValueError, TypeError):
-                window_end_parsed = now + timedelta(minutes=5)
-
-            spread = abs(1.0 - price_up - (price_down or (1.0 - price_up)))
-
-            matched.append(PolymarketMarket(
-                condition_id=m.get("condition_id", ""),
-                token_id_up=token_ids[0],
-                token_id_down=token_ids[1],
-                asset=asset,
-                market_type=MarketType.FIVE_MIN,
-                window_start=window_start,
-                window_end=window_end_parsed,
-                mid_up=price_up,
-                spread=spread,
-                volume=volume,
-            ))
-
-        logger.debug("Discovered %d markets for %s", len(matched), self._assets)
         return matched
