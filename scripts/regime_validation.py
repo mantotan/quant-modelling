@@ -75,20 +75,14 @@ def main() -> None:
         sys.exit(1)
     regime_idx = all_names.index("regime_vol_state")
 
-    # ── Feature filtering (same as train_pulse_fast.py) ──────────
-    cached = set(knobs.get("cached_features", []))
-    keep_idx = list(range(N_TICK_FEATURES))
-    for i in range(N_TICK_FEATURES, len(all_names)):
-        if all_names[i] in cached:
-            keep_idx.append(i)
-
     # ── Time-pct filtering ───────────────────────────────────────
     tp_set = np.array(knobs.get("time_pcts", [0.80]))
     tp_mask = np.zeros(len(dataset.time_pcts), dtype=bool)
     for tp in tp_set:
         tp_mask |= np.isclose(dataset.time_pcts, tp, atol=1e-6)
 
-    X = dataset.X[tp_mask][:, keep_idx]
+    # Use ALL features (model.lgb was saved with full 50-feature set)
+    X = dataset.X[tp_mask]
     y = dataset.y[tp_mask]
     bar_indices = dataset.bar_indices[tp_mask]
     market_probs = dataset.market_probs[tp_mask]
@@ -124,7 +118,12 @@ def main() -> None:
     cal_path = model_dir / "calibrator.pkl"
     if cal_path.exists():
         with open(cal_path, "rb") as f:
-            calibrator = pickle.load(f)
+            cal_data = pickle.load(f)
+        # Handle both dict-wrapped and direct calibrator formats
+        if isinstance(cal_data, dict):
+            calibrator = cal_data["calibrator"]
+        else:
+            calibrator = cal_data
     else:
         calibrator = IsotonicCalibrator()
 
