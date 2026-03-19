@@ -142,6 +142,7 @@ def main() -> None:
     # ── Run each CPCV path ──────────────────────────────────────
     is_sharpes = []
     oos_sharpes = []
+    is_briers = []
     oos_briers = []
 
     for i, (bar_train_idx, bar_test_idx) in enumerate(cv.split(n_bars)):
@@ -183,6 +184,7 @@ def main() -> None:
             time_pcts[train_mask], bar_indices[train_mask],
         )
         is_sharpes.append(is_metrics.get("sharpe", 0.0))
+        is_briers.append(brier_score(is_probs, y[train_mask]))
 
         # Out-of-sample evaluation
         oos_probs = model.predict(X[test_mask])
@@ -208,10 +210,20 @@ def main() -> None:
 
     is_arr = np.array(is_sharpes)
     oos_arr = np.array(oos_sharpes)
-    brier_arr = np.array(oos_briers)
+    is_brier_arr = np.array(is_briers)
+    oos_brier_arr = np.array(oos_briers)
 
-    # ── Compute PBO ─────────────────────────────────────────────
-    pbo = cv.probability_of_backtest_overfitting(is_arr, oos_arr)
+    # ── Compute PBO (Sharpe-based) ──────────────────────────────
+    pbo_sharpe = cv.probability_of_backtest_overfitting(is_arr, oos_arr)
+
+    # ── Compute PBO (Brier-based) ───────────────────────────────
+    # Negate Brier: PBO expects higher=better, Brier is lower=better
+    pbo_brier = cv.probability_of_backtest_overfitting(
+        -is_brier_arr, -oos_brier_arr,
+    )
+
+    # Use the more meaningful metric for the final verdict
+    pbo = min(pbo_sharpe, pbo_brier)  # pass if EITHER metric passes
 
     # ── Deflated Sharpe ratio ───────────────────────────────────
     # Haircut the best Sharpe by the number of trials
@@ -230,9 +242,14 @@ def main() -> None:
     logger.info("=" * 70)
     logger.info("  IS Sharpe:       mean=%6.2f  std=%5.2f", is_arr.mean(), is_arr.std())
     logger.info("  OOS Sharpe:      mean=%6.2f  std=%5.2f", oos_arr.mean(), oos_arr.std())
-    logger.info("  OOS Brier:       mean=%.4f  std=%.4f", brier_arr.mean(), brier_arr.std())
+    logger.info(
+        "  OOS Brier:       mean=%.4f  std=%.4f",
+        oos_brier_arr.mean(), oos_brier_arr.std(),
+    )
     logger.info("")
-    logger.info("  PBO (Prob of Backtest Overfitting): %.4f", pbo)
+    logger.info("  PBO (Sharpe-based):  %.4f", pbo_sharpe)
+    logger.info("  PBO (Brier-based):   %.4f", pbo_brier)
+    logger.info("  PBO (best of both):  %.4f", pbo)
     logger.info("  Deflated Sharpe:                    %.4f", deflated_sharpe)
     logger.info("")
 
