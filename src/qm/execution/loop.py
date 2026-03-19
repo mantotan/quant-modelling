@@ -12,10 +12,10 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
-from qm.core.types import Asset, Bar, MarketType, Outcome, PolymarketMarket, Signal
+from qm.core.types import Bar, MarketType, Outcome, PartialBar, PolymarketMarket, Signal
 from qm.execution.audit import AuditWriter
 from qm.model.calibration.calibrator import IsotonicCalibrator
 from qm.model.signals import SignalGenerator
@@ -137,7 +137,7 @@ class TradingLoop:
         BET_SIZE_USD.observe(size_usd)
 
         # 3. Filter (includes risk checks)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         ok, reason = self._filter.filter(
             signal=signal,
             size_usd=size_usd,
@@ -188,6 +188,113 @@ class TradingLoop:
 
         await self._audit.log_resolution(condition_id, outcome.value, pnl)
         return pnl
+
+    async def on_partial_bar(
+        self,
+        partial: PartialBar,
+        market: PolymarketMarket,
+        model_prob_up: float,
+    ) -> Fill | None:
+        """Process an intra-bar snapshot: Pulse model prediction → trade.
+
+        Called at each time_pct threshold (0.30, 0.40, 0.60, 0.80) during
+        a live bar. The caller (paper_trade.py or live_trade.py) is
+        responsible for computing features and model prediction — this
+        method receives the calibrated P(Up) directly.
+
+        Uses the same sizing → filtering → execution → audit flow as
+        on_bar_completed(), ensuring paper and live paths are identical.
+
+        Args:
+            partial: Current intra-bar snapshot from BarBuilder.
+            market: Active Polymarket market for this bar.
+            model_prob_up: Calibrated P(close >= open) from Pulse model.
+
+        Returns:
+            Fill if order was executed, None otherwise.
+        """
+        if not self._running:
+            return None
+
+        market_prob_up = (
+            market.mid_up if market.mid_up > 0 else 0.5
+        )
+        market_spread = market.spread if market.spread > 0 else 0.02
+
+        t0 = time.perf_counter_ns()
+        signal = self._signal_gen.generate(
+            timestamp=datetime.now(UTC),
+            asset=partial.asset,
+            market_type=MarketType.FIVE_MIN,
+            model_prob_up=model_prob_up,
+            market_prob_up=market_prob_up,
+            market_spread=market_spread,
+        )
+
+        if signal is None:
+            return None
+
+        SIGNALS_GENERATED.labels(
+            asset=signal.asset.value,
+            market_type=signal.market_type.value,
+            side=signal.recommended_side.value,
+        ).inc()
+        EDGE_OBSERVED.observe(signal.edge)
+        await self._audit.log_signal(signal)
+
+        elapsed_ns = time.perf_counter_ns() - t0
+        INFERENCE_LATENCY_NS.observe(elapsed_ns)
+
+        # Size the bet
+        buy_price = (
+            market_prob_up
+            if signal.recommended_side == Outcome.UP
+            else (1 - market_prob_up)
+        )
+        size_usd = self._sizer.size(
+            signal.edge, buy_price, self._portfolio.available_cash,
+        )
+        if size_usd <= 0:
+            return None
+
+        BET_SIZE_USD.observe(size_usd)
+
+        # Filter (risk checks)
+        now = datetime.now(UTC)
+        ok, reason = self._filter.filter(
+            signal=signal,
+            size_usd=size_usd,
+            portfolio=self._portfolio,
+            market=market,
+            now=now,
+        )
+        await self._audit.log_risk_check(signal, ok, reason)
+        if not ok:
+            return None
+
+        # Execute
+        fill = await self._executor.execute(signal, size_usd, market)
+
+        if fill.status == "filled":
+            self._portfolio.on_fill(
+                asset=signal.asset,
+                side=signal.recommended_side,
+                size_usd=fill.size_usd,
+                fill_price=fill.price,
+                condition_id=market.condition_id,
+            )
+            ORDERS_PLACED.labels(
+                asset=signal.asset.value,
+                outcome=signal.recommended_side.value,
+            ).inc()
+            await self._audit.log_fill(
+                asset=signal.asset.value,
+                side=signal.recommended_side.value,
+                size=fill.size_usd,
+                fill_price=fill.price,
+            )
+
+        return fill
 
     def stop(self) -> None:
         """Stop accepting new trades."""
