@@ -1,0 +1,22 @@
+[package]
+name = "qm-fast"
+version = "0.1.0"
+edition = "2021"
+description = "Rust hot path for QM quant trading: features, orderbook, EIP-712 signing"
+license = "MIT"
+
+[lib]
+name = "qm_fast"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["extension-module"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+approx = "0.5"
+
+[profile.release]
+opt-level = 3
+lto = true
