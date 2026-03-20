@@ -357,6 +357,23 @@ def main() -> None:
         pct_positive * 100, int((oos_arr > 0).sum()), n_paths,
     )
 
+    # Per-time-bucket Brier (if multiple time_pcts in dataset)
+    unique_tps = sorted(set(float(round(t, 4)) for t in time_pcts))
+    if len(unique_tps) > 1:
+        logger.info("")
+        logger.info("  Per-time-bucket Brier (global OOS, last path):")
+        # Use the last path's OOS data for per-bucket reporting
+        last_oos_probs = model.predict(X[test_mask])
+        last_oos_y = y[test_mask]
+        last_oos_tp = time_pcts[test_mask]
+        for tp in unique_tps:
+            tp_mask_b = np.isclose(last_oos_tp, tp, atol=1e-6)
+            if tp_mask_b.sum() > 0:
+                tp_brier = brier_score(last_oos_probs[tp_mask_b], last_oos_y[tp_mask_b])
+                tp_acc = float(((last_oos_probs[tp_mask_b] > 0.5) == last_oos_y[tp_mask_b]).mean())
+                logger.info("    t=%.3f: Brier=%.4f  Acc=%.1f%%  (%d samples)",
+                            tp, tp_brier, tp_acc * 100, int(tp_mask_b.sum()))
+
     logger.info("=" * 70)
 
     # ── Acceptance gate ─────────────────────────────────────────
