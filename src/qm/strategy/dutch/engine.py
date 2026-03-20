@@ -27,8 +27,9 @@ logger = logging.getLogger(__name__)
 class DutchConfig:
     """Configuration for dutch accumulation strategy."""
 
-    bar_budget: float = 50.0
-    order_size: float = 10.0
+    bar_budget: float = 200.0
+    order_size: float = 5.0
+    max_orders: int = 20
     cheap_threshold: float = 0.10
     contra_threshold: float = 0.11
     max_pair_cost: float = 0.97
@@ -175,6 +176,7 @@ class DutchAccumulationEngine:
         self._config = config
         self._inventory = DutchInventory()
         self._orders: list[dict] = []
+        self._order_count: int = 0
         self._decision_log: list[str] = []
         self._model_probs: list[float] = []
         self._model_flips: int = 0
@@ -263,9 +265,11 @@ class DutchAccumulationEngine:
                 self._stopped = True
             return []
 
-        # Budget check
+        # Budget + order count check
         budget_remaining = self._config.bar_budget - self._inventory.total_cost
         if budget_remaining < self._config.min_order_usd:
+            return []
+        if self._order_count >= self._config.max_orders:
             return []
 
         remaining_s = (1.0 - time_pct) * self._config.bar_seconds
@@ -391,6 +395,7 @@ class DutchAccumulationEngine:
                 )
                 orders.append(order)
                 budget_remaining -= dollar_size
+                self._order_count += 1
                 self._decision_log.append(
                     f"t={time_pct:.2f}: BUY {side} {reason} "
                     f"limit={limit_price:.4f} ${dollar_size:.2f}"
@@ -492,6 +497,7 @@ class DutchAccumulationEngine:
         """Clear all state for next bar."""
         self._inventory = DutchInventory()
         self._orders.clear()
+        self._order_count = 0
         self._decision_log.clear()
         self._model_probs.clear()
         self._model_flips = 0

@@ -108,12 +108,12 @@ def parse_args() -> argparse.Namespace:
         help="Enable dutch accumulation paper trading",
     )
     p.add_argument(
-        "--dutch-budget", type=float, default=50.0,
-        help="Per-bar budget in USD (default: 50)",
+        "--dutch-budget", type=float, default=200.0,
+        help="Per-bar budget in USD (default: 200)",
     )
     p.add_argument(
-        "--dutch-order-size", type=float, default=10.0,
-        help="Per-order size in USD (default: 10)",
+        "--dutch-order-size", type=float, default=5.0,
+        help="Per-order size in USD (default: 5)",
     )
     p.add_argument(
         "--dutch-tick-log", action="store_true",
