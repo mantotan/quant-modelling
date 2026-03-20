@@ -159,33 +159,35 @@ def build_arrays(
         for p in resolved
     ])
 
-    # Paper PnL per trade.
-    # New logs (with position_id): each resolution record has per-position PnL,
-    # so we consume records sequentially per condition_id (1:1 with fills).
-    # Old logs (no position_id): dedup by condition_id to avoid double-counting.
-    has_position_ids = any(
-        r.get("position_id") for recs in resolutions.values() for r in recs
-    )
-    resolution_idx: dict[str, int] = {}  # tracks next unused record per cid
-    seen_cids: set[str] = set()
+    # Paper PnL per trade — computed from fill data using Portfolio's
+    # shares-based formula. This matches how paper trading actually
+    # calculates PnL (shares = size_usd / fill_price, then win/loss).
+    # Resolution log PnL is unreliable for multi-position condition_ids
+    # due to aggregation artifacts, so we recompute from fills directly.
     paper_pnls_list: list[float] = []
     for p in resolved:
+        if p["fill_status"] != "filled" or p.get("size_usd", 0) <= 0:
+            paper_pnls_list.append(0.0)
+            continue
         cid = p["condition_id"]
-        if p["fill_status"] != "filled":
+        fp = p["fill_price"]
+        size = p["size_usd"]
+        if fp <= 0.0 or fp >= 1.0:
             paper_pnls_list.append(0.0)
-        elif has_position_ids:
-            # New format: each resolution record has correct per-position PnL
-            idx = resolution_idx.get(cid, 0)
-            records = resolutions[cid]
-            pnl = records[idx]["pnl"] if idx < len(records) else 0.0
-            paper_pnls_list.append(pnl)
-            resolution_idx[cid] = idx + 1
-        elif cid not in seen_cids:
-            # Old format fallback: sum all records, count once per condition_id
-            paper_pnls_list.append(sum(r["pnl"] for r in resolutions[cid]))
-            seen_cids.add(cid)
+            continue
+        # Determine side and outcome
+        side = p.get("signal_side", "")
+        outcome = resolutions[cid][0]["outcome"].upper()
+        if side:
+            bet_up = side.upper() == "UP"
         else:
-            paper_pnls_list.append(0.0)
+            bet_up = p["model_prob"] > p["market_prob"]
+        correct = (bet_up and outcome in ("UP", "YES")) or (
+            not bet_up and outcome not in ("UP", "YES")
+        )
+        shares = size / fp
+        pnl = shares * (1 - fp) if correct else -size
+        paper_pnls_list.append(pnl)
     paper_pnls = np.array(paper_pnls_list)
 
     # Fill info

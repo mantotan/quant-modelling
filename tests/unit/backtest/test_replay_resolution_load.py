@@ -155,11 +155,14 @@ class TestBuildArraysWithAggregatedResolutions:
         assert arrays is not None
         assert arrays["targets"][0] == 1.0
         assert arrays["targets"][1] == 0.0
-        assert arrays["paper_pnls"][0] == pytest.approx(10.0)
-        assert arrays["paper_pnls"][1] == pytest.approx(-5.0)
+        # paper_pnls computed from fills: signal_side=UP, fp=0.50, size=25
+        # cid_1 outcome=UP → correct → shares=50, pnl=50*(1-0.50)=25.0
+        # cid_2 outcome=DOWN → wrong (bet UP) → pnl=-25.0
+        assert arrays["paper_pnls"][0] == pytest.approx(25.0)
+        assert arrays["paper_pnls"][1] == pytest.approx(-25.0)
 
-    def test_multi_resolution_pnl_summed(self):
-        """Multiple resolutions for same condition_id should sum PnL."""
+    def test_multi_resolution_pnl_consistent(self):
+        """Multiple resolutions for same cid: paper_pnl comes from fills, not resolution logs."""
         predictions = self._make_predictions(["cid_1"])
         resolutions = {
             "cid_1": [
@@ -171,8 +174,9 @@ class TestBuildArraysWithAggregatedResolutions:
 
         arrays = build_arrays(predictions, resolutions)
         assert arrays is not None
-        # PnL must be 15 + 8 + 0 = 23, not just the last record (0)
-        assert arrays["paper_pnls"][0] == pytest.approx(23.0, abs=0.01)
+        # paper_pnls from fill data: signal_side=UP, outcome=UP, correct
+        # shares=25/0.50=50, pnl=50*(1-0.50)=25.0
+        assert arrays["paper_pnls"][0] == pytest.approx(25.0, abs=0.01)
 
     def test_unfilled_prediction_gets_zero_pnl(self):
         """Unfilled predictions should have zero PnL regardless of resolutions."""
@@ -202,8 +206,8 @@ class TestBuildArraysWithAggregatedResolutions:
         result = build_arrays([], {})
         assert result is None
 
-    def test_multi_prediction_same_condition_no_double_count(self):
-        """Multiple filled predictions sharing a condition_id should NOT double-count PnL."""
+    def test_multi_prediction_same_condition_independent_pnl(self):
+        """Multiple filled predictions sharing a condition_id get independent PnL from fills."""
         predictions = self._make_predictions(["cid_1", "cid_1"])
         resolutions = {
             "cid_1": [
@@ -213,8 +217,11 @@ class TestBuildArraysWithAggregatedResolutions:
         }
         arrays = build_arrays(predictions, resolutions)
         assert arrays is not None
-        # Total should be 15, NOT 30 (each condition_id counted once)
-        assert arrays["paper_pnls"].sum() == pytest.approx(15.0, abs=0.01)
+        # Both predictions: signal_side=UP, outcome=UP, correct
+        # Each: shares=25/0.50=50, pnl=50*(1-0.50)=25.0
+        assert arrays["paper_pnls"][0] == pytest.approx(25.0, abs=0.01)
+        assert arrays["paper_pnls"][1] == pytest.approx(25.0, abs=0.01)
+        assert arrays["paper_pnls"].sum() == pytest.approx(50.0, abs=0.01)
 
     def test_no_resolutions_returns_none(self):
         """No matching resolutions should return None with warning."""
