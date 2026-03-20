@@ -215,8 +215,8 @@ class StreamSlot:
         book_dn = self.feed.get_book("down")
         if book_up is None or book_dn is None:
             return None
-        # Skip if no real data yet
-        if book_up.best_bid <= 0 and book_up.best_ask >= 1.0:
+        # Skip if book is empty/uninitialized on either side
+        if book_up.best_bid <= 0 or book_up.best_ask >= 1.0:
             return None
 
         return TickSnapshot(
@@ -269,12 +269,10 @@ class TickWriter:
 
         while running_flag[0]:
             # Drain queue
-            drained = 0
             while not tick_queue.empty():
                 try:
                     tick = tick_queue.get_nowait()
                     self._buffer.append(tick.to_dict())
-                    drained += 1
                 except asyncio.QueueEmpty:
                     break
 
