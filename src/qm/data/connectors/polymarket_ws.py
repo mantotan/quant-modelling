@@ -22,7 +22,7 @@ import aiohttp
 
 logger = logging.getLogger(__name__)
 
-WS_URL = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+WS_URL = "wss://ws-subscriptions-frontend-clob.polymarket.com/ws/market"
 PING_INTERVAL = 10.0  # Send PING every 10s per docs
 
 
