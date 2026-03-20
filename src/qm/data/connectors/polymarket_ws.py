@@ -121,9 +121,15 @@ class PolymarketWSFeed:
         self._session: aiohttp.ClientSession | None = None
         self._running = False
         self._connected = asyncio.Event()
+        self._book_updated: asyncio.Event = asyncio.Event()
         self._token_id_up: str | None = None
         self._token_id_down: str | None = None
         self._connector_factory = connector_factory
+
+    @property
+    def book_updated(self) -> asyncio.Event:
+        """Fires on every orderbook update (book snapshot or price change)."""
+        return self._book_updated
 
     @property
     def mid_up(self) -> float:
@@ -285,6 +291,7 @@ class PolymarketWSFeed:
                     event.get("bids", []),
                     event.get("asks", []),
                 )
+                self._book_updated.set()
                 logger.debug(
                     "Book snapshot %s...: bid=%.3f ask=%.3f spread=%.4f",
                     asset_id[:12], book.best_bid, book.best_ask, book.spread,
@@ -297,6 +304,7 @@ class PolymarketWSFeed:
                         float(pc["size"]),
                         pc.get("side", "BUY"),
                     )
+                self._book_updated.set()
 
             elif event_type == "last_trade_price":
                 book.last_trade = float(event.get("price", book.last_trade))

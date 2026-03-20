@@ -1,19 +1,17 @@
-"""Limit order fill simulator for dutch accumulation paper trading.
+"""Limit order fill simulator V2 for dutch accumulation paper trading.
 
 Simulates realistic maker-only limit order fills:
-  - Orders placed at bid + offset (inside the spread)
-  - Fill only when ask drops to or below limit price
-  - Latency delay between price crossing and fill
+  - Consecutive-tick fill model (N ticks at/below limit = fill)
+  - Order chasing: cancel + re-place when market moves away
+  - Cancel orders that drift too far (>5c)
   - Depth-aware partial fills
-  - State machine: PENDING → CROSSING → FILLED | EXPIRED
-
-This is separate from PaperExecutor which does instant pessimistic fills.
+  - State machine: PENDING → CROSSING → FILLED | CANCELLED | EXPIRED
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from qm.strategy.dutch.engine import DutchOrder
 
@@ -28,7 +26,7 @@ class DutchFill:
     fill_price: float
     filled_shares: float
     fill_time_pct: float
-    latency_s: float
+    fill_ticks: int
     partial: bool
 
 
@@ -37,9 +35,10 @@ class _PendingOrder:
     """Internal state for a pending limit order."""
 
     order: DutchOrder
-    state: str = "PENDING"  # PENDING, CROSSING, FILLED
-    cross_time_pct: float = 0.0
+    state: str = "PENDING"  # PENDING, CROSSING, FILLED, CANCELLED
+    consecutive_ticks_at_limit: int = 0
     would_fill_count: int = 0
+    chase_count: int = 0
 
 
 @dataclass
@@ -51,29 +50,38 @@ class SimulatorStats:
     partial: int = 0
     would_fill: int = 0
     expired: int = 0
-    total_latency_s: float = 0.0
+    chased: int = 0
+    cancelled: int = 0
+    total_fill_ticks: int = 0
 
     @property
-    def avg_fill_latency_s(self) -> float:
-        return self.total_latency_s / self.filled if self.filled > 0 else 0.0
+    def avg_fill_ticks(self) -> float:
+        return self.total_fill_ticks / self.filled if self.filled > 0 else 0.0
 
 
 class LimitOrderSimulator:
-    """Simulates limit order fills with latency and depth checks.
+    """Simulates limit order fills with consecutive-tick model and chasing.
 
-    On each tick, checks if any pending order's limit price has been
-    reached by the market. After a configurable latency delay, fills
-    the order if depth is sufficient.
+    Fill model: order fills after N consecutive ticks where ask <= limit.
+    If ask bounces above limit, counter resets to 0.
+
+    Chase model: if market moves >chase_threshold from our limit, cancel
+    and re-place at new bid + offset. Max chase_count per order.
     """
 
     def __init__(
         self,
-        fill_latency_s: float = 2.0,
-        bar_seconds: float = 900.0,
+        fill_ticks: int = 3,
+        chase_threshold: float = 0.03,
+        max_chase: int = 2,
+        spread_offset: float = 0.01,
+        cancel_distance: float = 0.05,
     ) -> None:
-        self._fill_latency_s = fill_latency_s
-        self._bar_seconds = bar_seconds
-        self._latency_pct = fill_latency_s / bar_seconds
+        self._fill_ticks = fill_ticks
+        self._chase_threshold = chase_threshold
+        self._max_chase = max_chase
+        self._spread_offset = spread_offset
+        self._cancel_distance = cancel_distance
         self._pending: list[_PendingOrder] = []
         self._stats = SimulatorStats()
 
@@ -88,19 +96,55 @@ class LimitOrderSimulator:
         book_up,
         book_dn,
     ) -> list[DutchFill]:
-        """Process pending orders against current orderbook state.
+        """Process pending orders: chase pass then fill-check pass.
 
         book_up/book_dn are TokenBook | None.
         Returns list of fills that occurred this tick.
         """
+        # --- Chase pass: check if market moved away ---
+        for po in self._pending:
+            if po.state not in ("PENDING", "CROSSING"):
+                continue
+            book = book_up if po.order.side == "UP" else book_dn
+            if book is None or book.best_bid <= 0:
+                continue
+
+            new_limit = book.best_bid + self._spread_offset
+            distance = new_limit - po.order.limit_price
+
+            if distance > self._chase_threshold and po.chase_count < self._max_chase:
+                # Moderate distance — chase (cancel and re-place)
+                # Chase: re-place at new price
+                new_ask = book.best_ask
+                if new_limit >= new_ask:
+                    new_limit = new_ask
+                po.order = DutchOrder(
+                    side=po.order.side,
+                    limit_price=round(new_limit, 4),
+                    shares=po.order.shares,
+                    dollars=round(po.order.shares * new_limit, 2),
+                    time_pct=po.order.time_pct,
+                    placed_at=po.order.placed_at,
+                    reason=po.order.reason + f" chase#{po.chase_count + 1}",
+                )
+                po.chase_count += 1
+                po.state = "PENDING"
+                po.consecutive_ticks_at_limit = 0
+                self._stats.chased += 1
+            elif distance > self._cancel_distance:
+                # Too far and no chases left — cancel
+                po.state = "CANCELLED"
+                po.consecutive_ticks_at_limit = 0
+                self._stats.cancelled += 1
+
+        # --- Fill-check pass ---
         fills: list[DutchFill] = []
         remaining: list[_PendingOrder] = []
 
         for po in self._pending:
-            if po.state == "FILLED":
+            if po.state in ("FILLED", "CANCELLED"):
                 continue
 
-            # Get the relevant book
             book = book_up if po.order.side == "UP" else book_dn
             if book is None:
                 remaining.append(po)
@@ -109,27 +153,21 @@ class LimitOrderSimulator:
             ask = book.best_ask
             limit = po.order.limit_price
 
-            if po.state == "PENDING":
-                if ask <= limit:
-                    # Ask has crossed our limit — start latency timer
-                    po.state = "CROSSING"
-                    po.cross_time_pct = time_pct
-                    po.would_fill_count += 1
-                remaining.append(po)
-
-            elif po.state == "CROSSING":
-                if ask > limit:
-                    # Ask bounced back above our limit — back to pending
-                    po.state = "PENDING"
-                    remaining.append(po)
-                elif time_pct - po.cross_time_pct >= self._latency_pct:
-                    # Latency elapsed and ask is still at/below limit — FILL
+            if ask <= limit:
+                po.consecutive_ticks_at_limit += 1
+                if po.consecutive_ticks_at_limit >= self._fill_ticks:
                     fill = self._execute_fill(po, time_pct, book)
                     fills.append(fill)
                     po.state = "FILLED"
-                    # Don't add to remaining (it's done)
                 else:
                     remaining.append(po)
+            else:
+                # Ask bounced above limit
+                if po.consecutive_ticks_at_limit > 0:
+                    po.would_fill_count += 1
+                po.consecutive_ticks_at_limit = 0
+                po.state = "PENDING"
+                remaining.append(po)
 
         self._pending = remaining
         return fills
@@ -142,8 +180,6 @@ class LimitOrderSimulator:
         requested = po.order.shares
 
         if available <= 0:
-            # Edge case: book drained between crossing and fill
-            # Fill at limit price anyway (simulating aggressive)
             filled_shares = requested
             partial = False
         elif available < requested:
@@ -154,16 +190,15 @@ class LimitOrderSimulator:
             filled_shares = requested
             partial = False
 
-        latency_s = (time_pct - po.cross_time_pct) * self._bar_seconds
         self._stats.filled += 1
-        self._stats.total_latency_s += latency_s
+        self._stats.total_fill_ticks += po.consecutive_ticks_at_limit
 
         return DutchFill(
             order=po.order,
             fill_price=po.order.limit_price,
             filled_shares=round(filled_shares, 4),
             fill_time_pct=round(time_pct, 4),
-            latency_s=round(latency_s, 2),
+            fill_ticks=po.consecutive_ticks_at_limit,
             partial=partial,
         )
 
@@ -178,7 +213,7 @@ class LimitOrderSimulator:
         """Cancel all pending orders. Returns the cancelled orders."""
         cancelled = []
         for po in self._pending:
-            if po.state != "FILLED":
+            if po.state not in ("FILLED", "CANCELLED"):
                 cancelled.append(po.order)
                 self._stats.expired += 1
                 self._stats.would_fill += po.would_fill_count

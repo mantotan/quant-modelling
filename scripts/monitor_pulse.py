@@ -624,8 +624,8 @@ def print_dutch_panel(
     # Fill stats
     if sim_stats:
         print(f"\n  FILLS    placed={sim_stats.placed} filled={sim_stats.filled} "
-              f"partial={sim_stats.partial} would_fill={sim_stats.would_fill} "
-              f"avg_lat={sim_stats.avg_fill_latency_s:.1f}s")
+              f"partial={sim_stats.partial} chased={sim_stats.chased} "
+              f"cancelled={sim_stats.cancelled} avg_ticks={sim_stats.avg_fill_ticks:.1f}")
 
     # Last decisions
     decisions = engine_snap.get("last_decisions", [])
@@ -644,6 +644,26 @@ def print_dutch_panel(
 
     print(f"\n  Pred: {pred_us:.0f}us")
     print(f"{'=' * 78}")
+
+
+# -- State persistence ------------------------------------------------
+
+DUTCH_STATE_FILE = Path("data/dutch_paper/state.json")
+
+
+def _save_dutch_state(session: dict, pending: list) -> None:
+    """Save dutch session state for crash recovery."""
+    try:
+        state = {
+            "session": {k: v for k, v in session.items() if not k.startswith("_")},
+            "pending_count": len(pending),
+            "saved_at": datetime.now(UTC).isoformat(),
+        }
+        DUTCH_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(DUTCH_STATE_FILE, "w") as f:
+            json.dump(state, f, indent=2)
+    except Exception as e:
+        logger.warning("Failed to save dutch state: %s", e)
 
 
 # -- Main loop --------------------------------------------------------
@@ -715,14 +735,27 @@ async def main_loop(args: argparse.Namespace) -> None:
             bar_seconds=BAR_SECONDS[tf],
         )
         dutch_engine = DutchAccumulationEngine(dutch_config)
-        dutch_sim = LimitOrderSimulator(fill_latency_s=2.0, bar_seconds=BAR_SECONDS[tf])
+        dutch_sim = LimitOrderSimulator(fill_ticks=3)
         dutch_logger = DutchSummaryLogger(
             base_dir=Path("data/dutch_paper"),
             asset="BTC",
             timeframe=tf_label,
         )
-        logger.info("Dutch accumulation enabled: budget=$%.0f, order=$%.0f",
-                     args.dutch_budget, args.dutch_order_size)
+        # Load persisted session state
+        dutch_state_file = Path("data/dutch_paper/state.json")
+        if dutch_state_file.exists():
+            try:
+                with open(dutch_state_file) as f:
+                    saved = json.load(f)
+                if "session" in saved:
+                    dutch_session.update(saved["session"])
+                    logger.info("Restored dutch session: %dW %dL PnL=$%.2f",
+                                dutch_session["wins"], dutch_session["losses"],
+                                dutch_session["total_pnl"])
+            except Exception as e:
+                logger.warning("Failed to load dutch state: %s", e)
+        logger.info("Dutch accumulation enabled: budget=$%.0f, order=$%.0f, edge>%.2f",
+                     args.dutch_budget, args.dutch_order_size, dutch_config.cheap_threshold)
 
     # -- Start background tasks -----------------------------------
     running_flag = [True]
@@ -752,10 +785,31 @@ async def main_loop(args: argparse.Namespace) -> None:
     signal.signal(signal.SIGINT, handle_shutdown)
     signal.signal(signal.SIGTERM, handle_shutdown)
 
-    logger.info("Starting main loop (%.0fms polling)... waiting for ticks", POLL_INTERVAL * 1000)
+    # -- Timing cadences for event-driven loop --------------------
+    last_model_time = 0.0
+    last_display_time = 0.0
+    last_state_save = time.time()
+    MODEL_INTERVAL = 1.0      # model inference every 1s
+    DISPLAY_INTERVAL = 0.5    # display update every 0.5s
+    STATE_SAVE_INTERVAL = 300.0  # state persistence every 5 min
+    cal_prob = 0.5
+    raw_prob = 0.5
+    pred_us = 0.0
+
+    logger.info("Starting main loop (%s)... waiting for ticks",
+                "event-driven" if dutch_mode else f"{POLL_INTERVAL*1000:.0f}ms polling")
 
     while running_flag[0]:
-        await asyncio.sleep(POLL_INTERVAL)
+        # -- WAIT: event-driven (dutch) or polling (non-dutch) ----
+        ws_feed = ws_feeds.get(tf)
+        if dutch_mode and ws_feed and ws_feed._connected.is_set():
+            try:
+                await asyncio.wait_for(ws_feed.book_updated.wait(), timeout=1.0)
+                ws_feed.book_updated.clear()
+            except asyncio.TimeoutError:
+                pass
+        else:
+            await asyncio.sleep(POLL_INTERVAL)
 
         # -- Process completed bars -------------------------------
         while not completed_bars.empty():
@@ -815,7 +869,9 @@ async def main_loop(args: argparse.Namespace) -> None:
                     "orders_filled": dutch_sim.stats.filled,
                     "partial_fills": dutch_sim.stats.partial,
                     "would_fill_count": dutch_sim.stats.would_fill,
-                    "avg_fill_latency_s": round(dutch_sim.stats.avg_fill_latency_s, 2),
+                    "avg_fill_ticks": round(dutch_sim.stats.avg_fill_ticks, 1),
+                    "chased": dutch_sim.stats.chased,
+                    "cancelled": dutch_sim.stats.cancelled,
                     "expired": dutch_sim.stats.expired,
                 }
                 # Queue for resolution via Gamma API
@@ -851,19 +907,20 @@ async def main_loop(args: argparse.Namespace) -> None:
             current_bar_id = bar_id
             last_triggered = set()
 
-        # -- Compute features & predict ---------------------------
-        t0 = time.perf_counter_ns()
-        features = feat_cache.get_features(partial)
-        raw_prob = float(model.predict(features.reshape(1, -1))[0])
-
-        cal_prob = raw_prob
-        if calibrator:
-            cal_prob = float(calibrator.transform(
-                np.array([raw_prob]),
-                np.array([elapsed_pct]),
-            )[0])
-
-        pred_us = (time.perf_counter_ns() - t0) / 1000
+        # -- Model inference at 1Hz (expensive ~1ms) ---------------
+        now = time.time()
+        if now - last_model_time >= MODEL_INTERVAL:
+            t0 = time.perf_counter_ns()
+            features = feat_cache.get_features(partial)
+            raw_prob = float(model.predict(features.reshape(1, -1))[0])
+            cal_prob = raw_prob
+            if calibrator:
+                cal_prob = float(calibrator.transform(
+                    np.array([raw_prob]),
+                    np.array([elapsed_pct]),
+                )[0])
+            pred_us = (time.perf_counter_ns() - t0) / 1000
+            last_model_time = now
 
         # -- Check market data ------------------------------------
         pm_market = pm_markets.get(tf)
@@ -984,36 +1041,46 @@ async def main_loop(args: argparse.Namespace) -> None:
                 dutch_pending_resolutions[:] = dutch_pending_resolutions[-20:]
                 logger.warning("Dropped %d stale pending resolutions", dropped)
 
-        # -- Print display -----------------------------------------
-        if dutch_mode and dutch_engine:
-            print_dutch_panel(
-                price=last_price,
-                partial=partial,
-                tf_label=tf_label,
-                cal_prob=cal_prob,
-                ws_feed=ws_feed,
-                has_book=has_book,
-                mid_vel=mid_vel,
-                pred_us=pred_us,
-                engine_snap=dutch_engine.snapshot(),
-                sim_stats=dutch_sim.stats if dutch_sim else None,
-                session_stats=dutch_session,
-            )
-        else:
-            print_alpha_panel(
-                price=last_price,
-                partial=partial,
-                tf_label=tf_label,
-                raw_prob=raw_prob,
-                cal_prob=cal_prob,
-                ws_feed=ws_feed,
-                has_book=has_book,
-                mid_vel=mid_vel,
-                pred_us=pred_us,
-            )
+        # -- Display at cadence ------------------------------------
+        now_disp = time.time()
+        if now_disp - last_display_time >= DISPLAY_INTERVAL:
+            last_display_time = now_disp
+            if dutch_mode and dutch_engine:
+                print_dutch_panel(
+                    price=last_price,
+                    partial=partial,
+                    tf_label=tf_label,
+                    cal_prob=cal_prob,
+                    ws_feed=ws_feed,
+                    has_book=has_book,
+                    mid_vel=mid_vel,
+                    pred_us=pred_us,
+                    engine_snap=dutch_engine.snapshot(),
+                    sim_stats=dutch_sim.stats if dutch_sim else None,
+                    session_stats=dutch_session,
+                )
+            else:
+                print_alpha_panel(
+                    price=last_price,
+                    partial=partial,
+                    tf_label=tf_label,
+                    raw_prob=raw_prob,
+                    cal_prob=cal_prob,
+                    ws_feed=ws_feed,
+                    has_book=has_book,
+                    mid_vel=mid_vel,
+                    pred_us=pred_us,
+                )
+
+        # -- State persistence (every 5 min) -----------------------
+        if dutch_mode and now_disp - last_state_save >= STATE_SAVE_INTERVAL:
+            last_state_save = now_disp
+            _save_dutch_state(dutch_session, dutch_pending_resolutions)
 
     # -- Shutdown -------------------------------------------------
     logger.info("Shutting down...")
+    if dutch_mode:
+        _save_dutch_state(dutch_session, dutch_pending_resolutions)
     if dutch_logger:
         dutch_logger.close()
     for feed in ws_feeds.values():

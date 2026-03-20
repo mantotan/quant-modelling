@@ -1,9 +1,13 @@
-"""Dutch accumulation engine — buy both sides throughout a bar.
+"""Dutch accumulation engine V2 — buy both sides throughout a bar.
 
 Core state machine that tracks one bar's lifecycle:
   - Holds bilateral inventory (shares_up, shares_dn, cost_up, cost_dn)
-  - Decides when to buy each side based on model + market data
-  - Resolves at bar end to compute matched-pair PnL
+  - PnL-aware balancing (only urgently balance when worst-case outcome loses)
+  - 3-tier buy decision: cheap (underpriced), contra (other side overpriced),
+    balance (worst-case PnL negative)
+  - Marginal kill switch (stops when next pair costs > threshold)
+  - Book health checks (spread, depth)
+  - Edge-scaled + PnL-aware order sizing
 
 The engine is pure logic — no I/O, no async. It receives TokenBook
 snapshots and returns DutchOrder decisions. The fill simulator and
@@ -25,13 +29,14 @@ class DutchConfig:
 
     bar_budget: float = 50.0
     order_size: float = 10.0
-    cheap_threshold: float = 0.02
+    cheap_threshold: float = 0.10
+    contra_threshold: float = 0.11
     max_pair_cost: float = 0.97
+    min_order_usd: float = 1.0
     min_time_remaining: float = 30.0
     emergency_balance_time: float = 120.0
     spread_offset: float = 0.01
     bar_seconds: float = 900.0
-    cooldown_s: float = 5.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +84,20 @@ class DutchInventory:
         """Positive = more UP than DN."""
         return self.shares_up - self.shares_dn
 
+    @property
+    def pnl_if_up(self) -> float:
+        """Profit if UP wins: UP shares pay $1 each, minus total cost."""
+        return self.shares_up * 1.0 - self.total_cost
+
+    @property
+    def pnl_if_dn(self) -> float:
+        """Profit if DN wins: DN shares pay $1 each, minus total cost."""
+        return self.shares_dn * 1.0 - self.total_cost
+
+    @property
+    def worst_case_pnl(self) -> float:
+        return min(self.pnl_if_up, self.pnl_if_dn)
+
 
 @dataclass
 class DutchBarSummary:
@@ -107,10 +126,7 @@ class DutchBarSummary:
         unmatched_dn = inv.get("unmatched_dn", 0)
         total_cost = self.cost.get("total", 0)
 
-        # Matched pairs always pay $1 per pair
         matched_payout = matched * 1.0
-
-        # Unmatched shares: pay $1 if their side wins, $0 otherwise
         if outcome == "UP":
             unmatched_payout = unmatched_up * 1.0
         else:
@@ -147,15 +163,21 @@ class DutchBarSummary:
 
 
 class DutchAccumulationEngine:
-    """Core engine: decides when to buy each side, tracks inventory."""
+    """Core engine: decides when to buy each side, tracks inventory.
+
+    Buy decision uses 3 tiers:
+      Tier 1 (cheap): side is underpriced vs model (edge > threshold)
+      Tier 2 (contra): other side is overpriced → this side is value play
+      Tier 3 (balance): worst-case PnL is negative, need to hedge
+    """
 
     def __init__(self, config: DutchConfig) -> None:
         self._config = config
         self._inventory = DutchInventory()
         self._orders: list[dict] = []
         self._decision_log: list[str] = []
-        self._last_order_time: dict[str, float] = {"UP": -999.0, "DN": -999.0}
         self._model_probs: list[float] = []
+        self._model_flips: int = 0
         self._mid_range_up: list[float] = []
         self._spreads_up: list[float] = []
         self._spreads_dn: list[float] = []
@@ -178,6 +200,17 @@ class DutchAccumulationEngine:
         self._window_start = window_start
         self._window_end = window_end
 
+    @staticmethod
+    def _book_is_healthy(book) -> bool:
+        """Check if orderbook has enough liquidity to trade."""
+        if book is None:
+            return False
+        if book.spread > 0.10:
+            return False
+        if book.depth_at_bbo() < 5:
+            return False
+        return True
+
     def on_tick(
         self,
         time_pct: float,
@@ -185,7 +218,7 @@ class DutchAccumulationEngine:
         book_up,
         book_dn,
     ) -> list[DutchOrder]:
-        """Core decision logic. Called every ~1s with current state.
+        """Core decision logic. Called on every book update.
 
         Returns 0, 1, or 2 DutchOrder objects to place.
         book_up/book_dn are TokenBook | None.
@@ -193,105 +226,158 @@ class DutchAccumulationEngine:
         if self._stopped:
             return []
 
-        # Track model stats
+        # Track model stats (incremental flip counting)
+        if self._model_probs:
+            prev = self._model_probs[-1]
+            if (prev - 0.5) * (cal_prob - 0.5) < 0:
+                self._model_flips += 1
         self._model_probs.append(cal_prob)
 
-        # Guard: need both books
+        # Guard: need both books and both healthy
         if book_up is None or book_dn is None:
+            return []
+        if not self._book_is_healthy(book_up) or not self._book_is_healthy(book_dn):
+            return []
+
+        # Skip if book is empty (ask=1.0, bid=0.0 = no real data)
+        if book_up.best_bid <= 0 or book_up.best_ask >= 1.0:
+            return []
+        if book_dn.best_bid <= 0 or book_dn.best_ask >= 1.0:
             return []
 
         # Track market stats
-        mid_up = book_up.mid
-        self._mid_range_up.append(mid_up)
+        self._mid_range_up.append(book_up.mid)
         self._spreads_up.append(book_up.spread)
         self._spreads_dn.append(book_dn.spread)
 
-        # Kill switch: avg pair cost too high
-        if (
-            self._inventory.matched > 0
-            and self._inventory.avg_pair_cost > self._config.max_pair_cost
-        ):
+        # Kill switch: marginal pair cost (what the NEXT pair would cost)
+        marginal_maker = (
+            book_up.best_bid + self._config.spread_offset
+            + book_dn.best_bid + self._config.spread_offset
+        )
+        if marginal_maker >= self._config.max_pair_cost:
             if not self._stopped:
                 self._decision_log.append(
-                    f"t={time_pct:.2f}: KILL avg_pair_cost="
-                    f"{self._inventory.avg_pair_cost:.4f} > {self._config.max_pair_cost}"
+                    f"t={time_pct:.2f}: KILL marginal={marginal_maker:.4f}"
                 )
                 self._stopped = True
             return []
 
         # Budget check
         budget_remaining = self._config.bar_budget - self._inventory.total_cost
-        if budget_remaining < self._config.order_size * 0.5:
+        if budget_remaining < self._config.min_order_usd:
             return []
 
         remaining_s = (1.0 - time_pct) * self._config.bar_seconds
+
+        # PnL-aware balance state (computed once, used per-side)
+        pnl_up = self._inventory.pnl_if_up
+        pnl_dn = self._inventory.pnl_if_dn
+        worst = min(pnl_up, pnl_dn)
+        if worst >= 0:
+            needs_balance = False
+            need_side: str | None = None
+        else:
+            needs_balance = True
+            need_side = "DN" if pnl_up > pnl_dn else "UP"
+
+        # Compute cheap scores for both sides BEFORE the loop
+        cheap_up = cal_prob - book_up.best_ask
+        cheap_dn = (1.0 - cal_prob) - book_dn.best_ask
+
+        # TUNING: time_factor ramps cheap_threshold from 100% at t=0 to 50% at t=0.85
+        # Coefficients to be refined from JSONL bar data after live observation
+        time_factor = max(0.5, 1.0 - 0.588 * min(time_pct / 0.85, 1.0))
+        adjusted_threshold = self._config.cheap_threshold * time_factor
+
         orders: list[DutchOrder] = []
 
         for side in ("UP", "DN"):
             if side == "UP":
-                ask = book_up.best_ask
                 bid = book_up.best_bid
-                model_fair = cal_prob
-                my_shares = self._inventory.shares_up
-                other_shares = self._inventory.shares_dn
+                ask = book_up.best_ask
+                my_cheap = cheap_up
+                other_cheap = cheap_dn
             else:
-                ask = book_dn.best_ask
                 bid = book_dn.best_bid
-                model_fair = 1.0 - cal_prob
-                my_shares = self._inventory.shares_dn
-                other_shares = self._inventory.shares_up
+                ask = book_dn.best_ask
+                my_cheap = cheap_dn
+                other_cheap = cheap_up
 
-            # Skip if book is empty (ask=1.0, bid=0.0 = no real data)
-            if bid <= 0.0 or ask >= 1.0:
-                continue
-
-            cheap_score = model_fair - ask
-            need_this_side = other_shares - my_shares  # positive = need
-
-            # Cooldown check
-            elapsed_s = time_pct * self._config.bar_seconds
-            last_s = self._last_order_time[side] * self._config.bar_seconds
-            if elapsed_s - last_s < self._config.cooldown_s:
-                continue
-
-            # Time-adaptive threshold: patient early, aggressive late
-            # Ramps from 1.0 at t=0 to 0.5 at t=0.85
-            time_factor = max(0.5, 1.0 - 0.588 * min(time_pct / 0.85, 1.0))
-            adjusted_threshold = self._config.cheap_threshold * time_factor
+            # Contra-signal: positive when OTHER side is overpriced
+            # (meaning THIS side is the value play)
+            contra_signal = -other_cheap
 
             can_buy = False
             reason = ""
 
             if remaining_s <= self._config.min_time_remaining:
-                # Last 30s: emergency balance only
-                if need_this_side > 0 and remaining_s > 10:
-                    can_buy = cheap_score > -0.02
-                    reason = "emergency_balance"
+                # Last 30s: emergency balance only (if book still healthy)
+                if needs_balance and need_side == side and remaining_s > 10:
+                    if my_cheap > -0.02:
+                        can_buy = True
+                        reason = f"emergency worst_pnl={worst:.2f}"
             elif remaining_s <= self._config.emergency_balance_time:
-                # 30-120s: lower threshold if unbalanced
-                if need_this_side > 0 and cheap_score > 0:
+                # 30-120s: urgent balance + normal buys
+                # Tier 1: direct cheap
+                if my_cheap > adjusted_threshold:
                     can_buy = True
-                    reason = f"urgent_balance need={need_this_side:.0f}"
-                elif cheap_score > adjusted_threshold:
+                    reason = f"cheap={my_cheap:.3f}"
+                # Tier 3: urgent balance
+                elif needs_balance and need_side == side and my_cheap > 0:
                     can_buy = True
-                    reason = f"cheap={cheap_score:.3f}"
+                    reason = f"urgent_balance worst_pnl={worst:.2f}"
             else:
-                # Normal window
-                if cheap_score > adjusted_threshold:
+                # Normal window: all 3 tiers
+                # Tier 1: direct underpricing
+                if my_cheap > adjusted_threshold:
                     can_buy = True
-                    reason = f"cheap={cheap_score:.3f}"
-                elif need_this_side > 0 and cheap_score > 0:
+                    reason = f"cheap={my_cheap:.3f}"
+                # Tier 2: contra-signal (other side overpriced, this side is value)
+                # Guards: this side must be cheap (my_cheap > 0) + enough time
+                elif (
+                    contra_signal > self._config.contra_threshold
+                    and my_cheap > 0
+                    and remaining_s > 180
+                ):
                     can_buy = True
-                    reason = f"imbalance need={need_this_side:.0f}"
+                    reason = f"contra={contra_signal:.3f}"
+                # Tier 3: PnL-aware balance
+                elif needs_balance and need_side == side and my_cheap > 0:
+                    can_buy = True
+                    reason = f"balance worst_pnl={worst:.2f}"
 
             if can_buy:
                 limit_price = bid + self._config.spread_offset
                 if limit_price >= ask:
-                    limit_price = ask  # don't cross
+                    limit_price = ask
                 if limit_price <= 0:
                     continue
 
-                dollar_size = min(self._config.order_size, budget_remaining)
+                # Smart sizing
+                if needs_balance and need_side == side:
+                    # Balance: buy enough shares to make worst_case_pnl = 0
+                    if side == "UP":
+                        shares_needed = self._inventory.total_cost - self._inventory.shares_up
+                    else:
+                        shares_needed = self._inventory.total_cost - self._inventory.shares_dn
+                    shares_needed = max(0, shares_needed)
+                    dollar_size = min(
+                        shares_needed * limit_price,
+                        budget_remaining,
+                        self._config.order_size * 2,
+                    )
+                else:
+                    # Edge-scaled: bigger edge → bigger order (0.5x to 2x base)
+                    edge_for_scale = max(my_cheap, contra_signal if "contra" in reason else 0)
+                    edge_scale = min(edge_for_scale / (self._config.cheap_threshold * 2), 2.0)
+                    edge_scale = max(0.5, edge_scale)
+                    dollar_size = self._config.order_size * edge_scale
+                    dollar_size = min(dollar_size, budget_remaining)
+
+                if dollar_size < self._config.min_order_usd:
+                    continue
+
                 shares = dollar_size / limit_price
 
                 order = DutchOrder(
@@ -305,7 +391,6 @@ class DutchAccumulationEngine:
                 )
                 orders.append(order)
                 budget_remaining -= dollar_size
-                self._last_order_time[side] = time_pct
                 self._decision_log.append(
                     f"t={time_pct:.2f}: BUY {side} {reason} "
                     f"limit={limit_price:.4f} ${dollar_size:.2f}"
@@ -392,7 +477,7 @@ class DutchAccumulationEngine:
                     if self._model_probs
                     else [0.5, 0.5]
                 ),
-                "flips": self._count_flips(),
+                "flips": self._model_flips,
                 "predictions_count": len(self._model_probs),
             },
             decision_log=list(self._decision_log),
@@ -408,8 +493,8 @@ class DutchAccumulationEngine:
         self._inventory = DutchInventory()
         self._orders.clear()
         self._decision_log.clear()
-        self._last_order_time = {"UP": -999.0, "DN": -999.0}
         self._model_probs.clear()
+        self._model_flips = 0
         self._mid_range_up.clear()
         self._spreads_up.clear()
         self._spreads_dn.clear()
@@ -436,15 +521,11 @@ class DutchAccumulationEngine:
             ),
             "unmatched_up": round(max(0, inv.shares_up - inv.shares_dn), 4),
             "unmatched_dn": round(max(0, inv.shares_dn - inv.shares_up), 4),
+            "pnl_if_up": round(inv.pnl_if_up, 4),
+            "pnl_if_dn": round(inv.pnl_if_dn, 4),
+            "worst_case_pnl": round(inv.worst_case_pnl, 4),
             "stopped": self._stopped,
             "orders_count": len(self._orders),
             "last_decisions": self._decision_log[-5:],
         }
 
-    def _count_flips(self) -> int:
-        """Count how many times model crossed 0.5."""
-        flips = 0
-        for i in range(1, len(self._model_probs)):
-            if (self._model_probs[i - 1] - 0.5) * (self._model_probs[i] - 0.5) < 0:
-                flips += 1
-        return flips
