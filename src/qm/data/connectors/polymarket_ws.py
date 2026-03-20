@@ -144,15 +144,28 @@ class PolymarketWSFeed:
         self._books[token_id_down] = TokenBook(token_id=token_id_down)
         self._running = True
 
+        consecutive_failures = 0
         while running_flag[0] and self._running:
             try:
                 await self._run_once(token_id_up, token_id_down, running_flag)
+                consecutive_failures = 0  # reset on successful connection
             except asyncio.CancelledError:
                 logger.info("Polymarket WS task cancelled")
                 self._connected.clear()
                 return
             except Exception:
-                logger.warning("Polymarket WS disconnected, reconnecting in 5s...", exc_info=True)
+                consecutive_failures += 1
+                if consecutive_failures <= 3:
+                    logger.warning(
+                        "Polymarket WS disconnected (%d), reconnecting in 5s...",
+                        consecutive_failures, exc_info=(consecutive_failures == 1),
+                    )
+                elif consecutive_failures == 4:
+                    logger.warning(
+                        "Polymarket WS repeated failures — suppressing further logs "
+                        "until reconnected",
+                    )
+                # else: silently retry
                 self._connected.clear()
                 await asyncio.sleep(5.0)
 

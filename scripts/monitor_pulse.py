@@ -30,7 +30,6 @@ import polars as pl
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from qm.backtest.market_sim import MarketOddsSimulator
 from qm.core.constants import TIMEFRAME_MINUTES
 from qm.core.types import Asset, Timeframe
 from qm.data.connectors.polymarket_ws import PolymarketWSFeed
@@ -127,15 +126,10 @@ def load_models(
 
 def warm_up_caches(
     caches: dict[Timeframe, LiveFeatureCache],
-) -> dict[Timeframe, dict[str, float]]:
-    """Populate each TF's feature cache from historical bars.
-
-    Returns the warm-up feature dicts so callers can extract values
-    (e.g. realized_vol_10) without reaching into private attributes.
-    """
+) -> None:
+    """Populate each TF's feature cache from historical bars."""
     store = ParquetStore(base_dir=Path("data/raw/ohlcv"))
     pipeline = FeaturePipeline()
-    result: dict[Timeframe, dict[str, float]] = {}
 
     for tf, cache in caches.items():
         label = TF_LABELS[tf]
@@ -154,10 +148,7 @@ def warm_up_caches(
                 cache_dict[name] = float(val)
 
         cache.update_history(cache_dict)
-        result[tf] = cache_dict
         logger.info("Warm-up BTC_%s: cached %d features from %d bars", label, len(cache_dict), n)
-
-    return result
 
 
 # ── TradingView WSS ─────────────────────────────────────────────────
@@ -351,10 +342,13 @@ def print_table(
             f"{format_price(r['open'])}/{format_price(r['high'])}/"
             f"{format_price(r['low'])}/{format_price(r['close'])}"
         )
-        edge_str = f"{r['edge']:+.3f}" if r['edge'] is not None else "  N/A"
+        if r['mkt_prob'] is not None:
+            mkt_str = f"{r['mkt_prob']:>.4f}"
+            edge_str = f"{r['edge']:+.3f}"
+        else:
+            mkt_str = "   -- "
+            edge_str = "    -- "
         side_str = r.get("side", "--")
-        mkt_src = r.get("mkt_src", "sim")
-        mkt_str = f"{r['mkt_prob']:>.4f}" if mkt_src == "pm" else f"{r['mkt_prob']:>.4f}*"
         print(
             f" {r['label']:<4} │ {r['pct']:>4.1f}% │ {ohlc:<25} │ "
             f"{r['raw_prob']:>.4f} │ {r['cal_prob']:>.4f} │ "
@@ -369,16 +363,21 @@ def print_table(
             mid, spread = pm_odds[tf]
             mkt_parts.append(f"{label}={mid:.2f}/{spread:.2f}")
         else:
-            mkt_parts.append(f"{label}=sim")
-    print(f" Mkt: {' '.join(mkt_parts)} | Pred: {pred_us:.0f}us  (*=simulated)")
+            mkt_parts.append(f"{label}=--")
+    print(f" Mkt: {' '.join(mkt_parts)} | Pred: {pred_us:.0f}us")
 
 
-def print_threshold(tf_label: str, pct: float, raw: float, cal: float, mkt: float, edge: float, side: str) -> None:
+def print_threshold(
+    tf_label: str, pct: float, raw: float, cal: float,
+    mkt: float | None, edge: float | None, side: str,
+) -> None:
     """Print highlighted threshold crossing."""
+    mkt_str = f"Mkt={mkt:.4f}" if mkt is not None else "Mkt=--"
+    edge_str = f"Edge={edge:+.3f}" if edge is not None else "Edge=--"
     print(
         f"\n>>> {tf_label} THRESHOLD {pct*100:.0f}% — "
-        f"Raw={raw:.4f} Cal={cal:.4f} Mkt={mkt:.4f} "
-        f"Edge={edge:+.3f} → {side} <<<"
+        f"Raw={raw:.4f} Cal={cal:.4f} {mkt_str} "
+        f"{edge_str} → {side} <<<"
     )
 
 
@@ -433,17 +432,14 @@ async def main_loop(args: argparse.Namespace) -> None:
         )
 
     # ── Warm-up ──────────────────────────────────────────────────
-    warmup_features = warm_up_caches(feat_caches)
+    warm_up_caches(feat_caches)
 
     # ── BarBuilder (single instance, 3 TFs) ──────────────────────
     bar_builder = BarBuilder(assets=[Asset.BTC], timeframes=TIMEFRAMES)
     completed_bars: asyncio.Queue = asyncio.Queue()
 
-    # ── Market odds simulators (fallback when Polymarket unavailable)
-    market_sims: dict[Timeframe, MarketOddsSimulator] = {
-        tf: MarketOddsSimulator(efficiency=0.75, timeframe=tf)
-        for tf in TIMEFRAMES
-    }
+    # ── Market odds simulators (kept for reference but not used as fallback)
+    # When Polymarket WSS is unavailable, Mkt/Edge show as N/A instead of simulated
 
     # ── Polymarket feeds (all TFs) ───────────────────────────────
     pm_feeds: dict[Timeframe, PolymarketWSFeed] = {}
@@ -476,13 +472,6 @@ async def main_loop(args: argparse.Namespace) -> None:
     # ── Feature pipeline for live cache updates ──────────────────
     pipeline = FeaturePipeline()
     recent_bars: dict[Timeframe, list] = {tf: [] for tf in TIMEFRAMES}
-
-    # ── Realized vol cache for Black-Scholes fallback ────────────
-    realized_vol: dict[Timeframe, float] = {tf: 0.01 for tf in TIMEFRAMES}
-    for tf, feats in warmup_features.items():
-        vol = feats.get("realized_vol_10")
-        if vol is not None:
-            realized_vol[tf] = vol
 
     def handle_shutdown(sig_num, frame):
         logger.info("Shutdown signal received")
@@ -528,10 +517,6 @@ async def main_loop(args: argparse.Namespace) -> None:
                             if (val := last_row.get(name)) is not None
                         }
                         feat_caches[tf].update_history(cache_dict)
-                        # Update realized vol cache
-                        vol = cache_dict.get("realized_vol_10")
-                        if vol is not None:
-                            realized_vol[tf] = vol
                         logger.debug(
                             "Updated %s feature cache (%d features)",
                             TF_LABELS[tf], len(cache_dict),
@@ -575,22 +560,17 @@ async def main_loop(args: argparse.Namespace) -> None:
                     np.array([elapsed_pct]),
                 )[0])
 
-            # Market odds: prefer live Polymarket, fall back to simulator
-            mkt_prob = 0.5
-            mkt_src = "sim"
+            # Market odds: live Polymarket only, no simulated fallback
+            mkt_prob = None
+            mkt_src = "none"
             feed = pm_feeds.get(tf)
             if feed and feed._connected.is_set():
                 mkt_prob = feed.mid_up
                 mkt_src = "pm"
-            else:
-                mkt_prob = market_sims[tf].market_prob(
-                    partial.open, partial.current_price,
-                    realized_vol[tf], partial.elapsed_seconds,
-                )
 
-            edge = cal_prob - mkt_prob
+            edge = (cal_prob - mkt_prob) if mkt_prob is not None else None
             side = "UP" if cal_prob > 0.5 else "DN"
-            if abs(edge) < 0.005:
+            if edge is not None and abs(edge) < 0.005:
                 side = "--"
 
             rows.append({
