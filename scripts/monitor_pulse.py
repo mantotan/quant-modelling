@@ -578,10 +578,20 @@ async def main_loop(args: argparse.Namespace) -> None:
                     mkt_prob = pm_market.mid_up
                     mkt_src = "rest"
 
-            edge = (cal_prob - mkt_prob) if mkt_prob is not None else None
+            # Edge on the side we'd trade:
+            #   UP side edge = cal_prob - mkt_prob (model thinks Up underpriced)
+            #   DN side edge = (1-cal_prob) - (1-mkt_prob) = mkt_prob - cal_prob
             side = "UP" if cal_prob > 0.5 else "DN"
-            if edge is not None and abs(edge) < 0.005:
-                side = "--"
+            if mkt_prob is not None:
+                if side == "UP":
+                    edge = cal_prob - mkt_prob
+                else:
+                    edge = mkt_prob - cal_prob
+                if abs(edge) < 0.005:
+                    side = "--"
+                    edge = 0.0
+            else:
+                edge = None
 
             rows.append({
                 "label": label,
