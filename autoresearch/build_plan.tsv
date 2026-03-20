@@ -22,3 +22,4 @@ id	phase	work_unit	description	dependencies	status
 21	6A	alpha_validator	AlphaValidator standalone signal validation + tests	3,4,12	PENDING
 22	6B	paper_validator	PaperTradingValidator + real_odds_provider + tests		PENDING
 23	FIX_SIZING	fix_sizing	Unify bet sizing between paper executor and replay backtest — paper PnL=-$25.98 vs replay PnL=+$0.02 with identical trade counts (29). PnL units/scale differ.	none	DONE	reconciler
+24	FIX_RESOLUTION_LOAD	fix_resolution_load	Fix load_resolutions() in replay_backtest.py — dict overwrite clobbers multi-prediction condition_ids, causing false PnL sign mismatch (-$26.96 reported vs +$210.96 actual). Must sum PnL across all resolutions per condition_id.	none	PENDING	reconciler

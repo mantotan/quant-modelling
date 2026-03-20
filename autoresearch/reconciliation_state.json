@@ -1,11 +1,12 @@
 {
-  "last_reconciliation_at": "2026-03-20T07:48:00Z",
-  "last_trade_count": 29,
-  "last_dispatch_at": "2026-03-20T07:47:00Z",
+  "last_reconciliation_at": "2026-03-20T08:39:00Z",
+  "last_trade_count": 53,
+  "last_dispatch_at": "2026-03-20T08:38:00Z",
   "last_dispatch_decision": "RECONCILER",
-  "last_dispatch_reason": "29 new trades >= 10 threshold (first reconciliation)",
-  "total_predictions_seen": 84,
-  "total_resolutions_seen": 37,
-  "trust_level": "UNRELIABLE",
-  "fixes_in_progress": ["FIX_SIZING"]
+  "last_dispatch_reason": "revalidation needed (FIX_SIZING completed, 21 new trades since last reconciliation)",
+  "total_predictions_seen": 115,
+  "total_resolutions_seen": 53,
+  "trust_level": "SUSPICIOUS",
+  "fixes_in_progress": ["FIX_RESOLUTION_LOAD"],
+  "notes": "Trust level is SUSPICIOUS (1/4 fail: edge sign flip 8.96%). replay_backtest.py reports UNRELIABLE due to resolution clobbering bug — corrected paper PnL is +$210.96 (both sides positive)."
 }
