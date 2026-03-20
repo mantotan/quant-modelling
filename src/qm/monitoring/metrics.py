@@ -248,6 +248,38 @@ CIRCUIT_BREAKER_STATE = Gauge(
 )
 
 
+# ── Dutch accumulation metrics ────────────────────────────────────
+
+DUTCH_BARS = Counter(
+    "qm_dutch_bars_total",
+    "Dutch bars completed",
+)
+
+DUTCH_ORDERS = Counter(
+    "qm_dutch_orders_total",
+    "Dutch limit orders placed",
+    ["side"],
+)
+
+DUTCH_FILLS = Counter(
+    "qm_dutch_fills_total",
+    "Dutch limit order fills",
+    ["side"],
+)
+
+DUTCH_PAIR_COST = Histogram(
+    "qm_dutch_avg_pair_cost",
+    "Average pair cost per bar",
+    buckets=[0.90, 0.92, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99, 1.0, 1.02],
+)
+
+DUTCH_BAR_PNL = Histogram(
+    "qm_dutch_bar_pnl_usd",
+    "PnL per dutch bar in USD",
+    buckets=[-5, -2, -1, -0.5, 0, 0.5, 1, 2, 5, 10],
+)
+
+
 def start_metrics_server(port: int = 8000) -> None:
     """Start the Prometheus metrics HTTP server."""
     start_http_server(port)

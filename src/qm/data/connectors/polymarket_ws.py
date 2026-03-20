@@ -87,6 +87,26 @@ class TokenBook:
         else:
             self.best_ask = 1.0
 
+    def depth_at_bbo(self) -> float:
+        """Total shares sitting at best ask price."""
+        if not self.asks:
+            return 0.0
+        return self.asks.get(self.best_ask, 0.0)
+
+    def top_levels(self, side: str, n: int = 3) -> list[tuple[float, float]]:
+        """Top N price levels as [(price, size), ...].
+
+        side="ask": ascending by price (cheapest first).
+        side="bid": descending by price (highest first).
+        """
+        if side == "ask":
+            return sorted(self.asks.items())[:n]
+        return sorted(self.bids.items(), reverse=True)[:n]
+
+    def total_depth(self, side: str, levels: int = 3) -> float:
+        """Total shares across top N levels."""
+        return sum(size for _, size in self.top_levels(side, levels))
+
 
 class PolymarketWSFeed:
     """Real-time Polymarket CLOB orderbook feed.
@@ -280,6 +300,13 @@ class PolymarketWSFeed:
 
             elif event_type == "last_trade_price":
                 book.last_trade = float(event.get("price", book.last_trade))
+
+    def get_book(self, side: str) -> TokenBook | None:
+        """Get the TokenBook for 'up' or 'down' token."""
+        tid = self._token_id_up if side == "up" else self._token_id_down
+        if tid and tid in self._books:
+            return self._books[tid]
+        return None
 
     def stop(self) -> None:
         self._running = False
