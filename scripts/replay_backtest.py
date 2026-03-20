@@ -87,13 +87,19 @@ def load_paper_trades(
 
 def load_resolutions(
     paper_dir: Path, asset: str, tf: str, filter_date: str | None,
-) -> dict[str, dict]:
-    """Load resolution events, keyed by condition_id."""
+) -> dict[str, list[dict]]:
+    """Load resolution events, keyed by condition_id.
+
+    Multiple predictions can share a condition_id (e.g., predictions at
+    different elapsed_pct within the same bar).  We accumulate all
+    resolution records per condition_id so that PnL is summed correctly
+    instead of being clobbered by a later record.
+    """
     log_dir = paper_dir / f"{asset}_{tf}"
     if not log_dir.exists():
         return {}
 
-    resolutions: dict[str, dict] = {}
+    resolutions: dict[str, list[dict]] = {}
     pattern = f"trades_{filter_date}.jsonl" if filter_date else "trades_*.jsonl"
 
     for path in sorted(log_dir.glob(pattern)):
@@ -104,15 +110,21 @@ def load_resolutions(
                     continue
                 event = json.loads(line)
                 if event.get("type") == "resolution":
-                    resolutions[event["condition_id"]] = event
+                    cid = event["condition_id"]
+                    resolutions.setdefault(cid, []).append(event)
 
     return resolutions
 
 
 def build_arrays(
-    predictions: list[dict], resolutions: dict[str, dict],
+    predictions: list[dict], resolutions: dict[str, list[dict]],
 ) -> dict[str, np.ndarray] | None:
-    """Convert paper trade events to numpy arrays for backtester."""
+    """Convert paper trade events to numpy arrays for backtester.
+
+    ``resolutions`` maps each condition_id to a *list* of resolution
+    records.  PnL is summed across all records for a given condition_id
+    so that multi-prediction bars are accounted for correctly.
+    """
     if not predictions:
         return None
 
@@ -139,15 +151,19 @@ def build_arrays(
     bar_indices = np.array([p["bar_id"] for p in resolved])
 
     # Target: 1 if outcome was UP, 0 otherwise
+    # All resolution records for a condition_id share the same outcome;
+    # take from the first record.
     targets = np.array([
-        1.0 if resolutions[p["condition_id"]]["outcome"].upper() in ("UP", "YES")
+        1.0 if resolutions[p["condition_id"]][0]["outcome"].upper() in ("UP", "YES")
         else 0.0
         for p in resolved
     ])
 
-    # Paper PnL per trade
+    # Paper PnL per trade — sum across all resolution records for the
+    # condition_id to avoid clobbering when multiple predictions resolve
+    # under the same condition.
     paper_pnls = np.array([
-        resolutions[p["condition_id"]]["pnl"]
+        sum(r["pnl"] for r in resolutions[p["condition_id"]])
         if p["fill_status"] == "filled"
         else 0.0
         for p in resolved
