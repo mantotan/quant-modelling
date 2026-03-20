@@ -330,10 +330,10 @@ class MarketScanner:
                     continue
 
                 best: PolymarketMarket | None = None
-                best_remaining = 0.0
                 best_slug = ""
 
-                # Try current bar first, then next bar
+                # Try current bar first, then next bar.
+                # Prefer current bar when it still has enough time.
                 for bar_start in (current_bar, next_bar):
                     if self._timeframe == Timeframe.H1:
                         bar_start_dt = datetime.fromtimestamp(bar_start, tz=UTC)
@@ -375,10 +375,12 @@ class MarketScanner:
                         continue
 
                     market = _parse_market(m, asset, market_type)
-                    if market is not None and remaining > best_remaining:
+                    if market is not None:
                         best = market
-                        best_remaining = remaining
                         best_slug = slug
+                        # Current bar found with enough time — use it,
+                        # don't check next bar
+                        break
 
                 if best is not None:
                     matched.append(best)
