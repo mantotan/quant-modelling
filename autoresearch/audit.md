@@ -95,3 +95,23 @@ Note: rows 58-61 (DEPLOY-1 through DEPLOY-4) count as 5m/ALL and are included in
 | Trades/bar   | 1 (post Phase 2)   | ~5 (multi-tp)      | expected |
 
 **Overall Assessment: ALL 12 pulse_v2 models pass acceptance criteria. The system is deployment-ready pending [MTF-1] multi-timeframe signal combination (code work, not researcher scope) and [DEPLOY-5/6] (architecture work).**
+
+## Multi-TP Regime Validation (2026-03-23)
+
+Re-ran regime-bucketed OOS validation on current multi-tp pulse_v2 models (time_pcts=[0.10,0.20,0.40,0.60,0.80]). All 6 runs FULL PASS.
+
+### BTC (regime-sensitive: monotonic Sharpe low→crisis)
+| Timeframe | low Sharpe | normal Sharpe | high Sharpe | crisis Sharpe | Verdict |
+|-----------|-----------|---------------|-------------|---------------|---------|
+| 5m  | 51.17 | 70.08 | 87.58 | 98.10 | FULL PASS |
+| 15m | 40.44 | 55.45 | 79.81 | 86.49 | FULL PASS |
+| 1h  | 17.89 | 20.99 | 39.82 | 35.08 | FULL PASS |
+
+### SOL (tick-dominant: flat Sharpe across regimes)
+| Timeframe | low Sharpe | normal Sharpe | high Sharpe | crisis Sharpe | Verdict |
+|-----------|-----------|---------------|-------------|---------------|---------|
+| 5m  | 239.97 | 237.55 | 235.87 | 247.33 | FULL PASS |
+| 15m | 141.15 | 144.40 | 146.28 | 145.38 | FULL PASS |
+| 1h  | 69.38 | 67.82 | 71.37 | 76.71 | FULL PASS |
+
+BTC/SOL regime validation gate cleared for deployment.

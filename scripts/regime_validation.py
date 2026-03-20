@@ -81,15 +81,32 @@ def main() -> None:
     for tp in tp_set:
         tp_mask |= np.isclose(dataset.time_pcts, tp, atol=1e-6)
 
-    # Use ALL features (model.lgb was saved with full 50-feature set)
-    X = dataset.X[tp_mask]
+    X_full = dataset.X[tp_mask]
     y = dataset.y[tp_mask]
     bar_indices = dataset.bar_indices[tp_mask]
     market_probs = dataset.market_probs[tp_mask]
     time_pcts = dataset.time_pcts[tp_mask]
 
     # Extract regime state from FULL feature set (before column filtering)
-    regime_states = dataset.X[tp_mask][:, regime_idx]
+    regime_states = X_full[:, regime_idx]
+
+    # ── Load model + calibrator ──────────────────────────────────
+    model_dir = Path(f"data/models/pulse_v2/{args.asset}_{args.timeframe}")
+    model = lgb.Booster(model_file=str(model_dir / "model.lgb"))
+
+    from qm.model.calibration.calibrator import TimeAwareCalibrator
+
+    cal_path = model_dir / "calibrator.pkl"
+    if cal_path.exists():
+        calibrator = TimeAwareCalibrator()
+        calibrator.load(cal_path)
+    else:
+        calibrator = TimeAwareCalibrator()
+
+    # ── Filter columns to match model's expected features ────────
+    model_names = model.feature_name()
+    col_indices = [all_names.index(n) for n in model_names]
+    X = X_full[:, col_indices]
 
     logger.info("Dataset: %d samples, %d features, %d bars",
                 len(y), X.shape[1], len(np.unique(bar_indices)))
@@ -110,26 +127,9 @@ def main() -> None:
 
     logger.info("Test set: %d samples, %d bars", len(y_test), len(test_bars))
 
-    # ── Load model + calibrator ──────────────────────────────────
-    model_dir = Path(f"data/models/pulse_v2/{args.asset}_{args.timeframe}")
-    model = lgb.Booster(model_file=str(model_dir / "model.lgb"))
-
-    import pickle
-    cal_path = model_dir / "calibrator.pkl"
-    if cal_path.exists():
-        with open(cal_path, "rb") as f:
-            cal_data = pickle.load(f)
-        # Handle both dict-wrapped and direct calibrator formats
-        if isinstance(cal_data, dict):
-            calibrator = cal_data["calibrator"]
-        else:
-            calibrator = cal_data
-    else:
-        calibrator = IsotonicCalibrator()
-
     # ── Predict ──────────────────────────────────────────────────
     raw_probs = model.predict(X_test)
-    cal_probs = calibrator.transform(raw_probs)
+    cal_probs = calibrator.transform(raw_probs, tp_test)
 
     # ── Backtester ───────────────────────────────────────────────
     bt_cfg = knobs.get("backtest", {})
