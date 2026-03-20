@@ -42,6 +42,7 @@ from qm.execution.loop import TradingLoop
 from qm.execution.paper.engine import PaperExecutor
 from qm.execution.paper.trade_logger import PaperTradeLogger
 from qm.model.calibration.calibrator import TimeAwareCalibrator
+from qm.strategy.bar_accumulator import BarEdgeAccumulator
 from qm.execution.polymarket.market_scanner import MarketScanner
 from qm.features.live_cache import RUST_AVAILABLE, get_feature_calculator
 from qm.features.pipeline import FeaturePipeline
@@ -434,6 +435,15 @@ async def main_loop(args: argparse.Namespace) -> None:
         timeframe=args.timeframe,
     )
 
+    # Load trading strategy from knobs (default: first_confident)
+    trading_cfg = knobs.get("trading", {})
+    accumulator = BarEdgeAccumulator(
+        strategy=trading_cfg.get("strategy", "first_confident"),
+        confidence_threshold=trading_cfg.get("confidence_threshold", 0.05),
+    )
+    logger.info("Trading strategy: %s (threshold=%.2f)",
+                accumulator.strategy, accumulator.confidence_threshold)
+
     trading_loop = TradingLoop(
         signal_generator=signal_gen,
         calibrator=calibrator,
@@ -500,6 +510,36 @@ async def main_loop(args: argparse.Namespace) -> None:
 
         bar_id = int(partial.window_start.timestamp())
         if bar_id != current_bar_id.get(asset):
+            # Bar changed — execute any deferred trade from previous bar
+            old_bar_id = current_bar_id.get(asset)
+            if old_bar_id is not None:
+                deferred = accumulator.on_bar_end(old_bar_id)
+                if deferred:
+                    market = await scanner.get_active_market(asset)
+                    if market and ws_feed.mid_up > 0:
+                        market = PolymarketMarket(
+                            condition_id=market.condition_id,
+                            token_id_up=market.token_id_up,
+                            token_id_down=market.token_id_down,
+                            asset=market.asset,
+                            market_type=market.market_type,
+                            window_start=market.window_start,
+                            window_end=market.window_end,
+                            mid_up=ws_feed.mid_up,
+                            spread=ws_feed.spread,
+                            volume=market.volume,
+                        )
+                        fill = await trading_loop.on_partial_bar(
+                            partial, market, deferred.model_prob,
+                        )
+                        if fill and fill.status == "filled":
+                            stats["trades"] += 1
+                            logger.info(
+                                "TRADE (deferred): %s %s $%.2f @ %.4f (edge=%.3f)",
+                                asset.value, deferred.side,
+                                fill.size_usd, fill.price, deferred.edge,
+                            )
+                accumulator.cleanup_old_bars(bar_id)
             current_bar_id[asset] = bar_id
             last_triggered[asset] = set()
 
@@ -577,10 +617,21 @@ async def main_loop(args: argparse.Namespace) -> None:
             elapsed_us = (time.perf_counter_ns() - t0) / 1000
             stats["predictions"] += 1
 
-            # Execute via TradingLoop
-            fill = await trading_loop.on_partial_bar(
-                partial, market, float(prob_up),
+            # Feed prediction to accumulator (one-bet-per-bar)
+            decision = accumulator.on_prediction(
+                bar_id=bar_id,
+                time_pct=elapsed_pct,
+                model_prob=float(prob_up),
+                market_prob=float(market.mid_up),
+                spread=float(market.spread),
             )
+
+            fill = None
+            if decision:
+                # Accumulator approved this trade — execute it
+                fill = await trading_loop.on_partial_bar(
+                    partial, market, decision.model_prob,
+                )
 
             # Log every prediction for reconciliation replay
             trade_logger.log_prediction(
@@ -591,8 +642,8 @@ async def main_loop(args: argparse.Namespace) -> None:
                 market_spread=float(market.spread),
                 condition_id=market.condition_id,
                 features=features.flatten().tolist(),
-                signal_edge=float(abs(prob_up - market.mid_up)),
-                signal_side="UP" if prob_up > 0.5 else "DOWN",
+                signal_edge=decision.edge if decision else float(abs(prob_up - market.mid_up)),
+                signal_side=decision.side if decision else ("UP" if prob_up > 0.5 else "DOWN"),
                 size_usd=float(fill.size_usd) if fill and fill.status == "filled" else 0,
                 fill_price=float(fill.price) if fill and fill.status == "filled" else 0,
                 fill_status=fill.status if fill else "no_trade",
@@ -602,9 +653,9 @@ async def main_loop(args: argparse.Namespace) -> None:
                 stats["trades"] += 1
                 logger.info(
                     "TRADE: %s %s $%.2f @ %.4f (prob=%.3f, edge=%.3f) [%.0fus]",
-                    asset.value, "UP" if prob_up > 0.5 else "DOWN",
-                    fill.size_usd, fill.price, prob_up,
-                    abs(prob_up - market.mid_up), elapsed_us,
+                    asset.value, decision.side,
+                    fill.size_usd, fill.price, decision.model_prob,
+                    decision.edge, elapsed_us,
                 )
 
         # Dashboard every 5 minutes

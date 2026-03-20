@@ -67,6 +67,7 @@ class IntraBarBacktester:
         avg_daily_volume: float = 50_000.0,
         max_daily_trades: int = 100,
         fixed_bet_usd: float | None = None,
+        trade_selection: str = "all",
     ) -> None:
         self._fee_bps = fee_bps
         self._spread = spread
@@ -85,6 +86,7 @@ class IntraBarBacktester:
         self._max_daily_trades = max_daily_trades
         self._fixed_bet_usd = fixed_bet_usd
         self._bars_per_day = int(86400 / self._total_seconds)
+        self._trade_selection = trade_selection  # "all", "best_edge", "first_confident"
 
     def evaluate_fast(
         self,
@@ -109,8 +111,15 @@ class IntraBarBacktester:
 
         tradeable = valid & (edge >= self._min_edge)
 
-        # Per-bar trade limiting (skip loop when effectively unlimited)
-        if self._max_trades_per_bar < 10_000:
+        # Per-bar trade selection
+        if self._trade_selection == "best_edge":
+            # Two-pass: for each bar, keep only the sample with max edge
+            tradeable = self._select_best_edge(tradeable, edge, bar_indices)
+        elif self._trade_selection == "first_confident":
+            # For each bar, keep the first sample (lowest time_pct) with edge >= min_edge
+            tradeable = self._select_first_confident(tradeable, bar_indices)
+        elif self._max_trades_per_bar < 10_000:
+            # Legacy "all" mode with per-bar cap
             bar_trade_count: dict[int, int] = {}
             for i in range(n):
                 if not tradeable[i]:
@@ -393,6 +402,44 @@ class IntraBarBacktester:
         else:
             result.metrics = self._empty_metrics()
 
+        return result
+
+    @staticmethod
+    def _select_best_edge(
+        tradeable: np.ndarray, edge: np.ndarray, bar_indices: np.ndarray,
+    ) -> np.ndarray:
+        """For each bar, keep only the sample with the highest edge."""
+        result = np.zeros_like(tradeable)
+        tradeable_idx = np.where(tradeable)[0]
+        if len(tradeable_idx) == 0:
+            return result
+
+        trade_bars = bar_indices[tradeable_idx]
+        trade_edges = edge[tradeable_idx]
+
+        unique_bars = np.unique(trade_bars)
+        for bar in unique_bars:
+            bar_mask = trade_bars == bar
+            bar_positions = tradeable_idx[bar_mask]
+            best_pos = bar_positions[np.argmax(trade_edges[bar_mask])]
+            result[best_pos] = True
+
+        return result
+
+    @staticmethod
+    def _select_first_confident(
+        tradeable: np.ndarray, bar_indices: np.ndarray,
+    ) -> np.ndarray:
+        """For each bar, keep only the first tradeable sample (by dataset order = time order)."""
+        result = np.zeros_like(tradeable)
+        seen_bars: set[int] = set()
+        for i in range(len(tradeable)):
+            if not tradeable[i]:
+                continue
+            bi = int(bar_indices[i])
+            if bi not in seen_bars:
+                result[i] = True
+                seen_bars.add(bi)
         return result
 
     @staticmethod

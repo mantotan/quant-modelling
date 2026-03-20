@@ -254,6 +254,82 @@ class TestBarLevelMetrics:
             assert 0.3 < ratio < 3.0, f"Sharpe ratio {ratio} suggests sample-level bias"
 
 
+class TestTradeSelection:
+    """Tests for trade_selection modes: best_edge and first_confident."""
+
+    def _make_multi_tp_data(self):
+        """3 bars, 3 samples each, with varying edges."""
+        n_bars, spb = 3, 3
+        n = n_bars * spb
+        # Bar 0: edge increases over time (best at t=0.80)
+        # Bar 1: edge highest at t=0.40
+        # Bar 2: all similar edge
+        model_probs = np.array([
+            0.55, 0.60, 0.75,  # bar 0: edges ~0.04, 0.09, 0.24
+            0.70, 0.80, 0.60,  # bar 1: edges ~0.19, 0.29, 0.09
+            0.65, 0.65, 0.65,  # bar 2: edges ~0.14, 0.14, 0.14
+        ])
+        targets = np.ones(n)
+        market_probs = np.full(n, 0.50)
+        time_pcts = np.tile([0.10, 0.40, 0.80], n_bars)
+        bar_indices = np.repeat(np.arange(n_bars), spb)
+        return model_probs, targets, market_probs, time_pcts, bar_indices
+
+    def test_best_edge_one_trade_per_bar(self):
+        bt = IntraBarBacktester(
+            fee_bps=0, spread=0.02, min_edge=0.01,
+            impact_bps=0, max_daily_trades=10_000,
+            fixed_bet_usd=50.0, trade_selection="best_edge",
+        )
+        data = self._make_multi_tp_data()
+        metrics = bt.evaluate_fast(*data)
+        # 3 bars → exactly 3 trades (one per bar)
+        assert metrics["n_trades"] == 3
+        assert metrics["n_bars_traded"] == 3
+
+    def test_first_confident_one_trade_per_bar(self):
+        bt = IntraBarBacktester(
+            fee_bps=0, spread=0.02, min_edge=0.01,
+            impact_bps=0, max_daily_trades=10_000,
+            fixed_bet_usd=50.0, trade_selection="first_confident",
+        )
+        data = self._make_multi_tp_data()
+        metrics = bt.evaluate_fast(*data)
+        # first_confident takes first tradeable per bar → 3 trades
+        assert metrics["n_trades"] == 3
+        assert metrics["n_bars_traded"] == 3
+
+    def test_all_mode_multiple_trades_per_bar(self):
+        bt = IntraBarBacktester(
+            fee_bps=0, spread=0.02, min_edge=0.01,
+            impact_bps=0, max_trades_per_bar=10, max_daily_trades=10_000,
+            fixed_bet_usd=50.0, trade_selection="all",
+        )
+        data = self._make_multi_tp_data()
+        metrics = bt.evaluate_fast(*data)
+        # "all" mode: multiple trades per bar allowed
+        assert metrics["n_trades"] > 3
+
+    def test_best_edge_picks_highest(self):
+        """best_edge should pick the sample with max edge, not first."""
+        bt = IntraBarBacktester(
+            fee_bps=0, spread=0.0, min_edge=0.01,
+            impact_bps=0, max_daily_trades=10_000,
+            fixed_bet_usd=50.0, trade_selection="best_edge",
+        )
+        # Single bar: t=0.10 has low edge, t=0.80 has high edge
+        metrics = bt.evaluate_fast(
+            model_probs=np.array([0.55, 0.90]),
+            targets=np.array([1.0, 1.0]),
+            market_probs=np.array([0.50, 0.50]),
+            time_pcts=np.array([0.10, 0.80]),
+            bar_indices=np.array([0, 0]),
+        )
+        assert metrics["n_trades"] == 1
+        # The trade should use the t=0.80 prediction (edge=0.40 vs 0.05)
+        assert metrics["avg_pnl_per_trade"] > 0
+
+
 class TestFixedBetMode:
     def test_fixed_bet_uses_exact_amount(self):
         bt = IntraBarBacktester(
