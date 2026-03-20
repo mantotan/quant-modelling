@@ -62,6 +62,8 @@ All 12 pulse_v2 models (4 assets × 3 timeframes) pass acceptance criteria. Regi
 - `scripts/download_historical.py` — Binance Vision bulk downloader
 - `scripts/train_sentinel.py` — End-to-end Sentinel training
 - `scripts/train_pulse.py` — End-to-end Pulse training
+- `scripts/trade.py` — Unified trading script (paper/dry-run/live, --verbose for per-prediction logs)
+- `scripts/monitor_pulse.py` — Read-only BTC Pulse monitor (5m/15m/1h, live Polymarket odds)
 
 ## Data
 - `data/raw/ohlcv/` — Hive-partitioned Parquet (asset=X/timeframe=Y/date=Z/)

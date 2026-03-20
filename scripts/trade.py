@@ -24,7 +24,7 @@ import logging
 import signal
 import sys
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -489,6 +489,14 @@ async def main_loop(args: argparse.Namespace) -> None:
     ws_feed_task: asyncio.Task | None = None
     ws_subscribed_market: str = ""  # condition_id of currently subscribed market
 
+    # ── Verbose output file (separate from stdout so pm2 logs stay clean) ──
+    verbose_file = None
+    if args.verbose:
+        verbose_path = Path("data") / f"verbose_{args.asset}_{args.timeframe}.log"
+        verbose_path.parent.mkdir(parents=True, exist_ok=True)
+        verbose_file = open(verbose_path, "a")  # noqa: SIM115
+        logger.info("Verbose output: %s (tail -f to watch)", verbose_path)
+
     # ── Start background tasks ─────────────────────────────────
     running_flag = [True]  # mutable list so coroutines can check
     asyncio.create_task(
@@ -617,12 +625,13 @@ async def main_loop(args: argparse.Namespace) -> None:
             features = live_cache.get_features(partial)
 
             # Model prediction
-            prob_up = model.predict(features.reshape(1, -1))[0]
+            raw_prob_up = float(model.predict(features.reshape(1, -1))[0])
+            prob_up = raw_prob_up
             if calibrator and hasattr(calibrator, "transform"):
-                prob_up = calibrator.transform(
-                    np.array([prob_up]),
+                prob_up = float(calibrator.transform(
+                    np.array([raw_prob_up]),
                     np.array([elapsed_pct]),
-                )[0]
+                )[0])
 
             elapsed_us = (time.perf_counter_ns() - t0) / 1000
             stats["predictions"] += 1
@@ -668,15 +677,14 @@ async def main_loop(args: argparse.Namespace) -> None:
                     decision.edge, elapsed_us,
                 )
 
-            # Verbose monitor-style output
-            if args.verbose:
+            # Verbose monitor-style output (writes to separate file, not stdout)
+            if verbose_file is not None:
                 _tz = ZoneInfo("Asia/Bangkok")
                 w_start = partial.window_start.astimezone(_tz).strftime("%H:%M")
                 w_end = partial.window_end.astimezone(_tz).strftime("%H:%M")
                 filled = min(10, max(0, round(elapsed_pct * 10)))
                 bar_vis = "[" + "#" * filled + "." * (10 - filled) + "]"
                 side = "UP" if prob_up > 0.5 else "DN"
-                # Ask price for the side we'd trade
                 if side == "UP":
                     ask = ws_feed.best_ask_up if ws_feed.mid_up > 0 else market.mid_up
                     model_p = float(prob_up)
@@ -684,18 +692,18 @@ async def main_loop(args: argparse.Namespace) -> None:
                     ask = ws_feed.best_ask_down if ws_feed.mid_up > 0 else (1.0 - market.mid_up)
                     model_p = 1.0 - float(prob_up)
                 edge_val = model_p - ask
-                price_str = "%s $%s | %s-%s %s" % (
-                    asset.value, "{:,.0f}".format(partial.current_price),
-                    w_start, w_end, bar_vis,
-                )
-                pred_str = "Raw=%.4f Cal=%.4f %s Ask=%.4f Edge=%+.3f" % (
-                    float(model.predict(features.reshape(1, -1))[0]),
-                    float(prob_up), side, ask, edge_val,
-                )
                 trade_str = ""
                 if fill and fill.status == "filled":
                     trade_str = " >>> FILLED $%.2f @ %.4f" % (fill.size_usd, fill.price)
-                print("%s | %s%s | %.0fus" % (price_str, pred_str, trade_str, elapsed_us))
+                line = "%s | %s $%s | %s-%s %s | Raw=%.4f Cal=%.4f %s Ask=%.4f Edge=%+.3f%s | %.0fus\n" % (
+                    datetime.now(UTC).strftime("%H:%M:%S"),
+                    asset.value, "{:,.0f}".format(partial.current_price),
+                    w_start, w_end, bar_vis,
+                    raw_prob_up, float(prob_up), side, ask, edge_val,
+                    trade_str, elapsed_us,
+                )
+                verbose_file.write(line)
+                verbose_file.flush()
 
         # Dashboard every 5 minutes
         if time.time() - last_dashboard > 300:
@@ -714,6 +722,8 @@ async def main_loop(args: argparse.Namespace) -> None:
     logger.info("Shutting down...")
     ws_feed.stop()
     trade_logger.close()
+    if verbose_file is not None:
+        verbose_file.close()
     save_state(portfolio, stats)
     logger.info(
         "Final: bankroll=$%.2f, trades=%d, PnL=$%.2f",
