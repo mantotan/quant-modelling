@@ -436,7 +436,8 @@ async def main_loop(args: argparse.Namespace) -> None:
     )
 
     # Load trading strategy from knobs (default: first_confident)
-    trading_cfg = knobs.get("trading", {})
+    _knobs = json.loads(_KNOBS_PATH.read_text()) if _KNOBS_PATH.exists() else {}
+    trading_cfg = _knobs.get("trading", {})
     accumulator = BarEdgeAccumulator(
         strategy=trading_cfg.get("strategy", "first_confident"),
         confidence_threshold=trading_cfg.get("confidence_threshold", 0.05),
