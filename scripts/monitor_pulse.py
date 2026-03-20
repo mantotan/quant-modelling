@@ -31,8 +31,7 @@ import polars as pl
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from qm.core.constants import TIMEFRAME_MINUTES
-from qm.core.types import Asset, Timeframe
-from qm.data.connectors.polymarket_ws import PolymarketWSFeed
+from qm.core.types import Asset, PolymarketMarket, Timeframe
 from qm.data.ingestion.bar_builder import BarBuilder
 from qm.data.storage.parquet import ParquetStore
 from qm.execution.polymarket.market_scanner import MarketScanner
@@ -79,7 +78,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="BTC Pulse Live Monitor")
     p.add_argument(
         "--no-polymarket", action="store_true",
-        help="Skip Polymarket WSS, use simulated odds for all TFs",
+        help="Skip Polymarket odds polling",
     )
     p.add_argument(
         "--quiet", action="store_true",
@@ -247,70 +246,40 @@ async def price_feed(
             await asyncio.sleep(5.0)
 
 
-# ── Polymarket feeds ─────────────────────────────────────────────────
+# ── Polymarket odds (REST polling via Gamma API) ─────────────────────
 
-async def polymarket_feed(
+async def polymarket_poller(
     tf: Timeframe,
     scanner: MarketScanner,
-    pm_feeds: dict[Timeframe, PolymarketWSFeed],
+    pm_markets: dict[Timeframe, PolymarketMarket],
     running_flag: list[bool],
 ) -> None:
-    """Discover and subscribe to Polymarket markets, switching at bar boundaries.
+    """Poll Gamma REST API for live market odds every 2s.
 
-    Bar windows are fixed-duration, so we compute exactly when the next
-    bar starts and switch proactively instead of polling blindly.
+    No WSS dependency — uses the same REST endpoint as market discovery.
+    The Gamma API returns live outcomePrices with every query.
     """
     label = TF_LABELS[tf]
-    ws_task: asyncio.Task | None = None
-    subscribed_cid = ""
-
-    async def _subscribe(market) -> None:
-        """Stop old feed and subscribe to a new market."""
-        nonlocal ws_task, subscribed_cid
-        old_feed = pm_feeds.get(tf)
-        if old_feed and ws_task is not None:
-            old_feed.stop()
-            ws_task.cancel()
-
-        new_feed = PolymarketWSFeed()
-        pm_feeds[tf] = new_feed
-        ws_task = asyncio.create_task(
-            new_feed.connect_and_run(
-                market.token_id_up, market.token_id_down, running_flag,
-            ),
-        )
-        subscribed_cid = market.condition_id
-        logger.info("PM %s subscribed: %s (ends %s)", label, subscribed_cid[:16],
-                     market.window_end.strftime("%H:%M:%S"))
-        await asyncio.sleep(1.0)  # wait for initial book snapshot
+    last_cid = ""
 
     while running_flag[0]:
         try:
             market = await scanner.get_active_market(Asset.BTC)
-
-            if market and market.condition_id != subscribed_cid:
-                await _subscribe(market)
-
-            if market and market.window_end:
-                # Sleep until bar ends, then immediately switch to next market
-                now = datetime.now(UTC)
-                secs_to_end = (market.window_end - now).total_seconds()
-
-                if secs_to_end > 2:
-                    # Still time left — sleep until 1s before bar ends
-                    await asyncio.sleep(min(secs_to_end - 1, 30.0))
-                else:
-                    # Bar ending now or already ended — discover next immediately
-                    await asyncio.sleep(1.0)
-                    # Force cache expiry so scanner queries fresh
-                    scanner._cache_time = 0
+            if market:
+                pm_markets[tf] = market
+                if market.condition_id != last_cid:
+                    last_cid = market.condition_id
+                    logger.info(
+                        "PM %s market: %s mid=%.3f (ends %s)",
+                        label, last_cid[:16], market.mid_up,
+                        market.window_end.strftime("%H:%M:%S"),
+                    )
             else:
-                # No market found — retry in 10s
-                await asyncio.sleep(10.0)
-
+                pm_markets.pop(tf, None)
         except Exception as e:
-            logger.debug("PM %s discovery error: %s", label, e)
-            await asyncio.sleep(5.0)
+            logger.debug("PM %s poll error: %s", label, e)
+
+        await asyncio.sleep(2.0)
 
 
 # ── Output formatting ───────────────────────────────────────────────
@@ -438,20 +407,16 @@ async def main_loop(args: argparse.Namespace) -> None:
     bar_builder = BarBuilder(assets=[Asset.BTC], timeframes=TIMEFRAMES)
     completed_bars: asyncio.Queue = asyncio.Queue()
 
-    # ── Market odds simulators (kept for reference but not used as fallback)
-    # When Polymarket WSS is unavailable, Mkt/Edge show as N/A instead of simulated
-
-    # ── Polymarket feeds (all TFs) ───────────────────────────────
-    pm_feeds: dict[Timeframe, PolymarketWSFeed] = {}
+    # ── Polymarket odds (REST-polled via Gamma API) ─────────────
+    pm_markets: dict[Timeframe, PolymarketMarket] = {}
     pm_scanners: dict[Timeframe, MarketScanner] = {}
 
     if not args.no_polymarket:
         for tf in PM_TIMEFRAMES:
             if tf in models:
-                pm_feeds[tf] = PolymarketWSFeed()
-                pm_scanners[tf] = MarketScanner(
-                    assets={Asset.BTC}, timeframe=tf,
-                )
+                scanner = MarketScanner(assets={Asset.BTC}, timeframe=tf)
+                scanner._cache_ttl = 2.0  # fresher odds for monitoring
+                pm_scanners[tf] = scanner
 
     # ── Start background tasks ───────────────────────────────────
     running_flag = [True]
@@ -460,7 +425,7 @@ async def main_loop(args: argparse.Namespace) -> None:
 
     for tf in pm_scanners:
         asyncio.create_task(
-            polymarket_feed(tf, pm_scanners[tf], pm_feeds, running_flag),
+            polymarket_poller(tf, pm_scanners[tf], pm_markets, running_flag),
         )
 
     # ── Threshold tracking ───────────────────────────────────────
@@ -560,12 +525,12 @@ async def main_loop(args: argparse.Namespace) -> None:
                     np.array([elapsed_pct]),
                 )[0])
 
-            # Market odds: live Polymarket only, no simulated fallback
+            # Market odds from REST-polled Gamma API
             mkt_prob = None
             mkt_src = "none"
-            feed = pm_feeds.get(tf)
-            if feed and feed._connected.is_set():
-                mkt_prob = feed.mid_up
+            pm_market = pm_markets.get(tf)
+            if pm_market:
+                mkt_prob = pm_market.mid_up
                 mkt_src = "pm"
 
             edge = (cal_prob - mkt_prob) if mkt_prob is not None else None
@@ -606,9 +571,9 @@ async def main_loop(args: argparse.Namespace) -> None:
         # ── Collect market odds for footer ───────────────────────
         pm_odds: dict[Timeframe, tuple[float, float]] = {}
         for tf in PM_TIMEFRAMES:
-            feed = pm_feeds.get(tf)
-            if feed and feed._connected.is_set():
-                pm_odds[tf] = (feed.mid_up, feed.spread)
+            pm_market = pm_markets.get(tf)
+            if pm_market:
+                pm_odds[tf] = (pm_market.mid_up, pm_market.spread)
 
         # ── Print output ─────────────────────────────────────────
         now = time.time()
@@ -625,8 +590,6 @@ async def main_loop(args: argparse.Namespace) -> None:
 
     # ── Shutdown ─────────────────────────────────────────────────
     logger.info("Shutting down...")
-    for feed in pm_feeds.values():
-        feed.stop()
     logger.info("Monitor stopped.")
 
 
