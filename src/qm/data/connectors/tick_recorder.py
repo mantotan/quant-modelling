@@ -56,6 +56,7 @@ TICK_SCHEMA = {
     "depth_bid_dn": pl.Float64,
     "depth_ask_dn": pl.Float64,
     "is_heartbeat": pl.Boolean,
+    "is_stale": pl.Boolean,
 }
 
 
@@ -79,6 +80,7 @@ class TickSnapshot:
     depth_bid_dn: float
     depth_ask_dn: float
     is_heartbeat: bool
+    is_stale: bool
 
     def to_dict(self) -> dict:
         return {
@@ -98,6 +100,7 @@ class TickSnapshot:
             "depth_bid_dn": self.depth_bid_dn,
             "depth_ask_dn": self.depth_ask_dn,
             "is_heartbeat": self.is_heartbeat,
+            "is_stale": self.is_stale,
         }
 
 
@@ -208,7 +211,12 @@ class StreamSlot:
         await asyncio.sleep(1.0)  # wait for initial book snapshot
 
     def _snapshot(self, is_heartbeat: bool) -> TickSnapshot | None:
-        """Read current book state and create a TickSnapshot."""
+        """Read current book state and create a TickSnapshot.
+
+        Marks ticks as stale when WSS is disconnected — the book data
+        is from before the disconnect and should not be trusted by the
+        backtester. Filter with: df.filter(pl.col("is_stale") == False)
+        """
         if self.feed is None:
             return None
         book_up = self.feed.get_book("up")
@@ -218,6 +226,9 @@ class StreamSlot:
         # Skip if book is empty/uninitialized on either side
         if book_up.best_bid <= 0 or book_up.best_ask >= 1.0:
             return None
+
+        # Stale = WSS disconnected, book data is from before disconnect
+        is_stale = not self.feed._connected.is_set()
 
         return TickSnapshot(
             ts=datetime.now(UTC),
@@ -236,6 +247,7 @@ class StreamSlot:
             depth_bid_dn=book_dn.bids.get(book_dn.best_bid, 0.0),
             depth_ask_dn=book_dn.asks.get(book_dn.best_ask, 0.0),
             is_heartbeat=is_heartbeat,
+            is_stale=is_stale,
         )
 
 
