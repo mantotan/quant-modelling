@@ -194,6 +194,7 @@ class TradingLoop:
         partial: PartialBar,
         market: PolymarketMarket,
         model_prob_up: float,
+        deferred: bool = False,
     ) -> Fill | None:
         """Process an intra-bar snapshot: Pulse model prediction → trade.
 
@@ -259,13 +260,13 @@ class TradingLoop:
 
         BET_SIZE_USD.observe(size_usd)
 
-        # Filter (risk checks)
+        # Filter (risk checks — skip time budget for deferred trades)
         now = datetime.now(UTC)
         ok, reason = self._filter.filter(
             signal=signal,
             size_usd=size_usd,
             portfolio=self._portfolio,
-            market=market,
+            market=None if deferred else market,
             now=now,
         )
         await self._audit.log_risk_check(signal, ok, reason)

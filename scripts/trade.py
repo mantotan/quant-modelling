@@ -456,9 +456,11 @@ async def main_loop(args: argparse.Namespace) -> None:
         asset=args.asset,
         timeframe=args.timeframe,
     )
+    tf_seconds = {"5m": 300, "15m": 900, "1h": 3600}[args.timeframe]
     accumulator = BarEdgeAccumulator(
         strategy=trading_cfg.get("strategy", "first_confident"),
         confidence_threshold=trading_cfg.get("confidence_threshold", 0.05),
+        bar_seconds=tf_seconds,
     )
     logger.info("Trading strategy: %s (threshold=%.2f)",
                 accumulator.strategy, accumulator.confidence_threshold)
@@ -512,7 +514,8 @@ async def main_loop(args: argparse.Namespace) -> None:
     last_triggered: dict[Asset, set[float]] = {}
     current_bar_id: dict[Asset, int] = {}
     last_dashboard = time.time()
-    bar_seconds = {"5m": 300.0, "15m": 900.0, "1h": 3600.0}[args.timeframe]
+    bar_seconds = float(tf_seconds)
+    bar_market: dict[int, PolymarketMarket] = {}  # pinned market per bar_id
 
     logger.info("Starting main loop (1s polling)...")
     logger.info("Waiting for Polymarket market discovery...")
@@ -542,22 +545,25 @@ async def main_loop(args: argparse.Namespace) -> None:
             if old_bar_id is not None:
                 deferred = accumulator.on_bar_end(old_bar_id)
                 if deferred:
-                    market = await scanner.get_active_market(asset)
-                    if market and ws_feed.mid_up > 0:
-                        market = PolymarketMarket(
-                            condition_id=market.condition_id,
-                            token_id_up=market.token_id_up,
-                            token_id_down=market.token_id_down,
-                            asset=market.asset,
-                            market_type=market.market_type,
-                            window_start=market.window_start,
-                            window_end=market.window_end,
-                            mid_up=ws_feed.mid_up,
-                            spread=ws_feed.spread,
-                            volume=market.volume,
-                        )
+                    old_market = bar_market.get(old_bar_id)
+                    if old_market:
+                        # Refresh prices from WSS if real book exists
+                        if ws_feed.best_bid_up > 0 and ws_feed.best_ask_up < 1:
+                            old_market = PolymarketMarket(
+                                condition_id=old_market.condition_id,
+                                token_id_up=old_market.token_id_up,
+                                token_id_down=old_market.token_id_down,
+                                asset=old_market.asset,
+                                market_type=old_market.market_type,
+                                window_start=old_market.window_start,
+                                window_end=old_market.window_end,
+                                mid_up=ws_feed.mid_up,
+                                spread=ws_feed.spread,
+                                volume=old_market.volume,
+                            )
                         fill = await trading_loop.on_partial_bar(
-                            partial, market, deferred.model_prob,
+                            partial, old_market, deferred.model_prob,
+                            deferred=True,
                         )
                         if fill and fill.status == "filled":
                             stats["trades"] += 1
@@ -566,7 +572,16 @@ async def main_loop(args: argparse.Namespace) -> None:
                                 asset.value, deferred.side,
                                 fill.size_usd, fill.price, deferred.edge,
                             )
+                    else:
+                        logger.info(
+                            "DEFERRED SKIP: bar %d %s edge=%.4f (no pinned market)",
+                            old_bar_id, deferred.side, deferred.edge,
+                        )
                 accumulator.cleanup_old_bars(bar_id)
+            # Clean up old pinned markets
+            old_keys = [k for k in bar_market if k < bar_id - 3 * tf_seconds]
+            for k in old_keys:
+                del bar_market[k]
             current_bar_id[asset] = bar_id
             last_triggered[asset] = set()
 
@@ -587,6 +602,14 @@ async def main_loop(args: argparse.Namespace) -> None:
                 logger.debug("No active market for %s", asset.value)
                 continue
 
+            # Pin market per bar — prevent scanner switching to next bar
+            if bar_id not in bar_market:
+                bar_market[bar_id] = market
+            else:
+                pinned = bar_market[bar_id]
+                if market.condition_id != pinned.condition_id:
+                    market = pinned  # Use pinned market's identity
+
             # Start/update WS orderbook feed for this market
             if market.condition_id != ws_subscribed_market:
                 if ws_feed_task is not None:
@@ -605,8 +628,8 @@ async def main_loop(args: argparse.Namespace) -> None:
                 )
                 await asyncio.sleep(1.0)  # Wait for initial book snapshot
 
-            # Override market odds with live WS data
-            if ws_feed.mid_up > 0:
+            # Override market odds with live WS data (only if real book exists)
+            if ws_feed.best_bid_up > 0 and ws_feed.best_ask_up < 1:
                 market = PolymarketMarket(
                     condition_id=market.condition_id,
                     token_id_up=market.token_id_up,
@@ -685,11 +708,12 @@ async def main_loop(args: argparse.Namespace) -> None:
                 filled = min(10, max(0, round(elapsed_pct * 10)))
                 bar_vis = "[" + "#" * filled + "." * (10 - filled) + "]"
                 side = "UP" if prob_up > 0.5 else "DN"
+                ws_has_book = ws_feed.best_bid_up > 0 and ws_feed.best_ask_up < 1
                 if side == "UP":
-                    ask = ws_feed.best_ask_up if ws_feed.mid_up > 0 else market.mid_up
+                    ask = ws_feed.best_ask_up if ws_has_book else market.mid_up
                     model_p = float(prob_up)
                 else:
-                    ask = ws_feed.best_ask_down if ws_feed.mid_up > 0 else (1.0 - market.mid_up)
+                    ask = ws_feed.best_ask_down if ws_has_book else (1.0 - market.mid_up)
                     model_p = 1.0 - float(prob_up)
                 edge_val = model_p - ask
                 trade_str = ""

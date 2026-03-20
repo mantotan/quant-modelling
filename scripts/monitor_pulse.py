@@ -463,6 +463,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                 scanner = MarketScanner(
                     assets={Asset.BTC}, timeframe=tf,
                     connector_factory=create_connector,
+                    min_time_remaining_sec=5.0,
                 )
                 scanner._cache_ttl = 2.0
                 pm_scanners[tf] = scanner

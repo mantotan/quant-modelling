@@ -41,9 +41,11 @@ class BarEdgeAccumulator:
         self,
         strategy: Literal["best_edge", "first_confident"] = "first_confident",
         confidence_threshold: float = 0.05,
+        bar_seconds: int = 300,
     ) -> None:
         self._strategy = strategy
         self._confidence_threshold = confidence_threshold
+        self._bar_seconds = bar_seconds
         # bar_id → best prediction seen so far
         self._pending: dict[int, TradeDecision] = {}
         # bar_id → already committed (traded)
@@ -131,7 +133,7 @@ class BarEdgeAccumulator:
 
     def cleanup_old_bars(self, current_bar_id: int, max_age: int = 5) -> None:
         """Remove state for bars older than max_age bars ago."""
-        cutoff = current_bar_id - max_age * 300  # 300s per 5m bar
+        cutoff = current_bar_id - max_age * self._bar_seconds
         old_pending = [b for b in self._pending if b < cutoff]
         for b in old_pending:
             del self._pending[b]
