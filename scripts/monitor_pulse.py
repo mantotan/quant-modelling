@@ -264,35 +264,62 @@ async def polymarket_feed(
     pm_feeds: dict[Timeframe, PolymarketWSFeed],
     running_flag: list[bool],
 ) -> None:
-    """Discover and subscribe to Polymarket market for a timeframe."""
+    """Discover and subscribe to Polymarket markets, switching at bar boundaries.
+
+    Bar windows are fixed-duration, so we compute exactly when the next
+    bar starts and switch proactively instead of polling blindly.
+    """
     label = TF_LABELS[tf]
     ws_task: asyncio.Task | None = None
     subscribed_cid = ""
 
+    async def _subscribe(market) -> None:
+        """Stop old feed and subscribe to a new market."""
+        nonlocal ws_task, subscribed_cid
+        old_feed = pm_feeds.get(tf)
+        if old_feed and ws_task is not None:
+            old_feed.stop()
+            ws_task.cancel()
+
+        new_feed = PolymarketWSFeed()
+        pm_feeds[tf] = new_feed
+        ws_task = asyncio.create_task(
+            new_feed.connect_and_run(
+                market.token_id_up, market.token_id_down, running_flag,
+            ),
+        )
+        subscribed_cid = market.condition_id
+        logger.info("PM %s subscribed: %s (ends %s)", label, subscribed_cid[:16],
+                     market.window_end.strftime("%H:%M:%S"))
+        await asyncio.sleep(1.0)  # wait for initial book snapshot
+
     while running_flag[0]:
         try:
             market = await scanner.get_active_market(Asset.BTC)
-            if market and market.condition_id != subscribed_cid:
-                # New market — stop old feed, create fresh one
-                old_feed = pm_feeds.get(tf)
-                if old_feed and ws_task is not None:
-                    old_feed.stop()
-                    ws_task.cancel()
 
-                new_feed = PolymarketWSFeed()
-                pm_feeds[tf] = new_feed
-                ws_task = asyncio.create_task(
-                    new_feed.connect_and_run(
-                        market.token_id_up, market.token_id_down, running_flag,
-                    ),
-                )
-                subscribed_cid = market.condition_id
-                logger.info("PM %s subscribed: %s", label, subscribed_cid[:16])
-                await asyncio.sleep(1.0)
+            if market and market.condition_id != subscribed_cid:
+                await _subscribe(market)
+
+            if market and market.window_end:
+                # Sleep until bar ends, then immediately switch to next market
+                now = datetime.now(UTC)
+                secs_to_end = (market.window_end - now).total_seconds()
+
+                if secs_to_end > 2:
+                    # Still time left — sleep until 1s before bar ends
+                    await asyncio.sleep(min(secs_to_end - 1, 30.0))
+                else:
+                    # Bar ending now or already ended — discover next immediately
+                    await asyncio.sleep(1.0)
+                    # Force cache expiry so scanner queries fresh
+                    scanner._cache_time = 0
+            else:
+                # No market found — retry in 10s
+                await asyncio.sleep(10.0)
+
         except Exception as e:
             logger.debug("PM %s discovery error: %s", label, e)
-
-        await asyncio.sleep(10.0)
+            await asyncio.sleep(5.0)
 
 
 # ── Output formatting ───────────────────────────────────────────────

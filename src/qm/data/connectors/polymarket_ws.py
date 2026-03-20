@@ -147,8 +147,12 @@ class PolymarketWSFeed:
         while running_flag[0] and self._running:
             try:
                 await self._run_once(token_id_up, token_id_down, running_flag)
+            except asyncio.CancelledError:
+                logger.info("Polymarket WS task cancelled")
+                self._connected.clear()
+                return
             except Exception:
-                logger.warning("Polymarket WS disconnected, reconnecting in 5s...")
+                logger.warning("Polymarket WS disconnected, reconnecting in 5s...", exc_info=True)
                 self._connected.clear()
                 await asyncio.sleep(5.0)
 
