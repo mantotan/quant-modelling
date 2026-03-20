@@ -115,15 +115,12 @@ class TestDutchEngine:
     def test_contra_signal_buys_cheap_side(self):
         """When DN is overpriced, contra-signal buys UP (if UP is cheap)."""
         engine = self._make_engine(
-            cheap_threshold=0.10, contra_threshold=0.11, max_pair_cost=1.10,
+            cheap_threshold=0.10, contra_threshold=0.11,
         )
-        # Model P(UP)=0.55, ask_UP=0.42, ask_DN=0.75
-        # cheap_up = 0.55 - 0.42 = +0.13 → Tier 1 direct buy
-        # cheap_dn = 0.45 - 0.75 = -0.30 (DN overpriced)
-        # marginal = 0.40+0.01 + 0.70+0.01 = 1.12 → raise max_pair_cost to 1.10
-        # Actually marginal 1.12 > 1.10 still kills. Use lower bids.
-        # bid_up=0.40, bid_dn=0.50 → marginal = 0.41+0.51 = 0.92 < 1.10
-        # DN spread = 0.58-0.50 = 0.08 (healthy < 0.10)
+        # Model P(UP)=0.55, ask_UP=0.42 → cheap_up = +0.13 (Tier 1 direct)
+        # cheap_dn = 0.45 - 0.58 = -0.13 (DN overpriced)
+        # contra for UP = -(-0.13) = +0.13 > 0.11 (also triggers)
+        # No inventory yet → kill switch won't fire
         book_up = make_book(0.40, 0.42)
         book_dn = make_book(0.50, 0.58)
         orders = engine.on_tick(0.3, 0.55, book_up, book_dn)
@@ -195,25 +192,30 @@ class TestDutchEngine:
         dn_orders = [o for o in orders if o.side == "DN"]
         assert len(dn_orders) >= 1
 
-    def test_marginal_kill_switch(self):
-        """Stop when marginal maker pair cost exceeds threshold."""
-        engine = self._make_engine(max_pair_cost=0.97, spread_offset=0.01)
-        # bid_up=0.48 + 0.01 + bid_dn=0.48 + 0.01 = 0.98 > 0.97
+    def test_kill_switch_on_bad_avg_pair_cost(self):
+        """Stop when avg pair cost exceeds threshold after building inventory."""
+        engine = self._make_engine(max_pair_cost=0.97)
+        # Manually set inventory with bad avg pair cost
+        engine._inventory.shares_up = 20
+        engine._inventory.shares_dn = 20
+        engine._inventory.cost_up = 10   # avg 0.50
+        engine._inventory.cost_dn = 10   # avg 0.50 → pair cost = 1.00 > 0.97
         book_up = make_book(0.48, 0.52)
         book_dn = make_book(0.48, 0.52)
         orders = engine.on_tick(0.5, 0.65, book_up, book_dn)
         assert orders == []
         assert engine._stopped
 
-    def test_marginal_kill_allows_when_below(self):
-        """Don't kill when marginal maker cost is below threshold."""
+    def test_no_kill_before_inventory(self):
+        """Don't kill on marginal cost alone — allow first entries even if skewed."""
         engine = self._make_engine(
-            max_pair_cost=0.97, spread_offset=0.01, cheap_threshold=0.10,
+            max_pair_cost=0.97, cheap_threshold=0.10,
         )
-        # bid_up=0.40 + 0.01 + bid_dn=0.40 + 0.01 = 0.82 < 0.97
-        book_up = make_book(0.40, 0.45)
-        book_dn = make_book(0.40, 0.48)
-        orders = engine.on_tick(0.5, 0.65, book_up, book_dn)
+        # Skewed market: bid_UP=0.35, bid_DN=0.64 → marginal = 1.01
+        # But no inventory yet, so kill switch should NOT fire
+        book_up = make_book(0.35, 0.36)  # UP is cheap
+        book_dn = make_book(0.64, 0.65)
+        orders = engine.on_tick(0.5, 0.55, book_up, book_dn)
         assert not engine._stopped
 
     def test_min_order_usd(self):

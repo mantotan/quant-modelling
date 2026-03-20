@@ -252,18 +252,19 @@ class DutchAccumulationEngine:
         self._spreads_up.append(book_up.spread)
         self._spreads_dn.append(book_dn.spread)
 
-        # Kill switch: marginal pair cost (what the NEXT pair would cost)
-        marginal_maker = (
-            book_up.best_bid + self._config.spread_offset
-            + book_dn.best_bid + self._config.spread_offset
-        )
-        if marginal_maker >= self._config.max_pair_cost:
-            if not self._stopped:
-                self._decision_log.append(
-                    f"t={time_pct:.2f}: KILL marginal={marginal_maker:.4f}"
-                )
-                self._stopped = True
-            return []
+        # Kill switch: only after we have matched inventory AND avg cost is bad.
+        # Don't kill on marginal cost alone — the whole strategy is buying sides
+        # at DIFFERENT times. A 1.01 marginal at one moment doesn't mean the
+        # pair will cost 1.01 (prices oscillate within the bar).
+        if self._inventory.matched > 0:
+            avg_pc = self._inventory.avg_pair_cost
+            if avg_pc > self._config.max_pair_cost:
+                if not self._stopped:
+                    self._decision_log.append(
+                        f"t={time_pct:.2f}: KILL avg_pair_cost={avg_pc:.4f}"
+                    )
+                    self._stopped = True
+                return []
 
         # Budget + order count check
         budget_remaining = self._config.bar_budget - self._inventory.total_cost
