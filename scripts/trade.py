@@ -41,6 +41,7 @@ from qm.execution.audit import AuditWriter
 from qm.execution.loop import TradingLoop
 from qm.execution.paper.engine import PaperExecutor
 from qm.execution.paper.trade_logger import PaperTradeLogger
+from qm.model.calibration.calibrator import TimeAwareCalibrator
 from qm.execution.polymarket.market_scanner import MarketScanner
 from qm.features.live_cache import RUST_AVAILABLE, get_feature_calculator
 from qm.features.pipeline import FeaturePipeline
@@ -111,17 +112,10 @@ def load_model(model_dir: Path, asset: str, tf: str):
 
     calibrator = None
     if cal_path.exists():
-        import pickle
-        with open(cal_path, "rb") as f:
-            cal_data = pickle.load(f)
-        # Handle both dict-wrapped and direct calibrator formats
-        if isinstance(cal_data, dict):
-            calibrator = cal_data["calibrator"]
-        else:
-            calibrator = cal_data
+        calibrator = TimeAwareCalibrator()
+        calibrator.load(cal_path)  # handles both legacy and new formats
         logger.info("Loaded calibrator: %s", cal_path)
     else:
-        calibrator = IsotonicCalibrator()
         logger.warning("No calibrator found, using uncalibrated probs")
 
     return model, calibrator
@@ -577,6 +571,7 @@ async def main_loop(args: argparse.Namespace) -> None:
             if calibrator and hasattr(calibrator, "transform"):
                 prob_up = calibrator.transform(
                     np.array([prob_up]),
+                    np.array([elapsed_pct]),
                 )[0]
 
             elapsed_us = (time.perf_counter_ns() - t0) / 1000

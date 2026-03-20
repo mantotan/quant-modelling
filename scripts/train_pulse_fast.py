@@ -32,7 +32,7 @@ from qm.backtest.intrabar_backtest import IntraBarBacktester
 from qm.backtest.metrics.calibration import brier_score, expected_calibration_error
 from qm.backtest.validation.walk_forward import WalkForwardSplitter
 from qm.core.types import Timeframe
-from qm.model.calibration.calibrator import IsotonicCalibrator
+from qm.model.calibration.calibrator import TimeAwareCalibrator
 from qm.model.objective import ObjectiveConfig, compute_objective
 from qm.model.targets.intrabar import IntraBarDataset
 from qm.model.trainers.device import detect_device
@@ -182,6 +182,7 @@ def run(args: argparse.Namespace) -> dict:
     tp_test = time_pcts[test_mask]
     bi_test = bar_indices[test_mask]
     train_bar_indices = bar_indices[train_mask]
+    tp_train = time_pcts[train_mask]
 
     base_rate = float(y_train.mean())
     logger.info("Data: %d train (%d bars), %d test (%d bars), base=%.4f",
@@ -305,12 +306,12 @@ def run(args: argparse.Namespace) -> dict:
         oos_probs[te_mask] = m.predict(X_train[te_mask])
         oos_mask[te_mask] = True
 
-    cal = IsotonicCalibrator()
-    cal.fit(oos_probs[oos_mask], y_train[oos_mask])
+    cal = TimeAwareCalibrator()
+    cal.fit(oos_probs[oos_mask], y_train[oos_mask], tp_train[oos_mask])
 
     # ── Evaluate on test set ──────────────────────────────────────
     raw_test = model_final.predict(X_test)
-    cal_test = cal.transform(raw_test)
+    cal_test = cal.transform(raw_test, tp_test)
 
     acc = float(np.mean((cal_test > 0.5) == (y_test == 1)))
     brier = brier_score(cal_test, y_test)
