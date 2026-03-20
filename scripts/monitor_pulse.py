@@ -337,7 +337,7 @@ def print_table(
     print(f"\n{header}{'-' * max(0, 80 - len(header))}")
     print(
         f" {'TF':<4} | {'Bar%':>5} | {'O/H/L/C':<25} | "
-        f"{'Raw':>6} | {'Cal':>6} | {'Mkt':>6} | {'Edge':>7} | Side"
+        f"{'Raw':>6} | {'Cal':>6} | Side | {'Ask':>6} | {'Edge':>7}"
     )
 
     for r in rows:
@@ -345,17 +345,17 @@ def print_table(
             f"{format_price(r['open'])}/{format_price(r['high'])}/"
             f"{format_price(r['low'])}/{format_price(r['close'])}"
         )
-        if r['mkt_prob'] is not None:
-            mkt_str = f"{r['mkt_prob']:>.4f}"
+        side_str = r.get("side", "--")
+        if r['mkt_price'] is not None:
+            mkt_str = f"{r['mkt_price']:>.4f}"
             edge_str = f"{r['edge']:+.3f}"
         else:
             mkt_str = "   -- "
             edge_str = "    -- "
-        side_str = r.get("side", "--")
         print(
             f" {r['label']:<4} | {r['pct']:>4.1f}% | {ohlc:<25} | "
-            f"{r['raw_prob']:>.4f} | {r['cal_prob']:>.4f} | "
-            f"{mkt_str} | {edge_str} | {side_str}"
+            f"{r['raw_prob']:>.4f} | {r['cal_prob']:>.4f} | {side_str:>4} | "
+            f"{mkt_str} | {edge_str}"
         )
 
     # Market odds footer
@@ -372,15 +372,15 @@ def print_table(
 
 def print_threshold(
     tf_label: str, pct: float, raw: float, cal: float,
-    mkt: float | None, edge: float | None, side: str,
+    ask: float | None, edge: float | None, side: str,
 ) -> None:
     """Print highlighted threshold crossing."""
-    mkt_str = f"Mkt={mkt:.4f}" if mkt is not None else "Mkt=--"
+    ask_str = f"Ask{side}={ask:.4f}" if ask is not None else "Ask=--"
     edge_str = f"Edge={edge:+.3f}" if edge is not None else "Edge=--"
     print(
         f"\n>>> {tf_label} THRESHOLD {pct*100:.0f}% -- "
-        f"Raw={raw:.4f} Cal={cal:.4f} {mkt_str} "
-        f"{edge_str} -> {side} <<<"
+        f"Raw={raw:.4f} Cal={cal:.4f} {side} "
+        f"{ask_str} {edge_str} <<<"
     )
 
 
@@ -565,28 +565,31 @@ async def main_loop(args: argparse.Namespace) -> None:
                     np.array([elapsed_pct]),
                 )[0])
 
-            # Market odds: prefer WSS orderbook, fall back to REST
-            mkt_prob = None
+            # Market price: the price we'd actually pay to enter
+            #   Predicting UP  -> buy Up token  -> pay lowest ask Up
+            #   Predicting DN  -> buy Down token -> pay lowest ask Down
+            side = "UP" if cal_prob > 0.5 else "DN"
+            mkt_price = None
             mkt_src = "none"
             ws_feed = ws_feeds.get(tf)
             if ws_feed and ws_feed._connected.is_set():
-                mkt_prob = ws_feed.mid_up
+                if side == "UP":
+                    mkt_price = ws_feed.best_ask_up
+                else:
+                    mkt_price = ws_feed.best_ask_down
                 mkt_src = "ws"
             else:
                 pm_market = pm_markets.get(tf)
                 if pm_market:
-                    mkt_prob = pm_market.mid_up
+                    mkt_price = pm_market.mid_up if side == "UP" else (1.0 - pm_market.mid_up)
                     mkt_src = "rest"
 
-            # Edge on the side we'd trade:
-            #   UP side edge = cal_prob - mkt_prob (model thinks Up underpriced)
-            #   DN side edge = (1-cal_prob) - (1-mkt_prob) = mkt_prob - cal_prob
-            side = "UP" if cal_prob > 0.5 else "DN"
-            if mkt_prob is not None:
-                if side == "UP":
-                    edge = cal_prob - mkt_prob
-                else:
-                    edge = mkt_prob - cal_prob
+            # Edge = model's P(side wins) - cost to buy that side
+            #   UP: edge = cal_prob - ask_up
+            #   DN: edge = (1 - cal_prob) - ask_down
+            if mkt_price is not None:
+                model_prob_side = cal_prob if side == "UP" else (1.0 - cal_prob)
+                edge = model_prob_side - mkt_price
                 if abs(edge) < 0.005:
                     side = "--"
                     edge = 0.0
@@ -602,7 +605,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                 "close": partial.current_price,
                 "raw_prob": raw_prob,
                 "cal_prob": cal_prob,
-                "mkt_prob": mkt_prob,
+                "mkt_price": mkt_price,
                 "mkt_src": mkt_src,
                 "edge": edge,
                 "side": side,
@@ -615,7 +618,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                 if elapsed_pct >= threshold:
                     last_triggered[tf].add(threshold)
                     threshold_events.append(
-                        (label, threshold, raw_prob, cal_prob, mkt_prob, edge, side),
+                        (label, threshold, raw_prob, cal_prob, mkt_price, edge, side),
                     )
 
         pred_us = (time.perf_counter_ns() - t0) / 1000

@@ -129,6 +129,18 @@ class PolymarketWSFeed:
             return self._books[self._token_id_up].best_ask
         return 1.0
 
+    @property
+    def best_bid_down(self) -> float:
+        if self._token_id_down and self._token_id_down in self._books:
+            return self._books[self._token_id_down].best_bid
+        return 0.0
+
+    @property
+    def best_ask_down(self) -> float:
+        if self._token_id_down and self._token_id_down in self._books:
+            return self._books[self._token_id_down].best_ask
+        return 1.0
+
     async def connect_and_run(
         self,
         token_id_up: str,
