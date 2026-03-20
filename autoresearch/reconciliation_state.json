@@ -1,0 +1,11 @@
+{
+  "last_reconciliation_at": "2026-03-20T07:48:00Z",
+  "last_trade_count": 29,
+  "last_dispatch_at": "2026-03-20T07:47:00Z",
+  "last_dispatch_decision": "RECONCILER",
+  "last_dispatch_reason": "29 new trades >= 10 threshold (first reconciliation)",
+  "total_predictions_seen": 84,
+  "total_resolutions_seen": 37,
+  "trust_level": "UNRELIABLE",
+  "fixes_in_progress": ["FIX_SIZING"]
+}

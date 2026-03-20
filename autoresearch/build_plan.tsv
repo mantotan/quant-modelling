@@ -21,3 +21,4 @@ id	phase	work_unit	description	dependencies	status
 20	5B	logreg_trainer	LogRegTrainer + stacked ensemble + tests	9	PENDING
 21	6A	alpha_validator	AlphaValidator standalone signal validation + tests	3,4,12	PENDING
 22	6B	paper_validator	PaperTradingValidator + real_odds_provider + tests		PENDING
+23	FIX_SIZING	fix_sizing	Unify bet sizing between paper executor and replay backtest — paper PnL=-$25.98 vs replay PnL=+$0.02 with identical trade counts (29). PnL units/scale differ.	none	PENDING	reconciler
