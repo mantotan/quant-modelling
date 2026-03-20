@@ -24,8 +24,9 @@ import logging
 import signal
 import sys
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import aiohttp
 import lightgbm as lgb
@@ -96,6 +97,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--model-dir", default="data/models/pulse_v2",
         help="Model directory",
+    )
+    p.add_argument(
+        "--verbose", action="store_true",
+        help="Print monitor-style prediction table on every poll",
     )
     return p.parse_args()
 
@@ -662,6 +667,35 @@ async def main_loop(args: argparse.Namespace) -> None:
                     fill.size_usd, fill.price, decision.model_prob,
                     decision.edge, elapsed_us,
                 )
+
+            # Verbose monitor-style output
+            if args.verbose:
+                _tz = ZoneInfo("Asia/Bangkok")
+                w_start = partial.window_start.astimezone(_tz).strftime("%H:%M")
+                w_end = partial.window_end.astimezone(_tz).strftime("%H:%M")
+                filled = min(10, max(0, round(elapsed_pct * 10)))
+                bar_vis = "[" + "#" * filled + "." * (10 - filled) + "]"
+                side = "UP" if prob_up > 0.5 else "DN"
+                # Ask price for the side we'd trade
+                if side == "UP":
+                    ask = ws_feed.best_ask_up if ws_feed.mid_up > 0 else market.mid_up
+                    model_p = float(prob_up)
+                else:
+                    ask = ws_feed.best_ask_down if ws_feed.mid_up > 0 else (1.0 - market.mid_up)
+                    model_p = 1.0 - float(prob_up)
+                edge_val = model_p - ask
+                price_str = "%s $%s | %s-%s %s" % (
+                    asset.value, "{:,.0f}".format(partial.current_price),
+                    w_start, w_end, bar_vis,
+                )
+                pred_str = "Raw=%.4f Cal=%.4f %s Ask=%.4f Edge=%+.3f" % (
+                    float(model.predict(features.reshape(1, -1))[0]),
+                    float(prob_up), side, ask, edge_val,
+                )
+                trade_str = ""
+                if fill and fill.status == "filled":
+                    trade_str = " >>> FILLED $%.2f @ %.4f" % (fill.size_usd, fill.price)
+                print("%s | %s%s | %.0fus" % (price_str, pred_str, trade_str, elapsed_us))
 
         # Dashboard every 5 minutes
         if time.time() - last_dashboard > 300:
