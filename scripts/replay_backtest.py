@@ -159,20 +159,33 @@ def build_arrays(
         for p in resolved
     ])
 
-    # Paper PnL per trade — count each condition_id's resolution PnL
-    # exactly once to avoid double-counting when multiple predictions
-    # share a condition_id (e.g. multiple fills in the same market window).
+    # Paper PnL per trade.
+    # New logs (with position_id): each resolution record has per-position PnL,
+    # so we consume records sequentially per condition_id (1:1 with fills).
+    # Old logs (no position_id): dedup by condition_id to avoid double-counting.
+    has_position_ids = any(
+        r.get("position_id") for recs in resolutions.values() for r in recs
+    )
+    resolution_idx: dict[str, int] = {}  # tracks next unused record per cid
     seen_cids: set[str] = set()
     paper_pnls_list: list[float] = []
     for p in resolved:
         cid = p["condition_id"]
         if p["fill_status"] != "filled":
             paper_pnls_list.append(0.0)
+        elif has_position_ids:
+            # New format: each resolution record has correct per-position PnL
+            idx = resolution_idx.get(cid, 0)
+            records = resolutions[cid]
+            pnl = records[idx]["pnl"] if idx < len(records) else 0.0
+            paper_pnls_list.append(pnl)
+            resolution_idx[cid] = idx + 1
         elif cid not in seen_cids:
+            # Old format fallback: sum all records, count once per condition_id
             paper_pnls_list.append(sum(r["pnl"] for r in resolutions[cid]))
             seen_cids.add(cid)
         else:
-            paper_pnls_list.append(0.0)  # already counted this condition_id
+            paper_pnls_list.append(0.0)
     paper_pnls = np.array(paper_pnls_list)
 
     # Fill info

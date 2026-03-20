@@ -73,15 +73,19 @@ class PaperTradeLogger:
         outcome: str,
         pnl: float,
         was_correct: bool,
+        position_id: str = "",
     ) -> None:
-        self._write({
+        event: dict = {
             "type": "resolution",
             "ts": datetime.now(UTC).isoformat(),
             "condition_id": condition_id,
             "outcome": outcome,
             "pnl": round(pnl, 4),
             "was_correct": was_correct,
-        })
+        }
+        if position_id:
+            event["position_id"] = position_id
+        self._write(event)
 
     def _write(self, event: dict) -> None:
         """Append one JSON line. Rotates file daily."""

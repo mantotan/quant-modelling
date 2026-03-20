@@ -208,6 +208,7 @@ async def resolution_monitor(
         if not positions:
             continue
 
+        resolved_cids: set[str] = set()
         for pos in positions:
             age = (datetime.now(UTC) - pos.entry_time).total_seconds()
             if age < 300:  # wait at least 5 min before checking
@@ -238,21 +239,30 @@ async def resolution_monitor(
                 else Outcome.DOWN
             )
 
-            pnl = await trading_loop.on_market_resolution(
-                pos.condition_id, outcome,
-            )
-            won = pnl > 0
+            # Compute per-position PnL BEFORE resolution deletes positions
+            won = pos.side == outcome
+            pos_pnl = pos.pnl_if_correct() if won else pos.pnl_if_wrong()
+
+            # Resolve via TradingLoop once per condition_id (handles
+            # bankroll, circuit breaker, audit for all positions at once)
+            if pos.condition_id not in resolved_cids:
+                await trading_loop.on_market_resolution(
+                    pos.condition_id, outcome,
+                )
+                resolved_cids.add(pos.condition_id)
+
             logger.info(
-                "Resolved %s %s: %s → PnL $%.2f",
-                pos.asset.value, pos.side.value,
-                "WIN" if won else "LOSS", pnl,
+                "Resolved %s %s %s: %s → PnL $%.2f",
+                pos.id, pos.asset.value, pos.side.value,
+                "WIN" if won else "LOSS", pos_pnl,
             )
 
             if trade_logger:
                 trade_logger.log_resolution(
                     condition_id=pos.condition_id,
+                    position_id=pos.id,
                     outcome=outcome.value,
-                    pnl=float(pnl),
+                    pnl=float(pos_pnl),
                     was_correct=won,
                 )
 
