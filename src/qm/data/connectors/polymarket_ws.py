@@ -194,19 +194,22 @@ class PolymarketWSFeed:
                 return
             except Exception:
                 consecutive_failures += 1
+                # Exponential backoff: 5s, 10s, 20s, 40s, capped at 60s
+                backoff = min(5.0 * (2 ** (consecutive_failures - 1)), 60.0)
                 if consecutive_failures <= 3:
                     logger.warning(
-                        "Polymarket WS disconnected (%d), reconnecting in 5s...",
-                        consecutive_failures, exc_info=(consecutive_failures == 1),
+                        "Polymarket WS disconnected (%d), reconnecting in %.0fs...",
+                        consecutive_failures, backoff,
+                        exc_info=(consecutive_failures == 1),
                     )
                 elif consecutive_failures == 4:
                     logger.warning(
-                        "Polymarket WS repeated failures — suppressing further logs "
-                        "until reconnected",
+                        "Polymarket WS repeated failures — suppressing logs, "
+                        "backoff %.0fs", backoff,
                     )
-                # else: silently retry
+                # else: silently retry with backoff
                 self._connected.clear()
-                await asyncio.sleep(5.0)
+                await asyncio.sleep(backoff)
 
     async def _run_once(
         self,
