@@ -1,12 +1,12 @@
 {
-  "last_reconciliation_at": "2026-03-20T11:33:00Z",
-  "last_trade_count": 146,
-  "last_dispatch_at": "2026-03-20T11:33:00Z",
+  "last_reconciliation_at": "2026-03-20T13:29:00Z",
+  "last_trade_count": 199,
+  "last_dispatch_at": "2026-03-20T13:29:00Z",
   "last_dispatch_decision": "RECONCILER",
-  "last_dispatch_reason": "67 new trades >= 50 threshold",
-  "total_predictions_seen": 218,
-  "total_resolutions_seen": 146,
+  "last_dispatch_reason": "53 new trades >= 50 threshold",
+  "total_predictions_seen": 286,
+  "total_resolutions_seen": 199,
   "trust_level": "SUSPICIOUS",
   "fixes_in_progress": [],
-  "notes": "Cycle 3: Edge sign flip 5.78% (stable from 5.88%). All other checks PASS. 146 resolved trades. No fix triggered — borderline edge flip has no catalog fix. System profitable and stable."
+  "notes": "Cycle 4: Edge sign flip 5.11% (down from 5.78%). All other checks PASS. 199 resolved trades. No fix triggered — borderline edge flip has no catalog fix and is converging toward threshold. System profitable and stable."
 }
