@@ -322,6 +322,12 @@ async def polymarket_feed(
 
 # -- Output formatting -----------------------------------------------
 
+def format_bar(pct: float, width: int = 10) -> str:
+    """Render percentage as visual bar: [####......]"""
+    filled = min(width, max(0, round(pct / 100 * width)))
+    return "[" + "#" * filled + "." * (width - filled) + "]"
+
+
 def format_price(p: float) -> str:
     """Format price compactly."""
     if p >= 1000:
@@ -340,7 +346,7 @@ def print_table(
     header = f"--- BTC ${format_price(price)} | {now_str} "
     print(f"\n{header}{'-' * max(0, 80 - len(header))}")
     print(
-        f" {'TF':<4} | {'Window':<11} | {'Bar%':>5} | {'O/H/L/C':<25} | "
+        f" {'TF':<4} | {'Window':<11} | {'Progress':<12} | {'O/H/L/C':<25} | "
         f"{'Raw':>6} | {'Cal':>6} | Side | {'Ask':>6} | {'Edge':>7}"
     )
 
@@ -349,6 +355,7 @@ def print_table(
             f"{format_price(r['open'])}/{format_price(r['high'])}/"
             f"{format_price(r['low'])}/{format_price(r['close'])}"
         )
+        bar_vis = format_bar(r['pct'])
         side_str = r.get("side", "--")
         if r['mkt_price'] is not None:
             mkt_str = f"{r['mkt_price']:>.4f}"
@@ -357,7 +364,7 @@ def print_table(
             mkt_str = "   -- "
             edge_str = "    -- "
         print(
-            f" {r['label']:<4} | {r['window']:<11} | {r['pct']:>4.1f}% | {ohlc:<25} | "
+            f" {r['label']:<4} | {r['window']:<11} | {bar_vis} | {ohlc:<25} | "
             f"{r['raw_prob']:>.4f} | {r['cal_prob']:>.4f} | {side_str:>4} | "
             f"{mkt_str} | {edge_str}"
         )
