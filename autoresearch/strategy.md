@@ -192,3 +192,29 @@ No changes. All ranges remain at current wide defaults. The models have found th
 4. The auditor should perform a comprehensive deployment readiness review at its next trigger
 
 **The next productive action for this system is assigning the builder agent to [MTF-1].**
+
+---
+
+## OVERRIDE (2026-03-21): Multi-Timepoint Revalidation Required
+
+Phase 1 infrastructure deployed: TimeAwareCalibrator (per-bucket isotonic calibration),
+multi-tp training (time_pcts=[0.10, 0.20, 0.40, 0.60, 0.80], 5 samples/bar),
+BarEdgeAccumulator (one trade per bar, no side-flipping).
+
+**The researcher MUST retrain all 12 asset×timeframe combinations** with the new
+multi-tp configuration. This overrides the "COMPLETE" status above.
+
+### Priority Queue
+
+1. ~~Retrain ETH/5m with multi-tp (DONE — Brier=0.2129, 5x data, all 5 buckets active)~~
+2. Retrain BTC/5m with multi-tp (`--mode fast --save`)
+3. Retrain SOL/5m, XRP/5m with multi-tp
+4. Retrain all 15m models (BTC, ETH, SOL, XRP)
+5. Retrain all 1h models (BTC, ETH, SOL, XRP)
+6. Run CPCV for any model where Brier changed > 1% at t=0.80
+
+### KEEP criteria for revalidation
+- Use `--mode fast --save` for each run
+- KEEP if t=0.80 bucket Brier regression < 0.5% vs pre-multi-tp best
+- Slight overall Brier increase is expected (averaging across time points)
+- Log per-bucket Brier in description: "multi-tp: b10=0.239 b40=0.215 b80=0.180"

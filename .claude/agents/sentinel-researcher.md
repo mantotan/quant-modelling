@@ -96,6 +96,18 @@ Execute training. Set Bash timeout to 480000 (8 minutes).
 uv run scripts/train_pulse_fast.py --asset BTC --timeframe {tf} --trials 40 --timeout 420 --mode fast 2>autoresearch/last_run.log
 ```
 
+**Model saving:** Add `--save` flag to persist model + calibrator to `data/models/pulse_v2/{ASSET}_{TF}/`. Use `--save` when:
+- Running multi-tp revalidation (strategy.md OVERRIDE directive)
+- Running `--mode verify` and result is KEEP-VERIFIED
+Regular `--mode fast` exploration runs do NOT need `--save` unless directed.
+
+**Multi-tp revalidation (when strategy.md contains OVERRIDE directive):**
+- Use existing time_pcts from knobs.json (do NOT change them)
+- Run each asset×timeframe once with `--mode fast --save`
+- KEEP if t=0.80 bucket Brier regression < 0.5% vs pre-multi-tp best
+- Log per-bucket Brier in description: "multi-tp: b10=0.239 b40=0.215 b80=0.180"
+- Follow the OVERRIDE priority queue order
+
 **Timeframe selection:** Cycle through `5m`, `15m`, `1h` across iterations. Check results.tsv for which timeframes have been least explored (fewest rows) and prioritize those. If a SWITCH directive specifies an asset, keep the current timeframe rotation. Default to `5m` if no rotation history exists.
 
 **Pulse-specific rules:**

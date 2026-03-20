@@ -70,6 +70,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--timeout", type=int, default=420, help="Wall-clock budget in seconds")
     p.add_argument("--mode", default="fast", choices=["fast", "verify"])
+    p.add_argument("--save", action="store_true",
+                   help="Save model + calibrator to data/models/pulse_v2/{ASSET}_{TF}/")
     return p.parse_args()
 
 
@@ -308,6 +310,14 @@ def run(args: argparse.Namespace) -> dict:
 
     cal = TimeAwareCalibrator()
     cal.fit(oos_probs[oos_mask], y_train[oos_mask], tp_train[oos_mask])
+
+    # ── Save model + calibrator to disk (if --save) ──────────────
+    if args.save:
+        model_dir = Path(f"data/models/pulse_v2/{args.asset}_{args.timeframe}")
+        model_dir.mkdir(parents=True, exist_ok=True)
+        model_final.save_model(str(model_dir / "model.lgb"))
+        cal.save(model_dir / "calibrator.pkl")
+        logger.info("Model + calibrator saved to %s", model_dir)
 
     # ── Evaluate on test set ──────────────────────────────────────
     raw_test = model_final.predict(X_test)
