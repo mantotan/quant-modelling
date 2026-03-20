@@ -869,11 +869,13 @@ async def main_loop(args: argparse.Namespace) -> None:
         pm_market = pm_markets.get(tf)
         ws_feed = ws_feeds.get(tf)
 
-        # Verify market matches current bar
+        # Verify market matches current bar by deriving bar start from window_end
+        # (Gamma API startDate is market creation time, NOT bar boundary)
         market_matches = True
-        if pm_market and pm_market.window_start:
-            market_bar_id = int(pm_market.window_start.timestamp())
-            if market_bar_id != bar_id:
+        if pm_market and pm_market.window_end:
+            bar_secs = int(BAR_SECONDS[tf])
+            market_bar_start = int(pm_market.window_end.timestamp()) - bar_secs
+            if market_bar_start != bar_id:
                 market_matches = False
 
         has_book = (
