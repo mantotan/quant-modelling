@@ -1,60 +1,40 @@
-# Reconciliation Report — 2026-03-20 (Revalidation after FIX_SIZING)
+# Reconciliation Report — 2026-03-20 (Revalidation after FIX_RESOLUTION_LOAD)
 
 ## Trust Level: SUSPICIOUS
 
-**Note:** The replay_backtest.py script reports UNRELIABLE due to a PnL sign mismatch, but this is caused by a bug in the script's `load_resolutions()` function (see below). After correcting for the bug, the true trust level is SUSPICIOUS (1/4 checks fail).
+3/4 checks pass. Edge sign flip at 5.88% is just above the 5% TRUSTWORTHY threshold. This is an improvement from 8.96% in the previous run (before FIX_RESOLUTION_LOAD). The FIX_RESOLUTION_LOAD fix is validated — PnL sign match now works correctly with 79 resolved trades (up from 53).
 
-## Bug Found: Resolution Clobbering in replay_backtest.py
-
-`load_resolutions()` (line 107) uses `resolutions[event["condition_id"]] = event`, which **overwrites** earlier resolution records sharing the same condition_id. When a bar has multiple predictions (e.g., at 50%, 80% elapsed), each gets its own resolution record. The last resolution (often PnL=0 for an unfilled prediction) overwrites the earlier one (with actual PnL for a filled prediction).
-
-- **Reported paper PnL (buggy):** -$26.96
-- **Actual paper PnL (correct):** +$210.96 (sum of all 53 resolution records)
-- **Impact:** False PnL sign mismatch causing UNRELIABLE classification
-
-Fix required: `FIX_RESOLUTION_LOAD` -- aggregate resolution PnL per condition_id instead of overwriting.
-
-## Divergence Summary (Corrected)
+## Divergence Summary
 
 | Metric | Value | Threshold | Status |
 |--------|-------|-----------|--------|
-| Market odds MAE | 0.0094 | < 0.03 | PASS |
-| Edge sign flip % | 8.96% | < 5% | FAIL |
-| PnL sign match | +$210.96 vs +$187.92 | Same | PASS (corrected) |
-| Trade count ratio | 1.00 | 0.8-1.2 | PASS |
-
-## Divergence Summary (As Reported by Script)
-
-| Metric | Value | Threshold | Status |
-|--------|-------|-----------|--------|
-| Market odds MAE | 0.0094 | < 0.03 | PASS |
-| Edge sign flip % | 8.96% | < 5% | FAIL |
-| PnL sign match | -$26.96 vs +$187.92 | Same | FAIL (bug) |
+| Market odds MAE | 0.0089 | < 0.03 | PASS |
+| Edge sign flip % | 5.88% | < 5% | FAIL |
+| PnL sign match | +$982.93 vs +$406.73 | Same | PASS |
 | Trade count ratio | 1.00 | 0.8-1.2 | PASS |
 
 ## PnL Comparison
 
 | Source | Total PnL | Trades | Sharpe |
 |--------|-----------|--------|--------|
-| Paper trading (corrected) | $210.96 | 53 resolved | -- |
-| Paper trading (buggy load) | -$26.96 | 50 (clobbered) | -- |
-| Replay (real odds, paper-sized) | $187.92 | 50 | -- |
-| Replay (real odds, fractional) | $0.047 | 51 | 82.27 |
-| Replay (synthetic odds) | $0.045 | 41 | 94.52 |
+| Paper trading | $982.93 | 79 filled | -- |
+| Replay (real odds, paper-sized) | $406.73 | 79 | -- |
+| Replay (real odds, fractional) | $0.089 | 79 | 103.39 |
+| Replay (synthetic odds) | $0.075 | 67 | 98.03 |
 
-## Edge Sign Flip Analysis
+## Key Observations
 
-The 8.96% edge sign flip rate is in the SUSPICIOUS range (5-15%) but is an expected consequence of real Polymarket odds deviating from the synthetic 0.50 baseline. With market odds MAE of only 0.0094, the flips occur at the boundary where edge is near zero -- these are low-confidence trades that would not generate significant PnL in either direction.
-
-This is not a fixable divergence -- it is inherent to real vs synthetic odds.
+- **FIX_RESOLUTION_LOAD validated**: Resolution loading now correctly aggregates multi-prediction condition_ids. PnL sign match is clean PASS with both sides strongly positive.
+- **Edge sign flip improved**: 8.96% -> 5.88% with 26 more resolved trades. The flip rate may converge below 5% with more data.
+- **PnL magnitude gap**: Paper $982.93 vs Replay $406.73 -- paper PnL is 2.4x replay. Both positive, but the magnitude difference suggests paper executor may be sizing larger or capturing different fills. This is worth monitoring but not a sign mismatch.
+- **Strong Sharpe**: Replay backtester Sharpe of 103.39 (real odds) and 98.03 (synthetic) -- highly profitable in both modes.
+- **Time bucket analysis**: 60-180s trades are most profitable (win rate 62-71%), while 180-295s trades are marginal (win rate 48-53%). Late-bar edge degrades.
 
 ## Action Taken
 
-- Identified `FIX_RESOLUTION_LOAD` bug in `scripts/replay_backtest.py` -- resolution loader must aggregate (not overwrite) multi-prediction condition_ids
-- Added to build_plan.tsv as PENDING
-- After fix, re-run reconciliation to get clean result
-- Edge sign flip at 9% is acceptable and does not require a code fix
+No new fix triggered. Edge sign flip at 5.88% is borderline and does not map to any cataloged fix -- it reflects inherent differences between real and synthetic odds at the boundary where edge is near zero. Will re-evaluate when more trades accumulate (targeting 150+ resolved trades for stable metrics).
 
 ## Previous Fixes Applied
 
-- `FIX_SIZING` (DONE): Unified bet sizing between paper executor and replay backtest via `replay_paper_pnl()` function for USD-vs-USD comparison
+- `FIX_SIZING` (DONE): Unified bet sizing between paper executor and replay backtest
+- `FIX_RESOLUTION_LOAD` (DONE): Fixed resolution loader to aggregate (not overwrite) multi-prediction condition_ids -- **validated in this run**

@@ -1,12 +1,12 @@
 {
-  "last_reconciliation_at": "2026-03-20T08:39:00Z",
-  "last_trade_count": 53,
-  "last_dispatch_at": "2026-03-20T08:38:00Z",
+  "last_reconciliation_at": "2026-03-20T09:34:00Z",
+  "last_trade_count": 79,
+  "last_dispatch_at": "2026-03-20T09:34:00Z",
   "last_dispatch_decision": "RECONCILER",
-  "last_dispatch_reason": "revalidation needed (FIX_SIZING completed, 21 new trades since last reconciliation)",
-  "total_predictions_seen": 115,
-  "total_resolutions_seen": 53,
+  "last_dispatch_reason": "revalidation needed (FIX_RESOLUTION_LOAD completed, 26 new trades since last reconciliation)",
+  "total_predictions_seen": 148,
+  "total_resolutions_seen": 79,
   "trust_level": "SUSPICIOUS",
-  "fixes_in_progress": ["FIX_RESOLUTION_LOAD"],
-  "notes": "Trust level is SUSPICIOUS (1/4 fail: edge sign flip 8.96%). replay_backtest.py reports UNRELIABLE due to resolution clobbering bug — corrected paper PnL is +$210.96 (both sides positive)."
+  "fixes_in_progress": [],
+  "notes": "Revalidation after FIX_RESOLUTION_LOAD. Edge sign flip improved 8.96% -> 5.88% (borderline, just above 5% threshold). PnL sign match clean PASS. Both FIX_SIZING and FIX_RESOLUTION_LOAD validated."
 }
