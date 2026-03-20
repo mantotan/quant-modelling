@@ -1,0 +1,110 @@
+{
+  "model": "pulse",
+  "cached_features": [
+    "rsi_14", "rsi_7", "stoch_k", "macd_histogram", "williams_r",
+    "roc_5", "realized_vol_10", "vol_ratio", "parkinson_vol_10",
+    "bar_position", "body_ratio", "return_5", "volume_sma_10",
+    "hour_sin", "hour_cos",
+    "regime_vol_state", "regime_vol_zscore", "regime_trend_state",
+    "liquidation_proximity", "oi_price_divergence", "oi_momentum", "leverage_proxy"
+  ],
+  "alpha_features": {
+    "funding": [
+      "funding_rate", "funding_rate_sma3", "funding_rate_pctile",
+      "funding_rate_direction", "funding_cumulative_24h", "funding_hours_since"
+    ],
+    "liquidation": [
+      "liquidation_proximity", "oi_price_divergence", "oi_momentum", "leverage_proxy"
+    ],
+    "options_iv": [
+      "iv_atm", "iv_skew", "iv_term_spread", "iv_change_1h", "iv_percentile_30d"
+    ],
+    "polymarket": [
+      "pm_bid_ask_spread", "pm_order_imbalance", "pm_trade_flow", "pm_mid_momentum"
+    ]
+  },
+  "interaction_features": {
+    "enabled": false,
+    "pairs": [
+      "funding_x_rsi", "funding_x_vol", "oi_div_x_momentum", "iv_skew_x_return",
+      "leverage_x_proximity", "regime_x_funding", "btc_lead_x_funding", "pm_imbalance_x_vol"
+    ]
+  },
+  "regime_params": {
+    "enabled": true,
+    "vol_window": 120,
+    "lookback_window": 120,
+    "low_percentile": 25.0,
+    "high_percentile": 75.0,
+    "crisis_percentile": 95.0,
+    "trend_window": 20
+  },
+  "objective": {
+    "primary": "brier",
+    "brier_threshold": 0.20,
+    "brier_penalty_weight": 10.0,
+    "min_trades": 50,
+    "trade_penalty_weight": 5.0,
+    "max_drawdown_threshold": 0.30,
+    "drawdown_penalty_weight": 5.0
+  },
+  "feature_selection": {
+    "missing_threshold": 0.5,
+    "min_target_corr": 0.005,
+    "max_pairwise_corr": 0.90,
+    "min_features_fallback": 5,
+    "protected_prefixes": [
+      "funding_", "liquidation_", "leverage_", "oi_",
+      "regime_", "iv_", "pm_",
+      "funding_x_", "oi_div_x_", "iv_skew_x_",
+      "leverage_x_", "regime_x_", "btc_lead_x_", "pm_imbalance_x_"
+    ]
+  },
+  "time_pcts": [0.30, 0.50, 0.80],
+  "hpo_search_space": {
+    "n_estimators": [100, 1500],
+    "learning_rate": [0.005, 0.1],
+    "max_depth": [2, 6],
+    "num_leaves": [16, 128],
+    "min_child_samples": [100, 1000],
+    "subsample": [0.6, 0.9],
+    "colsample_bytree": [0.4, 0.8],
+    "reg_alpha": [1e-8, 10.0],
+    "reg_lambda": [1e-8, 10.0]
+  },
+  "walk_forward": {
+    "n_splits": 8,
+    "train_bars": 10000,
+    "test_bars": 2000,
+    "purge_period": 24,
+    "embargo_period": 6
+  },
+  "market_sim": {
+    "efficiency": 0.75
+  },
+  "backtest": {
+    "fee_bps": 0,
+    "spread": 0.02,
+    "min_edge": 0.01,
+    "impact_bps": 0,
+    "fixed_bet_usd": 100.0,
+    "max_trades_per_bar": 15,
+    "max_daily_trades": 500
+  },
+  "strategies": {
+    "single_side_sniper": {
+      "enabled": true,
+      "description": "single-side edge detection, maker limit orders",
+      "min_edge": 0.01,
+      "fixed_bet_usd": 100,
+      "max_trades_per_bar": 15
+    },
+    "both_sides_mm": {
+      "enabled": true,
+      "description": "trader_a-style: both-sides limit orders, high frequency",
+      "margin": 0.03,
+      "fixed_bet_usd": 100,
+      "max_trades_per_bar": 26
+    }
+  }
+}
