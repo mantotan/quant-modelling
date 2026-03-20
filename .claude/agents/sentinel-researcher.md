@@ -36,19 +36,20 @@ Read `autoresearch/phase.json` (if it exists).
 
 4. Read `autoresearch/audit.md` if it exists:
    - **RESET {hash}**: Run `git show {hash}:autoresearch/knobs.json` and write that content to `autoresearch/knobs.json`.
-   - **SWITCH {asset}**: Use that asset instead of the default for this run.
+   - **SWITCH {asset} [{timeframe}]**: Use that asset (and optionally timeframe) instead of the default for this run.
    - **ESCALATE {criteria}**: Adjust KEEP/DISCARD thresholds as specified.
    - **WIDEN**: Expand HPO search ranges in knobs.json.
 
 5. Update `autoresearch/researcher_ack.txt` with timestamps and current iteration number.
 
 ### TSV Schema Migration
-If `results.tsv` header has fewer than 17 tab-separated columns (old 12-column format):
-1. Rewrite the header line to the 17-column format (see Phase 7 for column names)
-2. For each existing data row, append `\t-\t-\t-\t-\t-` (5 dashes for the 5 new columns)
-3. Log: "Migrated results.tsv from {old_count} to 17 columns"
+If `results.tsv` header has fewer than 18 tab-separated columns (old format):
+1. Rewrite the header line to the 18-column format (see Phase 7 for column names), inserting `timeframe` as column 4.
+2. For each existing data row missing the `timeframe` column, insert `5m` after the `asset` column (column 3) — all pre-migration data was 5m.
+3. Pad any row with fewer than 18 columns with `\t-` until it reaches 18.
+4. Log: "Migrated results.tsv from {old_count} to 18 columns"
 
-Even if the header already has 17 columns, check each data row: if any row has fewer than 17 columns, pad it with `\t-` until it reaches 17. This handles rows written by an older researcher session.
+Even if the header already has 18 columns, check each data row: if any row has fewer than 18 columns, pad it with `\t-` until it reaches 18. This handles rows written by an older researcher session.
 
 ## Phase 2: Hypothesize
 
@@ -72,6 +73,7 @@ Priority chain — first match wins:
    d. If all categories tried recently → combine top 2 KEEP changes.
    e. If 5+ consecutive DISCARDs → random large perturbation (e.g., double reg_alpha range, halve learning_rate upper bound).
    f. If 15+ iterations on one asset → switch to the next (BTC→ETH→SOL→XRP→BTC).
+   f2. If 10+ iterations on one timeframe → switch to the next (5m→15m→1h→5m).
    g. Try reversing a previous DISCARD — context may have changed with other knobs.
 
 **You ALWAYS have something to try. NEVER say "out of ideas" or "waiting for human."**
@@ -91,25 +93,32 @@ Do NOT edit any Python source files.
 Execute training. Set Bash timeout to 480000 (8 minutes).
 
 ```bash
-uv run scripts/train_pulse_fast.py --asset BTC --timeframe 5m --trials 40 --timeout 420 --mode fast 2>autoresearch/last_run.log
+uv run scripts/train_pulse_fast.py --asset BTC --timeframe {tf} --trials 40 --timeout 420 --mode fast 2>autoresearch/last_run.log
 ```
+
+**Timeframe selection:** Cycle through `5m`, `15m`, `1h` across iterations. Check results.tsv for which timeframes have been least explored (fewest rows) and prioritize those. If a SWITCH directive specifies an asset, keep the current timeframe rotation. Default to `5m` if no rotation history exists.
 
 **Pulse-specific rules:**
 - Never remove tick features (indices 0-7) — they ARE the signal
-- Never set min_child_samples below 100 (dataset has 1 sample per bar at t=0.80 — knobs.json [0.30,0.50,0.80] only matches 0.80 in dataset)
+- Never set min_child_samples below 50 (dataset has 5 samples per bar across time_pcts [0.10, 0.20, 0.40, 0.60, 0.80])
 - Never change fee_bps, impact_bps, or market_sim.efficiency (maker-only, baked into dataset)
 - Never change the `strategies` section (read-only, evaluated in parallel)
-- Never change `backtest.fixed_bet_usd`, `backtest.max_trades_per_bar`, `backtest.max_daily_trades`, `backtest.min_edge` (execution params set from trader analysis)
+- Never change `backtest.fixed_bet_usd`, `backtest.max_daily_trades`, `backtest.min_edge` (execution params set from trader analysis)
+- Never change `trading.strategy` or `trading.confidence_threshold` without strategist recommendation
 - When toggling alpha feature groups, toggle the ENTIRE group (all funding features together, all liquidation together)
 - When disabling alpha features, also disable related interaction features that depend on them
 - Regime features toggle as a group (all 3 on or all 3 off)
 - Never change `objective.primary` without strategist recommendation — only tune weight parameters
-- **KNOWN ISSUES (2026-03-20):**
-  - time_pcts mismatch: dataset has [0.003..0.80], knobs.json requests [0.30,0.50,0.80], only 0.80 matches → single-snapshot model
+- Log per-bucket Brier in description when available (e.g., "b10=0.239, b40=0.215, b80=0.180")
+- **KNOWN ISSUES (2026-03-20, updated 2026-03-21):**
+  - time_pcts FIXED: model now trains on [0.10, 0.20, 0.40, 0.60, 0.80] (5 samples/bar)
+  - Calibration: TimeAwareCalibrator with per-time-bucket isotonic regression (backward compat with old pickles)
+  - Trading: BarEdgeAccumulator enforces one trade per bar (no side-flipping)
+  - Backtest: trade_selection param ("all", "best_edge", "first_confident") aligns with paper trading
   - Sharpe in results.tsv iters 1-39 was inflated ~100x (per-sample annualization bug, fixed from iter 40+)
   - CPCV results: ETH PBO=0.18 PASS, BTC PBO=0.96 FAIL, SOL PBO=0.64 FAIL (all OOS paths profitable)
 
-(Adjust `--asset` if a SWITCH directive is active.)
+(Adjust `--asset` if a SWITCH directive is active. Use the selected `{tf}` from the timeframe rotation above.)
 
 Parse JSON output between `===RESULTS_JSON===` and `===END_RESULTS===`.
 If markers are not found → this is a CRASH.
@@ -124,10 +133,10 @@ Extract from JSON output:
 
 If any key is missing from JSON, use `-` for that column in results.tsv.
 
-Find the best previous OOS Brier from results.tsv (lowest value among KEEP/KEEP-VERIFIED rows).
+Find the best previous OOS Brier from results.tsv **for the same asset+timeframe combination** (lowest value among KEEP/KEEP-VERIFIED rows matching current asset AND timeframe). If no previous rows exist for this asset+timeframe, treat as baseline.
 
 **KEEP** if ALL true:
-- `oos_brier` < best previous KEEP (or this is the baseline)
+- `oos_brier` < best previous KEEP for this asset+timeframe (or this is the baseline)
 - `oos_ece` < 0.05
 - `backtest_pnl` > 0 (relaxed for baseline: any value accepted)
 - `backtest_trades` >= 10 (prevent "1 lucky trade"; relaxed for baseline)
@@ -156,7 +165,7 @@ If `improvement > 0.02` (2% relative):
 1. Log the KEEP normally
 2. Immediately re-run with verify mode (Bash timeout 600000):
    ```bash
-   uv run scripts/train_pulse_fast.py --asset BTC --timeframe 5m --trials 100 --timeout 600 --mode verify 2>autoresearch/last_run.log
+   uv run scripts/train_pulse_fast.py --asset BTC --timeframe {tf} --trials 100 --timeout 600 --mode verify 2>autoresearch/last_run.log
    ```
 3. If verify Brier is ALSO better than pre-KEEP best → log as **KEEP-VERIFIED**
 4. If verify Brier regresses → copy `best_knobs.json` over `knobs.json`, log as **VERIFY-FAILED**
@@ -165,29 +174,35 @@ If `improvement > 0.02` (2% relative):
 
 **KEEP:**
 ```bash
+cp autoresearch/knobs.json autoresearch/best_knobs_{asset}_{tf}.json
 cp autoresearch/knobs.json autoresearch/best_knobs.json
-git add autoresearch/knobs.json autoresearch/best_knobs.json autoresearch/results.tsv autoresearch/last_run.log autoresearch/researcher_ack.txt
-git commit -m "autoresearch: KEEP — {description}"
+git add autoresearch/knobs.json autoresearch/best_knobs.json autoresearch/best_knobs_{asset}_{tf}.json autoresearch/results.tsv autoresearch/last_run.log autoresearch/researcher_ack.txt
+git commit -m "autoresearch: KEEP — {description} [{asset}/{tf}]"
 ```
 
 **DISCARD:**
 ```bash
-cp autoresearch/best_knobs.json autoresearch/knobs.json
+# Restore from the asset+timeframe-specific best if it exists, otherwise global best
+if [ -f autoresearch/best_knobs_{asset}_{tf}.json ]; then
+  cp autoresearch/best_knobs_{asset}_{tf}.json autoresearch/knobs.json
+else
+  cp autoresearch/best_knobs.json autoresearch/knobs.json
+fi
 git add autoresearch/knobs.json autoresearch/results.tsv autoresearch/last_run.log autoresearch/researcher_ack.txt
-git commit -m "autoresearch: DISCARD — {description}"
+git commit -m "autoresearch: DISCARD — {description} [{asset}/{tf}]"
 ```
 
 **CRASH:**
-Same as DISCARD, but commit message: `"autoresearch: CRASH — {reason}"`
+Same as DISCARD, but commit message: `"autoresearch: CRASH — {reason} [{asset}/{tf}]"`
 
 ## Phase 7: Log Results
 
-Append one row to `autoresearch/results.tsv` (17 tab-separated columns):
+Append one row to `autoresearch/results.tsv` (18 tab-separated columns):
 ```
-{iteration}\t{timestamp}\t{asset}\t{status}\t{oos_brier}\t{oos_ece}\t{backtest_pnl}\t{backtest_sharpe}\t{description}\t{commit_hash}\t{bs_pnl}\t{bs_sharpe}\t{backtest_max_dd}\t{backtest_trades}\t{backtest_win_rate}\t{oos_accuracy}\t{hpo_objective}
+{iteration}\t{timestamp}\t{asset}\t{timeframe}\t{status}\t{oos_brier}\t{oos_ece}\t{backtest_pnl}\t{backtest_sharpe}\t{description}\t{commit_hash}\t{bs_pnl}\t{bs_sharpe}\t{backtest_max_dd}\t{backtest_trades}\t{backtest_win_rate}\t{oos_accuracy}\t{hpo_objective}
 ```
 
-Columns 1-12: same as before. New columns 13-17:
+Column 4 is `timeframe` (`5m`, `15m`, or `1h`). Columns 1-3: same as before. Columns 5-13: shifted by 1. New columns 14-18:
 - `backtest_max_dd` — max drawdown in normalized dollars
 - `backtest_trades` — number of trades in OOS backtest
 - `backtest_win_rate` — fraction of profitable trades
@@ -198,10 +213,12 @@ Use `-` for any missing value (CRASH rows, missing JSON keys, `bs_pnl`, `bs_shar
 
 Status values: KEEP, DISCARD, CRASH, KEEP-VERIFIED, VERIFY-FAILED
 
+**Column order:** iteration, timestamp, asset, timeframe, status, oos_brier, oos_ece, backtest_pnl, backtest_sharpe, description, commit_hash, bs_pnl, bs_sharpe, backtest_max_dd, backtest_trades, backtest_win_rate, oos_accuracy, hpo_objective
+
 ## Output Format
 
 ```
-## Iteration N
+## Iteration N [{asset}/{tf}]
 **Directive:** [strategist priority #N / auditor SWITCH ETH / autonomous]
 **Hypothesis:** [what you changed and why]
 **Result:** brier={X}, ece={X}, pnl=${X}, sharpe={X}, max_dd=${X}, trades={N}, win_rate={X%}, accuracy={X%}

@@ -12,6 +12,7 @@ You are a tactical ML research strategist. You analyze the experiment history of
 - Dataset time_pcts [0.003..0.80] don't include 0.30/0.50 from knobs.json — only 0.80 matches. Model is single-snapshot.
 - Sharpe in results.tsv iters 1-39 was inflated ~100x (per-sample annualization). Fixed from iter 40+. Do not compare pre/post Sharpe.
 - CPCV results: ETH PBO=0.18 PASS, BTC PBO=0.96 FAIL (regime IS-OOS seesaw), SOL PBO=0.64 FAIL.
+- **Timeframes:** Research covers 5m, 15m, and 1h. Track KEEP rates per timeframe separately. Recommend timeframe rotation if one is under-explored.
 
 **Pulse knob categories** (use these when grouping experiments):
 - Feature selection (`cached_features` — which of 15 historical features to include)
@@ -52,6 +53,7 @@ Group each row by knob category based on its description:
 - Regularization (reg_alpha, reg_lambda, min_split_gain, min_child_samples bounds)
 - Walk-forward (n_splits, purge_period, embargo_period)
 - Backtest tuning (min_edge, kelly_fraction, spread, fee_bps)
+- Trading strategy (trading.strategy, trading.confidence_threshold)
 - Verification runs (mode=verify)
 
 **b. Compute KEEP rate per category:**
@@ -69,7 +71,7 @@ Are optimal hyperparameters clustering in narrow ranges? If learning_rate best i
 Did the researcher follow your last priority queue? If it deviated, note why (it may have had a good reason from the auditor).
 
 **e2. Risk profile analysis:**
-Track across KEEP rows (columns 13-15 in results.tsv):
+Track across KEEP rows (columns 14-16 in results.tsv; column 4 is timeframe):
 - `backtest_max_dd` trend: is drawdown growing while PnL stagnates?
 - `backtest_max_dd / backtest_pnl` ratio: should be < 1.0 and stable
 - `backtest_trades` range: sudden drops = model too conservative, sudden spikes = trading noise
@@ -77,7 +79,7 @@ Track across KEEP rows (columns 13-15 in results.tsv):
 - Skip rows where these columns are `-` (pre-migration data)
 
 **e3. HPO-OOS gap:**
-Compare `hpo_objective` (column 17) vs `oos_brier` (column 5) across iterations.
+Compare `hpo_objective` (column 18) vs `oos_brier` (column 6) across iterations.
 NOTE: `hpo_objective` is a composite value (brier + trade_penalty). When primary="brier" and trade count is sufficient, hpo_objective ≈ brier. A widening gap suggests overfitting or trade penalty instability.
 Skip rows where hpo_objective is `-`.
 
@@ -123,6 +125,12 @@ After iteration: {N}
 - Win rate range across KEEPs: {min%}-{max%}
 - HPO-OOS gap: {latest delta}, trend: {stable/widening/narrowing}
 
+## Timeframe Coverage
+- 5m: {N} iterations, {N} KEEPs, best Brier={X}
+- 15m: {N} iterations, {N} KEEPs, best Brier={X}
+- 1h: {N} iterations, {N} KEEPs, best Brier={X}
+- Recommendation: {rotate to X / balanced / focus on X}
+
 ## Blacklist
 - {specific change that consistently fails — include iteration numbers}
 
@@ -146,4 +154,5 @@ git commit -m "strategist: update after iteration {N}"
 - Prioritize by expected value: `KEEP_rate * average_improvement_when_KEEP`.
 - If there are fewer than 5 experiments, provide generic guidance based on ML best practices.
 - When `bs_pnl`/`bs_sharpe` columns are present in results.tsv (columns 11-12, after commit), compare single-side vs both-sides strategy performance across iterations. Note if one strategy consistently dominates.
-- When new columns (13-17) contain `-`, skip those rows in trend analysis rather than treating as zero.
+- When new columns (14-18) contain `-`, skip those rows in trend analysis rather than treating as zero.
+- Column 4 is `timeframe` — group KEEP rate analysis per asset+timeframe. Pre-migration rows without a timeframe column are `5m`.

@@ -37,10 +37,12 @@ You are the reconciliation agent for the QM trading system. Your job is to ensur
 For each asset with paper trade data:
 
 ```bash
-uv run scripts/replay_backtest.py --asset {ASSET} --timeframe 5m
+uv run scripts/replay_backtest.py --asset {ASSET} --timeframe {tf}
 ```
 
-Read the output report: `data/reconciliation/{ASSET}_5m/report_*.json` (most recent).
+Run for each timeframe that has paper trade data (`5m`, `15m`, `1h`). Check `data/paper_trades/{ASSET}_{tf}/` for existence before running.
+
+Read the output report: `data/reconciliation/{ASSET}_{tf}/report_*.json` (most recent for each asset+timeframe).
 
 ## Phase 2: Classify Divergences
 
@@ -70,6 +72,11 @@ If trust is SUSPICIOUS or UNRELIABLE, identify the **top fixable divergence** fr
 | `FIX_SIZING` | Bet size ratio < 0.5 | Unify bet sizing in both paths |
 | `FIX_EFFICIENCY` | Market odds MAE > 0.03 | Recompute optimal efficiency param |
 | `ESCALATE_ODDS` | Market odds MAE > 0.08 after FIX_EFFICIENCY | Retrain with real Polymarket odds |
+
+**Post-Phase-2 checks (added 2026-03-21):**
+- Trades per bar: should be exactly 1 (BarEdgeAccumulator enforces). If >1, accumulator is bypassed.
+- Side-flip rate: should be 0%. If >0%, accumulator is not working correctly.
+- Both checks use paper trade JSONL: group by condition_id, count fills per group, check sides.
 
 For fixable issues:
 
