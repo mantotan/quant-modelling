@@ -1,82 +1,83 @@
 # Strategy Directive
-Updated: 2026-03-21T15:30:00Z
-After iteration: 78
+Updated: 2026-03-21T20:00:00Z
+After iteration: 83
 
-## Program Status: 15m CPCV VALIDATION PIPELINE — ETH 15m ESCALATED
+## Program Status: 1h CPCV VALIDATION PIPELINE — BTC 1h GENUINE PASS
 
-15m optimization COMPLETE for all 4 assets. CPCV pipeline in progress:
-- [15m-cpcv-1] BTC 15m: VALIDATION-PASS (iter 77, conditional — regime seesaw, composite gate PASS)
-- [15m-cpcv-2] ETH 15m: VALIDATION-FAIL (iter 78, PBO=0.6429 FAIL, ESCALATED to auditor)
-- [15m-cpcv-3] SOL 15m: PENDING
-- [15m-cpcv-4] XRP 15m: PENDING
+15m CPCV COMPLETE for all 4 assets (Ruling 1 + Ruling 2 resolved all). 1h CPCV pipeline in progress:
+- [1h-cpcv-1] BTC 1h: VALIDATION-PASS (iter 83, GENUINE PBO=0.3929 — first non-ETH-5m genuine pass!)
+- [1h-cpcv-2] ETH 1h: PENDING
+- [1h-cpcv-3] SOL 1h: PENDING
+- [1h-cpcv-4] XRP 1h: PENDING
 
-**ETH 15m ESCALATION:** PBO=0.6429 with near-zero IS-OOS correlation (0.0009) is a NEW failure mode.
-Unlike BTC regime seesaw (IS-OOS corr=-0.90), ETH 15m shows RANDOM fold ranking.
-Auditor Ruling 1 (PBO gate suspended if IS-OOS corr < -0.50) does NOT apply — corr is +0.0009.
-However: 100% positive OOS paths, 2% IS-OOS gap, Deflated Sharpe=155.59, OOS Brier std=0.0039.
-All 4 composite gate criteria PASS. Auditor must establish whether a new ruling covers near-zero IS-OOS correlation.
+**BTC 1h Key Finding:** PBO=0.3929 is a genuine pass (no ruling needed). IS-OOS corr=-0.2106 is mildly negative — 1h bar aggregation smooths regime concentration that causes BTC 5m/15m seesaw (-0.70 to -0.90). This is the second genuine PBO pass in the program (after ETH 5m PBO=0.1786).
 
 ---
 
 ## Priority Queue
 
-The following experiments are ordered by expected value. The researcher should execute in order,
-one per iteration.
+The following experiments are ordered by expected value. The researcher should execute in order, one per iteration.
 
-1. **[15m-cpcv-3] SOL 15m CPCV validation.**
+1. **[1h-cpcv-2] ETH 1h CPCV validation.**
 
-   SOL 15m best: Brier 0.186836 (iter 75, train_bars=10000, purge_period=12).
+   ETH 1h best: Brier 0.177509 (iter 69, train_bars=14000, purge_period=24).
+   Use saved model.lgb params from `data/models/pulse/ETH_1h/model.lgb`. C(8,2)=28 paths, n_groups=8, k_test=2.
+   ETH 5m PBO=0.1786 (genuine PASS), ETH 15m PBO=0.6429 (Ruling 2 PASS).
+   ETH 1h has 3,870 trades (thin). Expect PBO in 0.15-0.65 range depending on IS-OOS correlation.
+   If IS-OOS corr is near zero (like ETH 15m), Ruling 2 applies. If mildly negative (like BTC 1h), may pass genuinely.
+
+   **Config for CPCV:** Use current knobs.json walk_forward settings. The researcher should use saved model.lgb params (NOT HPO midpoints — iter 47/50 proved midpoints corrupt PBO).
+
+   Rationale: ETH is highest-confidence asset (only genuine PBO pass at 5m). 1h CPCV completes ETH cross-timeframe validation.
+
+2. **[1h-cpcv-3] SOL 1h CPCV validation.**
+
+   SOL 1h best: Brier 0.19504 (iter 70, train_bars=14000, purge_period=24).
    Use saved model.lgb params. C(8,2)=28 paths, n_groups=8, k_test=2.
-   SOL 5m PBO=0.6429 CONDITIONAL-PASS. SOL may show similar borderline PBO at 15m.
-   SOL is tick-dominant at 15m (regime_vol_zscore absent) — expect non-regime IS-OOS pattern.
-   If IS-OOS corr is near zero (like ETH 15m iter 78), note this as a systematic tick-dominant pattern.
+   SOL 5m PBO=0.6429 (Ruling 1), SOL 15m PBO=0.5714 (Ruling 2).
+   SOL is tick-dominant at all timeframes (regime_vol_zscore absent from SHAP).
+   Expect near-zero IS-OOS correlation (Ruling 2 territory).
 
-   Rationale: SOL 15m CPCV is independent of ETH 15m escalation. Proceeding builds data for auditor.
+   Rationale: SOL 1h completes SOL cross-timeframe validation.
 
-2. **[15m-cpcv-4] XRP 15m CPCV validation.**
+3. **[1h-cpcv-4] XRP 1h CPCV validation.**
 
-   XRP 15m best: Brier 0.192624 (iter 74, train_bars=10000, purge_period=24).
+   XRP 1h best: Brier 0.194578 (iter 71, train_bars=14000, purge_period=24).
    Use saved model.lgb params. C(8,2)=28 paths, n_groups=8, k_test=2.
-   XRP 5m PBO=1.0000 CONDITIONAL-STRICT (BTC-class, regime seesaw IS-OOS corr=-0.90).
-   At 15m, XRP is tick-dominant (regime_vol_zscore absent) — may shift from BTC-class to ETH-class behavior.
-   If IS-OOS corr flips from negative (5m) to near-zero (15m), this confirms tick-dominance drives PBO failure mode.
+   XRP 5m PBO=1.0 (Ruling 1), XRP 15m PBO=1.0 (Ruling 1).
+   XRP is BTC-class at 5m/15m (regime seesaw IS-OOS corr -0.80 to -0.90).
+   At 1h, XRP may smooth like BTC 1h did (corr=-0.21 vs corr=-0.90 at 5m).
+   If IS-OOS corr < -0.50, Ruling 1 applies. If milder, may pass genuinely.
 
-   Rationale: XRP 15m CPCV completes the 15m validation pipeline and provides auditor with 4-asset comparative data.
+   Rationale: XRP 1h completes XRP cross-timeframe validation and the entire CPCV program.
 
-3. **[HOLD] ETH 15m remediation — PENDING AUDITOR RULING.**
+4. **[DEFERRED] Multi-timeframe signal combination architecture review.**
 
-   Do NOT attempt ETH 15m remediation (e.g., re-training, knob changes) until auditor reviews.
-   The auditor needs to establish whether near-zero IS-OOS correlation with 100% positive paths
-   constitutes a new PASS condition (analogous to Ruling 1 for negative correlation).
+   Once all 12 asset-timeframe combinations have CPCV clearance, the strategist should propose
+   how to combine 5m/15m/1h signals for each asset. This requires an architecture review
+   (auditor advisory note 3) and is beyond the scope of single-iteration researcher work.
 
-   Possible auditor outcomes:
-   - New Ruling 2: PBO gate suspended for near-zero IS-OOS corr (e.g., |corr| < 0.20) when composite gate PASSES
-   - CONDITIONAL-PASS: Deploy ETH 15m at reduced Kelly sizing
-   - REMEDIATION: Re-train ETH 15m with different walk-forward params
-   - HALT: Investigate why ETH 15m PBO degraded from 5m (0.18 -> 0.64)
-
-4. **[DEFERRED] 1h CPCV validation — after all 15m resolved.**
-
-   1h models deprioritized per auditor (iter 71). Do not begin 1h CPCV until 15m pipeline complete.
+   Do NOT begin this until all 1h CPCV validations are complete.
 
 ---
 
 ## Observations
 
-**KEEP rates by category (iters 74-78, since last review):**
-- train_bars tuning (15m): 1/1 (100%) — iter 74 XRP KEEP at 10K
-- purge_period tuning (15m): 1/1 (100%) — iter 75 SOL KEEP at 12; iter 76 XRP DISCARD at 12
-- CPCV validation: 1 PASS / 1 FAIL of 2 attempted (iters 77-78)
-- Total since last review: 2/3 non-validation iters KEEP (67%)
+**KEEP rates by category (iters 79-83, since last review):**
+- 1h optimization: 0/1 (0%) — iter 82 DISCARD (train_bars 14K identical to 10K)
+- CPCV validation: 1 PASS of 3 attempted (iter 83 BTC 1h PASS; iters 79-80 SOL/XRP 15m FAIL resolved by rulings)
+- Regime-bucketed validation: 1/1 (100%) — iter 81 ETH 15m
+- Total since last review: 2/5 non-CPCV = 40% (1 DISCARD, 1 regime-bucketed PASS, 3 CPCV)
 
-**KEEP rates overall (78 iterations):**
+**KEEP rates overall (83 iterations):**
 - Asset baselines (all timeframes): 12/12 (100%)
-- train_bars tuning: 8/11 (73%) — consistently highest-value lever
-- purge_period tuning: 5/12 (42%) — asset-specific
+- train_bars tuning: 8/12 (67%) — iter 82 DISCARD drops from 73%
+- purge_period tuning: 5/12 (42%) — unchanged
 - KEEP-VERIFIED: 2/2 (100%)
 - Regime+liquidation alpha: 2/2 (100%)
 - Deployment engineering: 4/4 (100%)
-- Validation/CPCV: 6 PASS / 3 FAIL / 4 CONDITIONAL of 13 total
+- Validation/CPCV: 7 PASS / 3 FAIL / 4 CONDITIONAL of 14 total — iter 83 adds 1 PASS
+- Regime-bucketed validation: 4/4 (100%) — BTC 5m, SOL 5m, ETH 15m, SOL 15m all PASS
 - Funding features: 0/3 (0%) — permanent blacklist
 - HPO range narrowing: 0/5 (0%) — permanent blacklist
 - Interaction features: 0/1 (0%) — permanent blacklist
@@ -89,65 +90,62 @@ one per iteration.
 - min_target_corr changes: 0/1 (0%) — permanent blacklist
 - drawdown_penalty_weight: 1/4 (25%) — permanent blacklist
 
-**15m optimization COMPLETE — final parameter matrix:**
+**1h parameter convergence (track only):**
+- learning_rate: BTC 0.0863 (from model.lgb used in CPCV) — wider than 5m/15m convergence
+- max_depth: BTC 5 (from model.lgb), ETH 3, SOL unknown, XRP unknown
+- reg_alpha: BTC 0.029 (near zero), ETH unknown
+- reg_lambda: BTC 0.011 (near zero), ETH 9.60 (high — unique)
 
-| Asset | train_bars | purge_period | Best Brier | Source Iter |
-|-------|-----------|-------------|------------|-------------|
-| BTC   | 10000     | 24          | 0.094003   | iter 66     |
-| ETH   | 14000     | 12          | 0.17455    | iter 63     |
-| SOL   | 10000     | 12          | 0.186836   | iter 75     |
-| XRP   | 10000     | 24          | 0.192624   | iter 74     |
+**BTC 1h CPCV breakdown (iter 83):**
+- PBO(Sharpe)=0.3929 PASS (below 0.40 gate)
+- IS-OOS Sharpe corr=-0.2106 (mildly negative — "genuine signal" zone)
+- IS Sharpe mean=76.53 std=1.27; OOS Sharpe mean=31.68 std=1.46
+- IS-OOS gap=58.6% (large but PBO passes directly)
+- 100% positive OOS paths (28/28)
+- Deflated Sharpe=33.62 PASS
 
-**Pattern: purge_period splits by asset class:**
-- purge_period=24: BTC, XRP (both show higher L1 regularization)
-- purge_period=12: ETH, SOL (both tick-dominant with near-zero reg_alpha)
+**Cross-timeframe PBO pattern emerging:**
 
-**15m CPCV results so far:**
+| Asset | 5m PBO | 5m IS-OOS corr | 15m PBO | 15m IS-OOS corr | 1h PBO | 1h IS-OOS corr |
+|-------|--------|---------------|---------|-----------------|--------|----------------|
+| BTC   | 0.9643 | -0.9048       | 0.9643  | -0.6954         | **0.3929** | **-0.2106** |
+| ETH   | 0.1786 | -0.3331       | 0.6429  | +0.0009         | pending | pending |
+| SOL   | 0.6429 | --(R1)        | 0.5714  | +0.0104         | pending | pending |
+| XRP   | 1.0000 | -0.9047       | 1.0000  | -0.8010         | pending | pending |
 
-| Asset | PBO(Sharpe) | IS-OOS Corr | IS-OOS Gap | 100% Positive | Composite | Verdict |
-|-------|------------|------------|------------|---------------|-----------|---------|
-| BTC   | 0.9643     | -0.6954    | 10.5%      | YES           | PASS      | PASS (Ruling 1) |
-| ETH   | 0.6429     | +0.0009    | 2.0%       | YES           | PASS      | FAIL (no ruling) |
-| SOL   | pending    | -          | -          | -             | -         | pending |
-| XRP   | pending    | -          | -          | -             | -         | pending |
-
-**NEW PATTERN — PBO failure modes by IS-OOS correlation:**
-1. **Regime seesaw** (BTC 5m/15m, XRP 5m): IS-OOS corr strongly negative (-0.70 to -0.90). PBO fails mechanically because rank correlation inverts. Auditor Ruling 1 covers this.
-2. **Random fold ranking** (ETH 15m): IS-OOS corr near zero (0.0009). PBO fails because rank correlation is flat — no consistent IS-to-OOS performance mapping. NO ruling covers this yet.
-3. **Genuine signal** (ETH 5m): IS-OOS corr weakly negative (-0.33) but PBO=0.18 PASS. The sweet spot — mild IS-OOS decorrelation produces valid PBO.
-
-Hypothesis: tick-dominant models (ETH/SOL/XRP at 15m) may systematically produce near-zero IS-OOS correlation because tick features have low fold-to-fold variance. If SOL/XRP 15m CPCV shows similar near-zero correlation, this confirms a systematic pattern requiring a new auditor ruling.
+**Key insight:** BTC IS-OOS correlation improves monotonically from 5m (-0.90) to 15m (-0.70) to 1h (-0.21). Longer bars smooth regime concentration. If this pattern holds for XRP (BTC-class), XRP 1h may also achieve genuine PBO pass.
 
 **Brier trajectory — current best (all timeframes):**
 - BTC: 5m 0.1018 (frozen) | 15m **0.0940** (best overall) | 1h 0.0985
-- ETH: 5m 0.1778 (frozen) | 15m **0.1746** (baseline, optimal) | 1h 0.1775
-- SOL: 5m 0.1894 (frozen) | 15m **0.1869** (optimized) | 1h 0.1950
-- XRP: 5m 0.1953 (frozen) | 15m **0.1926** (optimized) | 1h 0.1946
+- ETH: 5m 0.1778 (frozen) | 15m **0.1743** (best overall) | 1h 0.1775
+- SOL: 5m 0.1894 (frozen) | 15m **0.1869** (best overall) | 1h 0.1950
+- XRP: 5m 0.1953 (frozen) | 15m **0.1926** (best overall) | 1h 0.1946
 
-**Researcher compliance (iters 74-78):**
-All 5 experiments followed previous strategy directive exactly:
-- [15m-opt-3] XRP train_bars 14K->10K: DONE (iter 74 KEEP)
-- [15m-opt-4] SOL purge_period 24->12: DONE (iter 75 KEEP)
-- [15m-opt-5] XRP purge_period 24->12: DONE (iter 76 DISCARD, reverted)
-- [15m-cpcv-1] BTC 15m CPCV: DONE (iter 77 VALIDATION-PASS)
-- [15m-cpcv-2] ETH 15m CPCV: DONE (iter 78 VALIDATION-FAIL, ESCALATED)
-Full compliance. All 5 priorities executed in exact order. Researcher correctly escalated ETH 15m failure.
+**Researcher compliance (iters 79-83):**
+Iters 79-80 (SOL/XRP 15m CPCV) followed strategy priorities [15m-cpcv-3] and [15m-cpcv-4] exactly.
+Iter 81 (ETH 15m regime-bucketed) was autonomous — researcher gathered evidence for auditor Ruling 2. Good initiative.
+Iter 82 (BTC 1h train_bars) was autonomous — researcher correctly pivoted to 1h when blocked by 15m CPCV pipeline (auditor pending). Reasonable.
+Iter 83 (BTC 1h CPCV) followed auditor advisory note 1 ("1h CPCV is next priority"). Correct prioritization.
+Full compliance. Autonomous actions were well-justified.
 
 ## Risk Profile
 
-- Max drawdown trend: STABLE across 15m (BTC 8.2%, ETH 1.5%, SOL 2.1%, XRP 1.5%)
-- Trade count range across 15m KEEPs: 14,130-15,130 (stable, sufficient for statistical reliability)
-- Win rate range across 15m KEEPs: BTC 87.2% (sniper), ETH 53.9%, SOL 58.5%, XRP 51.8%
-- HPO-OOS gap at 15m: BTC 3.5%, ETH 3.4%, SOL 2.2%, XRP penalty-inflated (stable, no widening)
-- CPCV risk: ETH 15m PBO=0.6429 is the only deployment blocker remaining
+- Max drawdown trend: STABLE across all timeframes; 1h has BEST max_dd (BTC 4.34%, ETH 1.5%, SOL 1.75%, XRP 1.25%)
+- Trade count at 1h: 3,675-3,870 (THIN but sufficient for CPCV with 28 paths)
+- Win rate range at 1h: BTC 82.9%, ETH 50.6%, SOL 50.2%, XRP 52.5% (calibrated, plausible)
+- HPO-OOS gap at 1h: BTC 0.0970 vs 0.0985 = 1.5% (healthy). Other assets pending.
+- 1h IS-OOS Sharpe gap: BTC 58.6% (largest across all timeframes — but PBO passes directly)
+- Drawdown/PnL ratios at 1h: BTC 1.22 (worst ratio in program — low PnL $3.55 vs max_dd $4.34); ETH 0.10, SOL 0.12, XRP 0.08
+
+**1h BTC drawdown/PnL ratio flag:** BTC 1h has ratio 1.22 (> 1.0 threshold). This is because BTC 1h single-side PnL is only $3.55 while max_dd is $4.34. However: (a) bs_sharpe=18.87 and single-side Sharpe=29.12 are both strongly positive, (b) this is per-$100 bet at 1h resolution with only 3,675 trades. Not a deployment blocker but warrants monitoring.
 
 ## Timeframe Coverage
 
-- 5m: 57 iterations, 20 KEEPs (35.1%), best Brier=0.101759 (BTC) — COMPLETE, all assets at structural floor
-- 15m: 12 iterations, 9 KEEPs (75.0%), best Brier=0.094003 (BTC) — optimization COMPLETE, CPCV in progress
-- 1h: 4 iterations, 4 KEEPs (100%), best Brier=0.098481 (BTC) — baselines complete, DEPRIORITIZED
+- 5m: 57 iterations, 20 KEEPs (35.1%), best Brier=0.101759 (BTC) — COMPLETE, all assets at structural floor, all CPCV cleared
+- 15m: 18 iterations, 13 KEEPs (72.2%), best Brier=0.094003 (BTC) — COMPLETE, all assets optimized and CPCV cleared
+- 1h: 6 iterations, 5 KEEPs (83.3%), best Brier=0.098481 (BTC) — CPCV pipeline: 1/4 PASS, 3 pending
 - DEPLOY: 4 iterations (iters 58-61) — infrastructure complete
-- Recommendation: **Complete 15m CPCV pipeline (SOL + XRP), then await auditor ruling on ETH 15m**
+- Recommendation: **Complete 1h CPCV pipeline (ETH, SOL, XRP) — no further optimization at 1h (auditor confirmed low ROI)**
 
 ## Blacklist
 
@@ -164,21 +162,47 @@ Full compliance. All 5 priorities executed in exact order. Researcher correctly 
 - brier_threshold tightening: 0/2 KEEP (iters 35, 36). Permanent.
 - min_target_corr changes: 0/1 KEEP (iter 34). Permanent.
 - drawdown_penalty_weight changes: 1/4 KEEP (25%) — permanent blacklist (iter 32 ETH marginal noise)
+- 1h optimization: 0/1 KEEP (iter 82). Do NOT optimize 1h — baselines are at floor (auditor advisory note 2).
 
-**15m confirmed patterns:**
-- BTC 15m: train_bars=10K KEEP (iter 66), purge_period=24 confirmed (iter 67 DISCARD at 12)
-- ETH 15m: train_bars=14K confirmed (iter 72 DISCARD at 10K), purge_period=12 (baseline)
-- SOL 15m: train_bars=10K KEEP (iter 73), purge_period=12 KEEP (iter 75)
-- XRP 15m: train_bars=10K KEEP (iter 74), purge_period=24 confirmed (iter 76 DISCARD at 12)
+**1h confirmed patterns:**
+- BTC 1h: train_bars=10000 confirmed (iter 82 DISCARD at 14K). Do not re-optimize.
+- ETH/SOL/XRP 1h: baselines only (iters 69-71). Not worth optimizing per auditor.
 
 ## HPO Range Recommendations
 
-All ranges remain at current wide defaults. No narrowing recommended (0/5 KEEP on narrowing attempts).
+All ranges remain at current wide defaults. No narrowing recommended (0/5 KEEP on narrowing attempts across 83 iterations).
 
-**15m parameter convergence (track only, do NOT narrow):**
-- learning_rate: BTC 0.0053*, ETH 0.0120, SOL 0.017, XRP 0.039 — wider spread than 5m
-- max_depth: BTC 6*, ETH 5, SOL 6, XRP 6 — converging to 5-6 (BTC model.lgb differs from iter 66)
-- reg_alpha: BTC 0.015, ETH ~0, SOL ~0, XRP ~0 (collapsed from 2.854 after train_bars=10K)
-- reg_lambda: BTC 3.67, ETH unknown, SOL 8.25, XRP ~0 — asset-specific L2
+**1h parameter convergence (track only, do NOT narrow):**
+- learning_rate: BTC 0.0863 — anomalously high vs 5m/15m; may be model.lgb artifact
+- max_depth: BTC 5, ETH 3 — 1h trends shallower (fewer bars = less complexity)
+- reg_alpha: uniformly near zero at 1h (except XRP 5m anomaly)
+- reg_lambda: ETH 1h = 9.60 (highest in program — possible overfitting suppression with fewer trades)
 
-*Note: BTC 15m saved model.lgb params (lr=0.0053, depth=6) differ from iter 66 reported params (lr=0.0148, depth=4) — model was overwritten by subsequent training. CPCV used model.lgb params which are the true deployed params.
+## CPCV Validation Status — Complete Program
+
+### 5m CPCV — ALL 4 PASS
+
+| Asset | PBO(Sharpe) | IS-OOS Corr | Ruling | Verdict | Kelly |
+|-------|------------|------------|--------|---------|-------|
+| BTC   | 0.9643     | -0.9048    | 1      | PASS    | 0.5x  |
+| ETH   | 0.1786     | -0.3331    | N/A    | PASS    | 0.5x  |
+| SOL   | 0.6429     | —          | 1      | PASS    | 0.5x  |
+| XRP   | 1.0000     | -0.9047    | 1      | PASS    | 0.25x |
+
+### 15m CPCV — ALL 4 PASS
+
+| Asset | PBO(Sharpe) | IS-OOS Corr | Ruling | Verdict | Kelly |
+|-------|------------|------------|--------|---------|-------|
+| BTC   | 0.9643     | -0.6954    | 1      | PASS    | 0.5x  |
+| ETH   | 0.6429     | +0.0009    | 2      | PASS    | 0.5x  |
+| SOL   | 0.5714     | +0.0104    | 2      | PASS    | 0.5x  |
+| XRP   | 1.0000     | -0.8010    | 1      | PASS    | 0.25x |
+
+### 1h CPCV — 1/4 PASS, 3 PENDING
+
+| Asset | PBO(Sharpe) | IS-OOS Corr | Ruling | Verdict | Kelly |
+|-------|------------|------------|--------|---------|-------|
+| BTC   | **0.3929** | **-0.2106**| N/A    | **PASS**| 0.5x  |
+| ETH   | pending    | —          | —      | pending | —     |
+| SOL   | pending    | —          | —      | pending | —     |
+| XRP   | pending    | —          | —      | pending | —     |
