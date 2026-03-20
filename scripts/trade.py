@@ -44,7 +44,7 @@ from qm.execution.paper.trade_logger import PaperTradeLogger
 from qm.model.calibration.calibrator import TimeAwareCalibrator
 from qm.strategy.bar_accumulator import BarEdgeAccumulator
 from qm.execution.polymarket.market_scanner import MarketScanner
-from qm.features.live_cache import RUST_AVAILABLE, get_feature_calculator
+from qm.features.live_cache import RUST_AVAILABLE, LiveFeatureCache
 from qm.features.pipeline import FeaturePipeline
 from qm.model.calibration.calibrator import IsotonicCalibrator
 from qm.model.signals import SignalGenerator
@@ -125,7 +125,7 @@ def load_model(model_dir: Path, asset: str, tf: str):
 def warm_up(
     asset: Asset,
     tf: Timeframe,
-    feature_calc,
+    live_cache: LiveFeatureCache,
     bar_builder: BarBuilder,
 ) -> None:
     """Load historical bars and populate the feature cache.
@@ -153,10 +153,7 @@ def warm_up(
         if val is not None:
             cache_dict[name] = float(val)
 
-    if RUST_AVAILABLE:
-        feature_calc.update_cache(asset.value, cache_dict)
-    else:
-        feature_calc.update_cache(asset, cache_dict)
+    live_cache.update_history(cache_dict)
 
     logger.info(
         "Warm-up: cached %d features from %d bars for %s",
@@ -395,19 +392,21 @@ async def main_loop(args: argparse.Namespace) -> None:
     model_dir = Path(args.model_dir)
     model, calibrator = load_model(model_dir, args.asset, args.timeframe)
 
-    # ── Feature calculator (Rust or Python) ─────────────────────
-    feature_calc = get_feature_calculator()
+    # ── Feature calculator (Rust or Python, reordered to model) ─
+    model_subdir = model_dir / f"{args.asset}_{args.timeframe}"
+    live_cache = LiveFeatureCache.from_model_dir(
+        model_dir=model_subdir, asset=asset, timeframe=tf,
+    )
     logger.info(
-        "Feature calculator: %s (%d features)",
-        "Rust" if RUST_AVAILABLE else "Python",
-        feature_calc.n_features() if RUST_AVAILABLE else feature_calc.n_features,
+        "Feature cache: %s (%d model features)",
+        "Rust" if RUST_AVAILABLE else "Python", live_cache.n_features,
     )
 
     # ── Build BarBuilder for tick aggregation ───────────────────
     bar_builder = BarBuilder(assets=[asset], timeframes=[tf])
 
     # ── Warm-up: populate feature cache ─────────────────────────
-    warm_up(asset, tf, feature_calc, bar_builder)
+    warm_up(asset, tf, live_cache, bar_builder)
 
     # ── Instantiate trading components ──────────────────────────
     bankroll = Bankroll(initial=args.bankroll)
@@ -594,18 +593,9 @@ async def main_loop(args: argparse.Namespace) -> None:
                     volume=market.volume,
                 )
 
-            # Compute features (Rust or Python)
+            # Compute features (reordered to model's expected order)
             t0 = time.perf_counter_ns()
-            if RUST_AVAILABLE:
-                features = np.array(feature_calc.compute(
-                    asset.value,
-                    partial.open, partial.high_so_far,
-                    partial.low_so_far, partial.current_price,
-                    partial.volume_so_far, partial.trade_count,
-                    partial.elapsed_seconds, partial.remaining_seconds,
-                ))
-            else:
-                features = feature_calc.compute(partial)
+            features = live_cache.get_features(partial)
 
             # Model prediction
             prob_up = model.predict(features.reshape(1, -1))[0]

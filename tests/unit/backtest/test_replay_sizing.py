@@ -28,6 +28,7 @@ def _make_replay_arrays(
     target: float = 1.0,
 ) -> dict[str, np.ndarray]:
     """Create replay arrays simulating paper trade data."""
+    side = "UP" if model_prob > market_prob else "DOWN"
     return {
         "model_probs": np.full(n, model_prob),
         "market_probs": np.full(n, market_prob),
@@ -39,6 +40,7 @@ def _make_replay_arrays(
         "fill_prices": np.full(n, fill_price),
         "sizes": np.full(n, size_usd),
         "spreads": np.full(n, spread),
+        "signal_sides": [side] * n,
     }
 
 

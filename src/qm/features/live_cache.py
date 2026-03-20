@@ -263,6 +263,12 @@ class LiveFeatureCache:
 
         # Feature calculator (Rust or Python)
         self._calculator = get_feature_calculator()
+        self._is_rust = RUST_AVAILABLE and not isinstance(
+            self._calculator,
+            __import__(
+                "qm.features.intrabar", fromlist=["IntraBarFeatureCalculator"]
+            ).IntraBarFeatureCalculator,
+        )
 
         # Build reorder map: calculator output -> model expected order
         # Handle both property (Python) and method (Rust) interfaces
@@ -348,23 +354,20 @@ class LiveFeatureCache:
         Called once per bar completion with Sentinel pipeline output.
         Thread-safe (IntraBarFeatureCalculator.update_cache is dict assignment).
         """
-        self._calculator.update_cache(self._asset, features)
+        asset_key = self._asset.value if self._is_rust else self._asset
+        self._calculator.update_cache(asset_key, features)
 
     @property
     def is_ready(self) -> bool:
         """True when history cache has real data (not just defaults)."""
-        return self._calculator.is_ready(self._asset)
+        asset_key = self._asset.value if self._is_rust else self._asset
+        return self._calculator.is_ready(asset_key)
 
     # ----- Feature computation (called from trading loop at t=0.80) -----
 
     def _compute_raw(self, partial_bar: PartialBar) -> np.ndarray:
         """Call the underlying calculator, adapting for Rust vs Python interface."""
-        if RUST_AVAILABLE and not isinstance(
-            self._calculator,
-            # Lazy import to avoid circular ref
-            __import__("qm.features.intrabar", fromlist=["IntraBarFeatureCalculator"]).IntraBarFeatureCalculator,
-        ):
-            # Rust interface: positional args
+        if self._is_rust:
             result = self._calculator.compute(
                 partial_bar.asset.value,
                 partial_bar.open,

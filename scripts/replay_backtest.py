@@ -159,21 +159,28 @@ def build_arrays(
         for p in resolved
     ])
 
-    # Paper PnL per trade — sum across all resolution records for the
-    # condition_id to avoid clobbering when multiple predictions resolve
-    # under the same condition.
-    paper_pnls = np.array([
-        sum(r["pnl"] for r in resolutions[p["condition_id"]])
-        if p["fill_status"] == "filled"
-        else 0.0
-        for p in resolved
-    ])
+    # Paper PnL per trade — count each condition_id's resolution PnL
+    # exactly once to avoid double-counting when multiple predictions
+    # share a condition_id (e.g. multiple fills in the same market window).
+    seen_cids: set[str] = set()
+    paper_pnls_list: list[float] = []
+    for p in resolved:
+        cid = p["condition_id"]
+        if p["fill_status"] != "filled":
+            paper_pnls_list.append(0.0)
+        elif cid not in seen_cids:
+            paper_pnls_list.append(sum(r["pnl"] for r in resolutions[cid]))
+            seen_cids.add(cid)
+        else:
+            paper_pnls_list.append(0.0)  # already counted this condition_id
+    paper_pnls = np.array(paper_pnls_list)
 
     # Fill info
     fill_statuses = [p["fill_status"] for p in resolved]
     fill_prices = np.array([p["fill_price"] for p in resolved])
     sizes = np.array([p["size_usd"] for p in resolved])
     spreads = np.array([p["market_spread"] for p in resolved])
+    signal_sides = [p.get("signal_side", "") for p in resolved]
 
     return {
         "model_probs": model_probs,
@@ -186,6 +193,7 @@ def build_arrays(
         "fill_prices": fill_prices,
         "sizes": sizes,
         "spreads": spreads,
+        "signal_sides": signal_sides,
     }
 
 
@@ -210,6 +218,7 @@ def replay_paper_pnl(
     market_probs = arrays["market_probs"]
     targets = arrays["targets"]
     spreads = arrays["spreads"]
+    signal_sides = arrays.get("signal_sides", [])
 
     n = len(model_probs)
     pnl_per_trade = np.zeros(n)
@@ -224,13 +233,16 @@ def replay_paper_pnl(
         if fp <= 0.0 or fp >= 1.0:
             continue
 
-        # Determine side from model vs market
-        mp = model_probs[i]
-        mkt = market_probs[i]
-        half_spread = spreads[i] / 2
-        edge_up = mp - mkt - half_spread
-        edge_down = (1 - mp) - (1 - mkt) - half_spread
-        bet_up = edge_up > edge_down
+        # Determine side: use logged signal_side if available, else recalculate
+        if i < len(signal_sides) and signal_sides[i]:
+            bet_up = signal_sides[i].upper() == "UP"
+        else:
+            mp = model_probs[i]
+            mkt = market_probs[i]
+            half_spread = spreads[i] / 2
+            edge_up = mp - mkt - half_spread
+            edge_down = (1 - mp) - (1 - mkt) - half_spread
+            bet_up = edge_up > edge_down
 
         # Was the bet correct?
         correct = (bet_up and targets[i] == 1) or (not bet_up and targets[i] == 0)

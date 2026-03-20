@@ -138,6 +138,7 @@ class TestBuildArraysWithAggregatedResolutions:
                 "fill_price": 0.50,
                 "size_usd": 25.0,
                 "market_spread": 0.02,
+                "signal_side": "UP",
             }
             for i, cid in enumerate(condition_ids)
         ]
@@ -200,6 +201,20 @@ class TestBuildArraysWithAggregatedResolutions:
         """Empty predictions list should return None."""
         result = build_arrays([], {})
         assert result is None
+
+    def test_multi_prediction_same_condition_no_double_count(self):
+        """Multiple filled predictions sharing a condition_id should NOT double-count PnL."""
+        predictions = self._make_predictions(["cid_1", "cid_1"])
+        resolutions = {
+            "cid_1": [
+                {"outcome": "UP", "pnl": 15.0},
+                {"outcome": "UP", "pnl": 0.0},
+            ],
+        }
+        arrays = build_arrays(predictions, resolutions)
+        assert arrays is not None
+        # Total should be 15, NOT 30 (each condition_id counted once)
+        assert arrays["paper_pnls"].sum() == pytest.approx(15.0, abs=0.01)
 
     def test_no_resolutions_returns_none(self):
         """No matching resolutions should return None with warning."""
