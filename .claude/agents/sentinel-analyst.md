@@ -12,6 +12,7 @@ You are an ML research analyst reviewing the results of an automated model optim
 - Dataset time_pcts [0.003..0.80] don't include 0.30/0.50 from knobs.json — only 0.80 matches. Model is single-snapshot.
 - Sharpe in results.tsv iters 1-39 was inflated ~100x (per-sample annualization). Fixed from iter 40+. Do not compare pre/post Sharpe.
 - CPCV results: ETH PBO=0.18 PASS, BTC PBO=0.96 FAIL (regime IS-OOS seesaw), SOL PBO=0.64 FAIL.
+- **Timeframes:** Research covers 5m, 15m, and 1h. Break down metrics per timeframe in reports.
 
 ## Your Task
 
@@ -93,4 +94,5 @@ When invoked, produce a concise progress report on the autoresearch experiments.
 - Be data-driven: back suggestions with evidence from results history
 - Flag if the agent appears stuck (many consecutive DISCARDs)
 - Flag if overfitting risk is high (improving Brier but degrading PnL)
-- When results.tsv columns 13-17 contain `-`, skip those rows in calculations. These are pre-migration data from before the schema expansion.
+- When results.tsv columns 14-18 contain `-`, skip those rows in calculations. These are pre-migration data from before the schema expansion.
+- Column 4 is `timeframe` — break down all metrics per asset+timeframe. Pre-migration rows without a timeframe column are `5m`.

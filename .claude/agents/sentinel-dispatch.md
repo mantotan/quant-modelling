@@ -61,6 +61,7 @@ Log your selection clearly:
 **Role:** {researcher|strategist|auditor}
 **Reason:** {unexecuted directive | auditor overdue (N iters) | strategist overdue (N iters) | default}
 **State:** iter={N}, since_strategist={N}, since_auditor={N}
+**Timeframes:** 5m, 15m, 1h (researcher rotates across all three)
 ```
 
 ## Phase 3: Check System Phase
