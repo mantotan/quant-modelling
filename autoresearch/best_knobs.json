@@ -62,7 +62,7 @@
   },
   "time_pcts": [0.10, 0.20, 0.40, 0.60, 0.80],
   "hpo_search_space": {
-    "n_estimators": [100, 1500],
+    "n_estimators": [100, 800],
     "learning_rate": [0.005, 0.1],
     "max_depth": [2, 6],
     "num_leaves": [16, 128],
@@ -74,7 +74,7 @@
   },
   "walk_forward": {
     "n_splits": 8,
-    "train_bars": 10000,
+    "train_bars": 14000,
     "test_bars": 2000,
     "purge_period": 24,
     "embargo_period": 6
