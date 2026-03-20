@@ -22,6 +22,7 @@ import aiohttp
 import polars as pl
 
 from qm.core.constants import SUPPORTED_ASSETS
+from qm.data.connectors.http import create_connector
 from qm.core.types import Asset
 from qm.monitoring.metrics import (
     POLYMARKET_ACTIVE_MARKETS,
@@ -235,7 +236,7 @@ class PolymarketOddsRecorder:
             "timescale" if self._timescale else f"parquet:{self._parquet_dir}",
         )
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(connector=create_connector()) as session:
             while self._running:
                 try:
                     markets = await self._discover_markets(session)

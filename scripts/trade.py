@@ -43,6 +43,7 @@ from qm.execution.paper.engine import PaperExecutor
 from qm.execution.paper.trade_logger import PaperTradeLogger
 from qm.model.calibration.calibrator import TimeAwareCalibrator
 from qm.strategy.bar_accumulator import BarEdgeAccumulator
+from qm.data.connectors.http import create_connector
 from qm.execution.polymarket.market_scanner import MarketScanner
 from qm.features.live_cache import RUST_AVAILABLE, LiveFeatureCache
 from qm.features.pipeline import FeaturePipeline
@@ -476,10 +477,10 @@ async def main_loop(args: argparse.Namespace) -> None:
     }
 
     # ── Market scanner (cached, 10s TTL) ────────────────────────
-    scanner = MarketScanner(assets={asset}, timeframe=tf)
+    scanner = MarketScanner(assets={asset}, timeframe=tf, connector_factory=create_connector)
 
     # ── Polymarket WS orderbook feed ──────────────────────────
-    ws_feed = PolymarketWSFeed()
+    ws_feed = PolymarketWSFeed(connector_factory=create_connector)
     ws_feed_task: asyncio.Task | None = None
     ws_subscribed_market: str = ""  # condition_id of currently subscribed market
 
@@ -578,7 +579,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                 if ws_feed_task is not None:
                     ws_feed.stop()
                     ws_feed_task.cancel()
-                ws_feed = PolymarketWSFeed()
+                ws_feed = PolymarketWSFeed(connector_factory=create_connector)
                 ws_feed_task = asyncio.create_task(
                     ws_feed.connect_and_run(
                         market.token_id_up, market.token_id_down, running_flag,
