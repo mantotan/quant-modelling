@@ -583,18 +583,25 @@ async def main_loop(args: argparse.Namespace) -> None:
             side = "UP" if cal_prob > 0.5 else "DN"
             mkt_price = None
             mkt_src = "none"
+
+            # Check if WSS/REST market matches current bar
+            pm_market = pm_markets.get(tf)
+            market_matches_bar = True
+            if pm_market and pm_market.window_start:
+                market_bar_id = int(pm_market.window_start.timestamp())
+                if market_bar_id != bar_id:
+                    market_matches_bar = False
+
             ws_feed = ws_feeds.get(tf)
-            if ws_feed and ws_feed._connected.is_set():
+            if market_matches_bar and ws_feed and ws_feed._connected.is_set():
                 if side == "UP":
                     mkt_price = ws_feed.best_ask_up
                 else:
                     mkt_price = ws_feed.best_ask_down
                 mkt_src = "ws"
-            else:
-                pm_market = pm_markets.get(tf)
-                if pm_market:
-                    mkt_price = pm_market.mid_up if side == "UP" else (1.0 - pm_market.mid_up)
-                    mkt_src = "rest"
+            elif market_matches_bar and pm_market:
+                mkt_price = pm_market.mid_up if side == "UP" else (1.0 - pm_market.mid_up)
+                mkt_src = "rest"
 
             # Edge = model's P(side wins) - cost to buy that side
             #   UP: edge = cal_prob - ask_up
@@ -646,13 +653,19 @@ async def main_loop(args: argparse.Namespace) -> None:
         # -- Collect market odds for footer -----------------------
         pm_odds: dict[Timeframe, tuple[float, float]] = {}
         for tf in PM_TIMEFRAMES:
+            # Check if market matches current bar
+            pm_market = pm_markets.get(tf)
+            partial_tf = bar_builder.get_partial_bar(Asset.BTC, tf)
+            bar_matches = True
+            if pm_market and partial_tf and pm_market.window_start:
+                if int(pm_market.window_start.timestamp()) != int(partial_tf.window_start.timestamp()):
+                    bar_matches = False
+
             ws_feed = ws_feeds.get(tf)
-            if ws_feed and ws_feed._connected.is_set():
+            if bar_matches and ws_feed and ws_feed._connected.is_set():
                 pm_odds[tf] = (ws_feed.mid_up, ws_feed.spread)
-            else:
-                pm_market = pm_markets.get(tf)
-                if pm_market:
-                    pm_odds[tf] = (pm_market.mid_up, pm_market.spread)
+            elif bar_matches and pm_market:
+                pm_odds[tf] = (pm_market.mid_up, pm_market.spread)
 
         # -- Print output -----------------------------------------
         now = time.time()
