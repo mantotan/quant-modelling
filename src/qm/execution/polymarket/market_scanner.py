@@ -34,6 +34,7 @@ _SLUG_ASSET: dict[Asset, str] = {
 _TF_CONFIG: dict[Timeframe, tuple[str, int, MarketType]] = {
     Timeframe.M5: ("5m", 300, MarketType.FIVE_MIN),
     Timeframe.M15: ("15m", 900, MarketType.FIFTEEN_MIN),
+    Timeframe.H1: ("1h", 3600, MarketType.ONE_HOUR),
 }
 
 

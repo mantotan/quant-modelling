@@ -25,6 +25,7 @@ class MarketType(str, Enum):
     ONE_MIN = "1m"
     FIVE_MIN = "5m"
     FIFTEEN_MIN = "15m"
+    ONE_HOUR = "1h"
     MONTHLY = "monthly"
 
 
