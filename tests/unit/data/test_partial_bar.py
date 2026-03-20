@@ -64,17 +64,15 @@ class TestGetPartialBar:
         assert partial.elapsed_seconds == pytest.approx(120.0)
         assert partial.remaining_seconds == pytest.approx(180.0)
 
-    def test_elapsed_clamped_to_total(self, builder: BarBuilder):
-        """Clock skew: `now` is after window_end. Elapsed should be clamped."""
+    def test_returns_none_after_window_end(self, builder: BarBuilder):
+        """After window_end, get_partial_bar returns None (bar expired)."""
         base = datetime(2026, 3, 18, 12, 0, 0, tzinfo=timezone.utc)
         builder.on_trade(Asset.BTC, 70000.0, 1.0, base + timedelta(seconds=1))
 
         # now is 10 seconds past the window end
         now = base + timedelta(seconds=310)
         partial = builder.get_partial_bar(Asset.BTC, Timeframe.M5, now=now)
-        assert partial is not None
-        assert partial.elapsed_seconds == pytest.approx(300.0)
-        assert partial.remaining_seconds == pytest.approx(0.0)
+        assert partial is None
 
     def test_remaining_clamped_to_zero(self, builder: BarBuilder):
         """Now before window_start (edge case). Elapsed=0, remaining=total."""
