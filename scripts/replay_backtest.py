@@ -173,18 +173,100 @@ def build_arrays(
     }
 
 
+def replay_paper_pnl(
+    arrays: dict[str, np.ndarray],
+    fee_bps: float = 0,
+) -> dict:
+    """Replay PnL using actual paper trade sizes and Portfolio accounting.
+
+    This recomputes PnL from paper trade fills using the same shares-based
+    model as Portfolio.on_resolution():
+      - shares = size_usd / fill_price
+      - win:  pnl = shares * (1 - fill_price) - fee
+      - loss: pnl = -size_usd
+
+    Returns metrics in real USD, directly comparable to paper trading PnL.
+    """
+    fill_statuses = arrays["fill_statuses"]
+    sizes = arrays["sizes"]
+    fill_prices = arrays["fill_prices"]
+    model_probs = arrays["model_probs"]
+    market_probs = arrays["market_probs"]
+    targets = arrays["targets"]
+    spreads = arrays["spreads"]
+
+    n = len(model_probs)
+    pnl_per_trade = np.zeros(n)
+    n_trades = 0
+
+    for i in range(n):
+        if fill_statuses[i] != "filled" or sizes[i] <= 0:
+            continue
+
+        size_usd = sizes[i]
+        fp = fill_prices[i]
+        if fp <= 0.0 or fp >= 1.0:
+            continue
+
+        # Determine side from model vs market
+        mp = model_probs[i]
+        mkt = market_probs[i]
+        half_spread = spreads[i] / 2
+        edge_up = mp - mkt - half_spread
+        edge_down = (1 - mp) - (1 - mkt) - half_spread
+        bet_up = edge_up > edge_down
+
+        # Was the bet correct?
+        correct = (bet_up and targets[i] == 1) or (not bet_up and targets[i] == 0)
+
+        # Shares-based PnL (same as Portfolio.Position)
+        shares = size_usd / fp
+        if correct:
+            gross = shares * (1 - fp)
+            fee = gross * (fee_bps / 10_000) if fee_bps > 0 else 0.0
+            pnl_per_trade[i] = gross - fee
+        else:
+            pnl_per_trade[i] = -size_usd
+
+        n_trades += 1
+
+    total_pnl = float(pnl_per_trade.sum())
+    traded_pnls = pnl_per_trade[pnl_per_trade != 0]
+    win_rate = float((traded_pnls > 0).mean()) if len(traded_pnls) > 0 else 0.0
+
+    return {
+        "total_pnl": total_pnl,
+        "n_trades": n_trades,
+        "win_rate": win_rate,
+        "avg_pnl_per_trade": float(traded_pnls.mean()) if len(traded_pnls) > 0 else 0.0,
+    }
+
+
 def run_replay(
     arrays: dict[str, np.ndarray],
     timeframe: Timeframe,
     knobs: dict,
 ) -> dict:
-    """Run backtest replay with real odds (Mode A) and compute divergences."""
-    bt_cfg = knobs.get("backtest", {})
+    """Run backtest replay in three modes and compute divergences.
 
-    # Mode A: real market odds from paper trading
+    Mode A (paper-sized): Replays using actual paper trade sizes and
+        Portfolio-compatible shares-based PnL. Produces USD values
+        directly comparable to paper trading PnL.
+    Mode A' (backtester, real odds): IntraBarBacktester with real market
+        odds. PnL in fractional units (for Sharpe/metrics only).
+    Mode B (backtester, synthetic): IntraBarBacktester with 0.50 market
+        odds. PnL in fractional units (for Sharpe/metrics only).
+    """
+    bt_cfg = knobs.get("backtest", {})
+    fee_bps = bt_cfg.get("fee_bps", 0)
+
+    # Mode A: replay with actual paper trade sizes (real USD)
+    metrics_a = replay_paper_pnl(arrays, fee_bps=fee_bps)
+
+    # Mode A' (backtester): real market odds, fractional sizing
     backtester_a = IntraBarBacktester(
-        fee_bps=bt_cfg.get("fee_bps", 0),
-        spread=float(np.median(arrays["spreads"])),  # Use observed median spread
+        fee_bps=fee_bps,
+        spread=float(np.median(arrays["spreads"])),
         min_edge=bt_cfg.get("min_edge", 0.01),
         max_trades_per_bar=bt_cfg.get("max_trades_per_bar", 15),
         max_daily_trades=bt_cfg.get("max_daily_trades", 500),
@@ -192,18 +274,18 @@ def run_replay(
         timeframe=timeframe,
     )
 
-    metrics_a = backtester_a.evaluate_fast(
+    metrics_a_bt = backtester_a.evaluate_fast(
         model_probs=arrays["model_probs"],
         targets=arrays["targets"],
-        market_probs=arrays["market_probs"],  # REAL odds
+        market_probs=arrays["market_probs"],
         time_pcts=arrays["time_pcts"],
         bar_indices=arrays["bar_indices"],
     )
 
     # Mode B: synthetic backtest (fixed spread from knobs)
     backtester_b = IntraBarBacktester(
-        fee_bps=bt_cfg.get("fee_bps", 0),
-        spread=bt_cfg.get("spread", 0.02),  # Fixed spread from backtest config
+        fee_bps=fee_bps,
+        spread=bt_cfg.get("spread", 0.02),
         min_edge=bt_cfg.get("min_edge", 0.01),
         max_trades_per_bar=bt_cfg.get("max_trades_per_bar", 15),
         max_daily_trades=bt_cfg.get("max_daily_trades", 500),
@@ -211,26 +293,33 @@ def run_replay(
         timeframe=timeframe,
     )
 
-    # For Mode B, use synthetic market_probs = 0.50 (uninformed prior)
-    # This matches what backtest does when no real odds are available
     synthetic_probs = np.full_like(arrays["market_probs"], 0.50)
 
     metrics_b = backtester_b.evaluate_fast(
         model_probs=arrays["model_probs"],
         targets=arrays["targets"],
-        market_probs=synthetic_probs,  # SYNTHETIC odds
+        market_probs=synthetic_probs,
         time_pcts=arrays["time_pcts"],
         bar_indices=arrays["bar_indices"],
     )
 
-    return {"mode_a": metrics_a, "mode_b": metrics_b}
+    return {
+        "mode_a": metrics_a,
+        "mode_a_bt": metrics_a_bt,
+        "mode_b": metrics_b,
+    }
 
 
 def compute_divergences(
     arrays: dict[str, np.ndarray],
     replay_metrics: dict,
 ) -> dict:
-    """Compute divergence metrics between paper and backtest."""
+    """Compute divergence metrics between paper and backtest.
+
+    Uses mode_a (paper-sized replay in real USD) for PnL comparison
+    against paper trading. mode_a_bt and mode_b are fractional-unit
+    backtester runs used only for Sharpe and directional metrics.
+    """
     # Market odds divergence (real vs 0.50 baseline)
     real_odds = arrays["market_probs"]
     odds_deviation = np.abs(real_odds - 0.50)
@@ -241,16 +330,19 @@ def compute_divergences(
     synthetic_edge_up = model_probs - 0.50
     edge_sign_flip = np.mean(np.sign(real_edge_up) != np.sign(synthetic_edge_up))
 
-    # Paper PnL vs replay PnL
+    # Paper PnL vs replay PnL (both in real USD now)
     paper_total = float(arrays["paper_pnls"].sum())
     replay_a_total = float(replay_metrics["mode_a"].get("total_pnl", 0))
     replay_b_total = float(replay_metrics["mode_b"].get("total_pnl", 0))
+
+    # Backtester metrics (fractional, for Sharpe only)
+    replay_a_bt_total = float(replay_metrics["mode_a_bt"].get("total_pnl", 0))
 
     # Per-trade PnL correlation (paper vs replay_a)
     filled = np.array([s == "filled" for s in arrays["fill_statuses"]])
     n_filled_paper = int(filled.sum())
 
-    # Trade count comparison
+    # Trade count comparison (paper-sized replay uses same fills)
     n_replay_a = int(replay_metrics["mode_a"].get("n_trades", 0))
     n_replay_b = int(replay_metrics["mode_b"].get("n_trades", 0))
     trade_ratio = n_replay_a / max(n_filled_paper, 1)
@@ -263,11 +355,13 @@ def compute_divergences(
         "pnl_paper": paper_total,
         "pnl_replay_real_odds": replay_a_total,
         "pnl_replay_synthetic_odds": replay_b_total,
+        "pnl_replay_bt_fractional": replay_a_bt_total,
         "n_paper_filled": n_filled_paper,
         "n_replay_a_trades": n_replay_a,
         "n_replay_b_trades": n_replay_b,
         "trade_count_ratio": round(trade_ratio, 3),
         "median_spread_observed": float(np.median(arrays["spreads"])),
+        "replay_a_bt_sharpe": float(replay_metrics["mode_a_bt"].get("sharpe", 0)),
     }
 
 
@@ -329,8 +423,18 @@ def main() -> None:
 
     # Run replay
     replay_metrics = run_replay(arrays, tf, knobs)
-    logger.info("Mode A (real odds): %s", json.dumps(replay_metrics["mode_a"], indent=2))
-    logger.info("Mode B (synthetic): %s", json.dumps(replay_metrics["mode_b"], indent=2))
+    logger.info(
+        "Mode A (paper-sized, real USD): %s",
+        json.dumps(replay_metrics["mode_a"], indent=2),
+    )
+    logger.info(
+        "Mode A' (backtester, fractional): %s",
+        json.dumps(replay_metrics["mode_a_bt"], indent=2),
+    )
+    logger.info(
+        "Mode B (backtester, synthetic): %s",
+        json.dumps(replay_metrics["mode_b"], indent=2),
+    )
 
     # Compute divergences
     divergences = compute_divergences(arrays, replay_metrics)
@@ -348,6 +452,7 @@ def main() -> None:
         "divergences": divergences,
         **trust,
         "replay_mode_a": replay_metrics["mode_a"],
+        "replay_mode_a_bt": replay_metrics["mode_a_bt"],
         "replay_mode_b": replay_metrics["mode_b"],
     }
 
