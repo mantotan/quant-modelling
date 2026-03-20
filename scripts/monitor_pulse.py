@@ -27,6 +27,7 @@ import aiohttp
 import lightgbm as lgb
 import numpy as np
 import polars as pl
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -54,6 +55,9 @@ TV_SYMBOL = "BINANCE:BTCUSDT"
 
 # Poll interval (seconds)
 POLL_INTERVAL = 1.0
+
+# Display timezone
+DISPLAY_TZ = ZoneInfo("Asia/Bangkok")  # GMT+7
 
 # Timeframes to monitor
 TIMEFRAMES = [Timeframe.M5, Timeframe.M15, Timeframe.H1]
@@ -336,7 +340,7 @@ def print_table(
     header = f"--- BTC ${format_price(price)} | {now_str} "
     print(f"\n{header}{'-' * max(0, 80 - len(header))}")
     print(
-        f" {'TF':<4} | {'Bar%':>5} | {'O/H/L/C':<25} | "
+        f" {'TF':<4} | {'Window':<11} | {'Bar%':>5} | {'O/H/L/C':<25} | "
         f"{'Raw':>6} | {'Cal':>6} | Side | {'Ask':>6} | {'Edge':>7}"
     )
 
@@ -353,7 +357,7 @@ def print_table(
             mkt_str = "   -- "
             edge_str = "    -- "
         print(
-            f" {r['label']:<4} | {r['pct']:>4.1f}% | {ohlc:<25} | "
+            f" {r['label']:<4} | {r['window']:<11} | {r['pct']:>4.1f}% | {ohlc:<25} | "
             f"{r['raw_prob']:>.4f} | {r['cal_prob']:>.4f} | {side_str:>4} | "
             f"{mkt_str} | {edge_str}"
         )
@@ -596,8 +600,13 @@ async def main_loop(args: argparse.Namespace) -> None:
             else:
                 edge = None
 
+            # Format window times in display timezone
+            w_start = partial.window_start.astimezone(DISPLAY_TZ).strftime("%H:%M")
+            w_end = partial.window_end.astimezone(DISPLAY_TZ).strftime("%H:%M")
+
             rows.append({
                 "label": label,
+                "window": f"{w_start}-{w_end}",
                 "pct": elapsed_pct * 100,
                 "open": partial.open,
                 "high": partial.high_so_far,
