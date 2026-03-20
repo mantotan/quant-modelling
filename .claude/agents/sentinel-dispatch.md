@@ -50,6 +50,7 @@ is newer than the researcher_ack.txt's last acknowledged directive, the directiv
 
 Priority order (first match wins):
 
+0. **OVERRIDE directive in strategy.md** → RESEARCHER (OVERRIDE always means there is work to do, even if strategist said "COMPLETE")
 1. **Unexecuted audit directive exists** → RESEARCHER (must execute directive first)
 2. **iters_since_auditor >= 20** AND total_iterations > 10 → AUDITOR
 3. **iters_since_strategist >= 5** AND total_iterations > 0 → STRATEGIST

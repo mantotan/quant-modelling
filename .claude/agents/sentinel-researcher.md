@@ -55,6 +55,7 @@ Even if the header already has 18 columns, check each data row: if any row has f
 
 Priority chain — first match wins:
 
+0. **OVERRIDE directive** in strategy.md → these supersede ALL other signals including "COMPLETE" status. Search strategy.md for the word "OVERRIDE". If found, follow the OVERRIDE's priority queue. Items marked ~~strikethrough~~ or "DONE" are already completed — skip them.
 1. **Auditor directive** (RESET/SWITCH/ESCALATE/WIDEN) → execute it
 2. **Strategist priority queue** → follow the top unexecuted item
 3. **Autonomous mode** (no guidance or all stale):
