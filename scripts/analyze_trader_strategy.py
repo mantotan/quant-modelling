@@ -65,7 +65,10 @@ def analyze(name: str, trades: list):
     # Categorize trades
     btc_5m = [t for t in trades if "btc-updown-5m" in t.get("slug", "")]
     btc_15m = [t for t in trades if "btc-updown-15m" in t.get("slug", "")]
-    crypto_short = [t for t in trades if any(x in t.get("slug", "") for x in ["btc-updown-5m", "btc-updown-15m", "eth-updown", "sol-updown"])]
+    crypto_short = [t for t in trades if any(x in t.get("slug", "") for x in [
+        "btc-updown-5m", "btc-updown-15m", "eth-updown", "sol-updown",
+        "bitcoin-up-or-down", "ethereum-up-or-down", "solana-up-or-down", "xrp-up-or-down",
+    ])]
 
     print(f"\n--- MARKET BREAKDOWN ---")
     market_cats = defaultdict(int)
@@ -73,10 +76,10 @@ def analyze(name: str, trades: list):
         slug = t.get("slug", "")
         if "btc-updown-5m" in slug: market_cats["BTC 5m"] += 1
         elif "btc-updown-15m" in slug: market_cats["BTC 15m"] += 1
-        elif "btc-updown-1h" in slug: market_cats["BTC 1h"] += 1
-        elif "eth-updown" in slug: market_cats["ETH"] += 1
-        elif "sol-updown" in slug: market_cats["SOL"] += 1
-        elif "xrp-updown" in slug: market_cats["XRP"] += 1
+        elif "btc-updown-1h" in slug or "bitcoin-up-or-down" in slug: market_cats["BTC 1h"] += 1
+        elif "eth-updown" in slug or "ethereum-up-or-down" in slug: market_cats["ETH"] += 1
+        elif "sol-updown" in slug or "solana-up-or-down" in slug: market_cats["SOL"] += 1
+        elif "xrp-updown" in slug or "xrp-up-or-down" in slug: market_cats["XRP"] += 1
         else: market_cats["Other"] += 1
 
     for cat, count in sorted(market_cats.items(), key=lambda x: -x[1]):

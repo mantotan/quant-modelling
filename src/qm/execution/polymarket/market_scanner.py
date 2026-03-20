@@ -1,7 +1,12 @@
 """Polymarket market scanner: discovers active binary crypto markets.
 
 Queries the Gamma API by deterministic slug pattern for 5m/15m/1h
-crypto Up/Down markets. Slug format: {asset}-updown-{tf}-{unix_ts}
+crypto Up/Down markets.
+
+Slug formats:
+  5m/15m: {asset}-updown-{tf}-{unix_ts}        e.g. btc-updown-5m-1710864000
+  1h:     {asset}-up-or-down-{month}-{day}-{year}-{hour}{am/pm}-et
+          e.g. bitcoin-up-or-down-march-20-2026-7am-et
 
 The Gamma API returns outcomes/prices as JSON strings (not token arrays),
 so this module parses them directly instead of using the recorder's helpers.
@@ -13,6 +18,7 @@ import json
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import aiohttp
 
@@ -22,11 +28,27 @@ logger = logging.getLogger(__name__)
 
 GAMMA_API_URL = "https://gamma-api.polymarket.com/markets"
 
-# Slug prefixes per asset (lowercase)
+# ET timezone for 1h slug construction
+_ET = ZoneInfo("America/New_York")
+
+_MONTH_NAMES = [
+    "january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december",
+]
+
+# Slug prefixes per asset (lowercase) — used for 5m/15m
 _SLUG_ASSET: dict[Asset, str] = {
     Asset.BTC: "btc",
     Asset.ETH: "eth",
     Asset.SOL: "sol",
+    Asset.XRP: "xrp",
+}
+
+# Full asset names for 1h slug format
+_SLUG_ASSET_1H: dict[Asset, str] = {
+    Asset.BTC: "bitcoin",
+    Asset.ETH: "ethereum",
+    Asset.SOL: "solana",
     Asset.XRP: "xrp",
 }
 
@@ -42,6 +64,28 @@ def _current_bar_start(bar_seconds: int) -> int:
     """Unix timestamp of the current bar's start."""
     now = int(datetime.now(UTC).timestamp())
     return (now // bar_seconds) * bar_seconds
+
+
+def _hour_to_slug_suffix(hour: int) -> str:
+    """Convert 24h hour to '7am'/'12pm' etc."""
+    if hour == 0:
+        return "12am"
+    if hour < 12:
+        return f"{hour}am"
+    if hour == 12:
+        return "12pm"
+    return f"{hour - 12}pm"
+
+
+def _build_1h_slug(asset: Asset, bar_start_utc: datetime) -> str:
+    """Build 1h slug: bitcoin-up-or-down-march-20-2026-7am-et."""
+    et_time = bar_start_utc.astimezone(_ET)
+    asset_name = _SLUG_ASSET_1H.get(asset, asset.value.lower())
+    month = _MONTH_NAMES[et_time.month - 1]
+    return (
+        f"{asset_name}-up-or-down-{month}-{et_time.day}"
+        f"-{et_time.year}-{_hour_to_slug_suffix(et_time.hour)}-et"
+    )
 
 
 def _parse_market(
@@ -186,11 +230,18 @@ class MarketScanner:
             tf_cfg = _TF_CONFIG.get(self._timeframe)
             if tf_cfg:
                 tf_suffix, bar_seconds, _ = tf_cfg
-                slug_prefix = _SLUG_ASSET.get(asset)
-                if slug_prefix:
-                    bar_start = int(entry_time.timestamp())
-                    bar_start = (bar_start // bar_seconds) * bar_seconds
-                    slug = f"{slug_prefix}-updown-{tf_suffix}-{bar_start}"
+                if self._timeframe == Timeframe.H1:
+                    bar_ts = int(entry_time.timestamp())
+                    bar_ts = (bar_ts // bar_seconds) * bar_seconds
+                    bar_start_dt = datetime.fromtimestamp(bar_ts, tz=UTC)
+                    slug = _build_1h_slug(asset, bar_start_dt)
+                else:
+                    slug_prefix = _SLUG_ASSET.get(asset)
+                    if slug_prefix:
+                        bar_start = int(entry_time.timestamp())
+                        bar_start = (bar_start // bar_seconds) * bar_seconds
+                        slug = f"{slug_prefix}-updown-{tf_suffix}-{bar_start}"
+                if slug:
                     self._slug_cache[condition_id] = slug
         if not slug:
             logger.debug("No slug for %s", condition_id[:16])
@@ -278,7 +329,11 @@ class MarketScanner:
 
                 # Try current bar first, then next bar
                 for bar_start in (current_bar, next_bar):
-                    slug = f"{slug_prefix}-updown-{tf_suffix}-{bar_start}"
+                    if self._timeframe == Timeframe.H1:
+                        bar_start_dt = datetime.fromtimestamp(bar_start, tz=UTC)
+                        slug = _build_1h_slug(asset, bar_start_dt)
+                    else:
+                        slug = f"{slug_prefix}-updown-{tf_suffix}-{bar_start}"
 
                     try:
                         async with session.get(

@@ -106,12 +106,14 @@ def main():
             slugs["btc_5m"] += 1
         elif "btc-updown-15m" in slug:
             slugs["btc_15m"] += 1
-        elif "btc-updown-1h" in slug:
+        elif "btc-updown-1h" in slug or "bitcoin-up-or-down" in slug:
             slugs["btc_1h"] += 1
-        elif "eth" in slug:
+        elif "eth-updown" in slug or "ethereum-up-or-down" in slug:
             slugs["eth"] += 1
-        elif "sol" in slug:
+        elif "sol-updown" in slug or "solana-up-or-down" in slug:
             slugs["sol"] += 1
+        elif "xrp-updown" in slug or "xrp-up-or-down" in slug:
+            slugs["xrp"] += 1
         else:
             slugs["other"] += 1
 

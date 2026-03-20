@@ -53,7 +53,7 @@ TV_WSS_URL = "wss://data.tradingview.com/socket.io/websocket"
 TV_SYMBOL = "BINANCE:BTCUSDT"
 
 # Poll interval (seconds)
-POLL_INTERVAL = 0.25
+POLL_INTERVAL = 1.0
 
 # Timeframes to monitor
 TIMEFRAMES = [Timeframe.M5, Timeframe.M15, Timeframe.H1]
