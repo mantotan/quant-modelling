@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Live BTC Pulse model monitor — 5m, 15m, 1h simultaneous.
+"""Live BTC Pulse model monitor -- 5m, 15m, 1h simultaneous.
 
 Read-only terminal monitor: streams BTC ticks from TradingView WSS,
 runs all 3 Pulse models on every poll, prints market situation and
@@ -32,6 +32,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from qm.core.constants import TIMEFRAME_MINUTES
 from qm.core.types import Asset, PolymarketMarket, Timeframe
+from qm.data.connectors.http import create_connector
+from qm.data.connectors.polymarket_ws import PolymarketWSFeed
 from qm.data.ingestion.bar_builder import BarBuilder
 from qm.data.storage.parquet import ParquetStore
 from qm.execution.polymarket.market_scanner import MarketScanner
@@ -91,7 +93,7 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-# ── Model loading ────────────────────────────────────────────────────
+# -- Model loading ----------------------------------------------------
 
 def load_models(
     model_dir: Path,
@@ -104,7 +106,7 @@ def load_models(
         cal_path = model_dir / f"BTC_{label}" / "calibrator.pkl"
 
         if not model_path.exists():
-            logger.error("No model at %s — skipping %s", model_path, label)
+            logger.error("No model at %s -- skipping %s", model_path, label)
             continue
 
         model = lgb.Booster(model_file=str(model_path))
@@ -121,7 +123,7 @@ def load_models(
     return models
 
 
-# ── Feature warm-up ──────────────────────────────────────────────────
+# -- Feature warm-up --------------------------------------------------
 
 def warm_up_caches(
     caches: dict[Timeframe, LiveFeatureCache],
@@ -150,7 +152,7 @@ def warm_up_caches(
         logger.info("Warm-up BTC_%s: cached %d features from %d bars", label, len(cache_dict), n)
 
 
-# ── TradingView WSS ─────────────────────────────────────────────────
+# -- TradingView WSS -------------------------------------------------
 
 def _tv_encode(msg: str) -> str:
     return f"~m~{len(msg)}~m~{msg}"
@@ -246,43 +248,75 @@ async def price_feed(
             await asyncio.sleep(5.0)
 
 
-# ── Polymarket odds (REST polling via Gamma API) ─────────────────────
+# -- Polymarket odds (WSS primary, REST fallback) ---------------------
 
-async def polymarket_poller(
+async def polymarket_feed(
     tf: Timeframe,
     scanner: MarketScanner,
+    ws_feeds: dict[Timeframe, PolymarketWSFeed],
     pm_markets: dict[Timeframe, PolymarketMarket],
     running_flag: list[bool],
 ) -> None:
-    """Poll Gamma REST API for live market odds every 2s.
+    """Manage WSS orderbook feed for a timeframe, with REST fallback.
 
-    No WSS dependency — uses the same REST endpoint as market discovery.
-    The Gamma API returns live outcomePrices with every query.
+    Discovers markets via scanner (REST), subscribes WSS for live orderbook.
+    Also stores REST-polled market in pm_markets as fallback odds source.
+    Switches at bar boundaries using window_end timing.
     """
     label = TF_LABELS[tf]
-    last_cid = ""
+    ws_task: asyncio.Task | None = None
+    subscribed_cid = ""
+
+    async def _subscribe(market) -> None:
+        nonlocal ws_task, subscribed_cid
+        old_feed = ws_feeds.get(tf)
+        if old_feed and ws_task is not None:
+            old_feed.stop()
+            ws_task.cancel()
+
+        new_feed = PolymarketWSFeed(connector_factory=create_connector)
+        ws_feeds[tf] = new_feed
+        ws_task = asyncio.create_task(
+            new_feed.connect_and_run(
+                market.token_id_up, market.token_id_down, running_flag,
+            ),
+        )
+        subscribed_cid = market.condition_id
+        logger.info(
+            "PM %s subscribed: %s (ends %s)",
+            label, subscribed_cid[:16],
+            market.window_end.strftime("%H:%M:%S"),
+        )
+        await asyncio.sleep(1.0)
 
     while running_flag[0]:
         try:
             market = await scanner.get_active_market(Asset.BTC)
+
             if market:
                 pm_markets[tf] = market
-                if market.condition_id != last_cid:
-                    last_cid = market.condition_id
-                    logger.info(
-                        "PM %s market: %s mid=%.3f (ends %s)",
-                        label, last_cid[:16], market.mid_up,
-                        market.window_end.strftime("%H:%M:%S"),
-                    )
+                if market.condition_id != subscribed_cid:
+                    await _subscribe(market)
             else:
                 pm_markets.pop(tf, None)
+
+            if market and market.window_end:
+                now = datetime.now(UTC)
+                secs_to_end = (market.window_end - now).total_seconds()
+                if secs_to_end > 2:
+                    await asyncio.sleep(min(secs_to_end - 1, 30.0))
+                else:
+                    await asyncio.sleep(1.0)
+                    scanner._cache_time = 0
+            else:
+                await asyncio.sleep(10.0)
+
         except Exception as e:
-            logger.debug("PM %s poll error: %s", label, e)
+            logger.debug("PM %s error: %s", label, e)
+            await asyncio.sleep(5.0)
 
-        await asyncio.sleep(2.0)
 
-
-# ── Output formatting ───────────────────────────────────────────────
+# -- Output formatting -----------------------------------------------
 
 def format_price(p: float) -> str:
     """Format price compactly."""
@@ -299,11 +333,11 @@ def print_table(
 ) -> None:
     """Print the combined table for all timeframes."""
     now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
-    header = f"─── BTC ${format_price(price)} | {now_str} "
-    print(f"\n{header}{'─' * max(0, 80 - len(header))}")
+    header = f"--- BTC ${format_price(price)} | {now_str} "
+    print(f"\n{header}{'-' * max(0, 80 - len(header))}")
     print(
-        f" {'TF':<4} │ {'Bar%':>5} │ {'O/H/L/C':<25} │ "
-        f"{'Raw':>6} │ {'Cal':>6} │ {'Mkt':>6} │ {'Edge':>7} │ Side"
+        f" {'TF':<4} | {'Bar%':>5} | {'O/H/L/C':<25} | "
+        f"{'Raw':>6} | {'Cal':>6} | {'Mkt':>6} | {'Edge':>7} | Side"
     )
 
     for r in rows:
@@ -319,9 +353,9 @@ def print_table(
             edge_str = "    -- "
         side_str = r.get("side", "--")
         print(
-            f" {r['label']:<4} │ {r['pct']:>4.1f}% │ {ohlc:<25} │ "
-            f"{r['raw_prob']:>.4f} │ {r['cal_prob']:>.4f} │ "
-            f"{mkt_str} │ {edge_str} │ {side_str}"
+            f" {r['label']:<4} | {r['pct']:>4.1f}% | {ohlc:<25} | "
+            f"{r['raw_prob']:>.4f} | {r['cal_prob']:>.4f} | "
+            f"{mkt_str} | {edge_str} | {side_str}"
         )
 
     # Market odds footer
@@ -344,9 +378,9 @@ def print_threshold(
     mkt_str = f"Mkt={mkt:.4f}" if mkt is not None else "Mkt=--"
     edge_str = f"Edge={edge:+.3f}" if edge is not None else "Edge=--"
     print(
-        f"\n>>> {tf_label} THRESHOLD {pct*100:.0f}% — "
+        f"\n>>> {tf_label} THRESHOLD {pct*100:.0f}% -- "
         f"Raw={raw:.4f} Cal={cal:.4f} {mkt_str} "
-        f"{edge_str} → {side} <<<"
+        f"{edge_str} -> {side} <<<"
     )
 
 
@@ -364,7 +398,7 @@ def print_bar_complete(bar) -> None:
     )
 
 
-# ── Main loop ────────────────────────────────────────────────────────
+# -- Main loop --------------------------------------------------------
 
 async def main_loop(args: argparse.Namespace) -> None:
     model_dir = Path(args.model_dir)
@@ -379,17 +413,17 @@ async def main_loop(args: argparse.Namespace) -> None:
     print(f"  Thresholds: {[f'{t*100:.0f}%' for t in TIME_PCTS]}")
     print("=" * 60)
 
-    # ── Load models ──────────────────────────────────────────────
+    # -- Load models ----------------------------------------------
     models = load_models(model_dir)
     if not models:
-        logger.error("No models loaded — exiting")
+        logger.error("No models loaded -- exiting")
         return
 
     for tf in TIMEFRAMES:
         if tf not in models:
-            logger.warning("BTC_%s model not found — will skip", TF_LABELS[tf])
+            logger.warning("BTC_%s model not found -- will skip", TF_LABELS[tf])
 
-    # ── Feature caches (one per TF, handles feature reordering) ──
+    # -- Feature caches (one per TF, handles feature reordering) --
     feat_caches: dict[Timeframe, LiveFeatureCache] = {}
     for tf in TIMEFRAMES:
         if tf not in models:
@@ -400,41 +434,47 @@ async def main_loop(args: argparse.Namespace) -> None:
             cache_dir, asset=Asset.BTC, timeframe=tf,
         )
 
-    # ── Warm-up ──────────────────────────────────────────────────
+    # -- Warm-up --------------------------------------------------
     warm_up_caches(feat_caches)
 
-    # ── BarBuilder (single instance, 3 TFs) ──────────────────────
+    # -- BarBuilder (single instance, 3 TFs) ----------------------
     bar_builder = BarBuilder(assets=[Asset.BTC], timeframes=TIMEFRAMES)
     completed_bars: asyncio.Queue = asyncio.Queue()
 
-    # ── Polymarket odds (REST-polled via Gamma API) ─────────────
+    # -- Polymarket feeds (WSS primary, REST fallback) -----------
+    ws_feeds: dict[Timeframe, PolymarketWSFeed] = {}
     pm_markets: dict[Timeframe, PolymarketMarket] = {}
     pm_scanners: dict[Timeframe, MarketScanner] = {}
 
     if not args.no_polymarket:
         for tf in PM_TIMEFRAMES:
             if tf in models:
-                scanner = MarketScanner(assets={Asset.BTC}, timeframe=tf)
-                scanner._cache_ttl = 2.0  # fresher odds for monitoring
+                scanner = MarketScanner(
+                    assets={Asset.BTC}, timeframe=tf,
+                    connector_factory=create_connector,
+                )
+                scanner._cache_ttl = 2.0
                 pm_scanners[tf] = scanner
 
-    # ── Start background tasks ───────────────────────────────────
+    # -- Start background tasks -----------------------------------
     running_flag = [True]
 
     asyncio.create_task(price_feed(bar_builder, completed_bars, running_flag))
 
     for tf in pm_scanners:
         asyncio.create_task(
-            polymarket_poller(tf, pm_scanners[tf], pm_markets, running_flag),
+            polymarket_feed(
+                tf, pm_scanners[tf], ws_feeds, pm_markets, running_flag,
+            ),
         )
 
-    # ── Threshold tracking ───────────────────────────────────────
+    # -- Threshold tracking ---------------------------------------
     last_triggered: dict[Timeframe, set[float]] = {tf: set() for tf in TIMEFRAMES}
     current_bar_id: dict[Timeframe, int] = {}
     last_print = 0.0
     last_price = 0.0
 
-    # ── Feature pipeline for live cache updates ──────────────────
+    # -- Feature pipeline for live cache updates ------------------
     pipeline = FeaturePipeline()
     recent_bars: dict[Timeframe, list] = {tf: [] for tf in TIMEFRAMES}
 
@@ -450,7 +490,7 @@ async def main_loop(args: argparse.Namespace) -> None:
     while running_flag[0]:
         await asyncio.sleep(POLL_INTERVAL)
 
-        # ── Process completed bars ───────────────────────────────
+        # -- Process completed bars -------------------------------
         while not completed_bars.empty():
             bar = completed_bars.get_nowait()
             tf = bar.timeframe
@@ -489,7 +529,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                     except Exception as e:
                         logger.warning("Feature cache update failed for %s: %s", TF_LABELS[tf], e)
 
-        # ── Predict for each TF ──────────────────────────────────
+        # -- Predict for each TF ----------------------------------
         rows: list[dict] = []
         threshold_events: list[tuple] = []
         t0 = time.perf_counter_ns()
@@ -525,13 +565,18 @@ async def main_loop(args: argparse.Namespace) -> None:
                     np.array([elapsed_pct]),
                 )[0])
 
-            # Market odds from REST-polled Gamma API
+            # Market odds: prefer WSS orderbook, fall back to REST
             mkt_prob = None
             mkt_src = "none"
-            pm_market = pm_markets.get(tf)
-            if pm_market:
-                mkt_prob = pm_market.mid_up
-                mkt_src = "pm"
+            ws_feed = ws_feeds.get(tf)
+            if ws_feed and ws_feed._connected.is_set():
+                mkt_prob = ws_feed.mid_up
+                mkt_src = "ws"
+            else:
+                pm_market = pm_markets.get(tf)
+                if pm_market:
+                    mkt_prob = pm_market.mid_up
+                    mkt_src = "rest"
 
             edge = (cal_prob - mkt_prob) if mkt_prob is not None else None
             side = "UP" if cal_prob > 0.5 else "DN"
@@ -568,14 +613,18 @@ async def main_loop(args: argparse.Namespace) -> None:
         if not rows:
             continue
 
-        # ── Collect market odds for footer ───────────────────────
+        # -- Collect market odds for footer -----------------------
         pm_odds: dict[Timeframe, tuple[float, float]] = {}
         for tf in PM_TIMEFRAMES:
-            pm_market = pm_markets.get(tf)
-            if pm_market:
-                pm_odds[tf] = (pm_market.mid_up, pm_market.spread)
+            ws_feed = ws_feeds.get(tf)
+            if ws_feed and ws_feed._connected.is_set():
+                pm_odds[tf] = (ws_feed.mid_up, ws_feed.spread)
+            else:
+                pm_market = pm_markets.get(tf)
+                if pm_market:
+                    pm_odds[tf] = (pm_market.mid_up, pm_market.spread)
 
-        # ── Print output ─────────────────────────────────────────
+        # -- Print output -----------------------------------------
         now = time.time()
         has_threshold = len(threshold_events) > 0
 
@@ -588,8 +637,10 @@ async def main_loop(args: argparse.Namespace) -> None:
             print_table(last_price, rows, pm_odds, pred_us)
             last_print = now
 
-    # ── Shutdown ─────────────────────────────────────────────────
+    # -- Shutdown -------------------------------------------------
     logger.info("Shutting down...")
+    for feed in ws_feeds.values():
+        feed.stop()
     logger.info("Monitor stopped.")
 
 

@@ -186,6 +186,7 @@ class MarketScanner:
         assets: set[Asset] | None = None,
         timeframe: Timeframe = Timeframe.M5,
         min_time_remaining_sec: float = 60.0,
+        connector_factory=None,
     ) -> None:
         self._assets = assets or {Asset.BTC, Asset.ETH}
         self._timeframe = timeframe
@@ -195,6 +196,7 @@ class MarketScanner:
         self._cache_ttl = 10.0  # refresh every 10s
         # Map condition_id → slug for resolution lookups
         self._slug_cache: dict[str, str] = {}
+        self._connector_factory = connector_factory
 
     async def get_active_market(
         self, asset: Asset,
@@ -248,7 +250,9 @@ class MarketScanner:
             return None
 
         try:
+            connector = self._connector_factory() if self._connector_factory else None
             async with aiohttp.ClientSession(
+                connector=connector,
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as session, session.get(
                 GAMMA_API_URL, params={"slug": slug},
@@ -315,7 +319,9 @@ class MarketScanner:
 
         matched: list[PolymarketMarket] = []
 
+        connector = self._connector_factory() if self._connector_factory else None
         async with aiohttp.ClientSession(
+            connector=connector,
             timeout=aiohttp.ClientTimeout(total=10),
         ) as session:
             for asset in self._assets:

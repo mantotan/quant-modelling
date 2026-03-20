@@ -95,7 +95,7 @@ class PolymarketWSFeed:
     Exposes mid_up, spread, best_bid_up, best_ask_up for the scanner.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, connector_factory=None) -> None:
         self._books: dict[str, TokenBook] = {}
         self._ws: aiohttp.ClientWebSocketResponse | None = None
         self._session: aiohttp.ClientSession | None = None
@@ -103,6 +103,7 @@ class PolymarketWSFeed:
         self._connected = asyncio.Event()
         self._token_id_up: str | None = None
         self._token_id_down: str | None = None
+        self._connector_factory = connector_factory
 
     @property
     def mid_up(self) -> float:
@@ -175,7 +176,8 @@ class PolymarketWSFeed:
         token_id_down: str,
         running_flag: list[bool],
     ) -> None:
-        self._session = aiohttp.ClientSession()
+        connector = self._connector_factory() if self._connector_factory else None
+        self._session = aiohttp.ClientSession(connector=connector)
         try:
             self._ws = await self._session.ws_connect(
                 WS_URL, heartbeat=PING_INTERVAL,
