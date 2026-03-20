@@ -1,231 +1,191 @@
 # Strategy Directive
-Updated: 2026-03-25T10:30:00Z
-After iteration: 119
+Updated: 2026-03-25T16:00:00Z
+After iteration: 125
 
-## Program Status: POST-OVERRIDE Autonomous HPO Phase (Anti-Starvation Rollout)
+## Program Status: POST-OVERRIDE Anti-Starvation Rollout — Phase 2
 
-Iters 115-120 completed the prior strategy's 6-item queue. Results: 3 KEEPs (XRP/1h +0.018%,
-ETH/15m +0.275%, ETH/5m new baseline 0.211888), 3 DISCARDs (SOL/1h regression, XRP/15m
-regression, ETH/1h lr-narrowing no improvement). The n_estimators=[100,800] anti-starvation
-fix introduced in iter 116 is confirmed effective (ETH/15m 23/40, ETH/5m 23/40 vs prior 2/40).
-The critical gap: anti-starvation has NOT yet been applied to BTC/5m (11/40), BTC/15m (15-17/40),
-SOL/5m (2/40 in iter 111 — the worst), or XRP/15m (22/40). This is the priority for this directive.
-
-Note: best_knobs.json has n_estimators=[100,800] (from iter 116 KEEP). knobs.json still has
-n_estimators=[100,1500]. Researcher should use best_knobs.json as baseline and verify.
+The strategy queue from iter 119 is 5/6 executed (items 1-5 complete). Item 6 (ETH/5m min_child
+narrowing [300,700]) is SKIPPED per audit note 3: range contraction has 0/5 KEEP rate and must
+not be pursued until the full anti-starvation rollout is complete. SOL/15m has 16/40 trial
+starvation and has NEVER received the n_estimators=[100,800] fix — this is the top remaining
+anti-starvation target. Additionally, the auditor's conditional unlock of BTC/5m n_splits=6
+(after items 3-6 complete) is now eligible since items 3-5 are done and item 6 is being skipped.
+XRP/15m remains structurally starved with n_estimators=658 near ceiling even with [100,800] range.
 
 ---
 
 ## Priority Queue
 
-1. **SOL/5m anti-starvation: apply n_estimators=[100,800] (highest urgency)**
-   - Command: `--asset SOL --timeframe 5m --mode fast --save`
-   - Knob change: hpo_search_space.n_estimators = [100, 800] (should already be in best_knobs.json)
-   - Rationale: SOL/5m had catastrophic starvation at 2/40 trials in iter 111 (1185s timeout).
-     ETH/15m went from 2/40 to 23/40 after this fix (iter 116). ETH/5m also got 23/40 (iter 117).
-     SOL/5m is the most under-explored asset in the portfolio — its multi-tp Brier 0.218209 was
-     set with only 18/40 trials (iter 93, before starvation worsened). The 2-trial result from
-     iter 111 is unreliable. A fresh run with n_estimators=[100,800] should give 20-30/40 trials
-     and is the single most likely experiment to improve the portfolio.
-   - KEEP criterion: any Brier improvement from 0.218209 (iter 93 best)
-   - train_bars=10000, purge_period=24 (SOL-optimal)
+1. **SOL/15m anti-starvation: apply n_estimators=[100,800] (highest urgency)**
+   - Command: `--asset SOL --timeframe 15m --mode fast --save`
+   - Knob change: hpo_search_space.n_estimators is already [100, 800] in knobs.json — no change needed
+   - Rationale: SOL/15m has had persistent 16/40 trial starvation at EVERY run (iters 97, 109). This
+     is the only multi-tp asset that has NOT yet received anti-starvation treatment. ETH/15m went
+     16/40 -> 2/40 (worsened before fix) -> 23/40 after fix (iter 116 +0.275% KEEP). SOL/5m went
+     2/40 -> 24/40 after fix (iter 121 +0.069% KEEP). n_estimators=[100,800] is ALREADY in
+     knobs.json (set at iter 116 KEEP). Verify that best_knobs.json also has n_estimators=[100,800]
+     before running. Expected result: 20-25/40 trials and likely Brier improvement from best 0.215443.
+   - KEEP criterion: any Brier improvement from 0.215443 (iter 97 best)
 
-2. **BTC/5m anti-starvation: apply n_estimators=[100,800]**
-   - Command: `--asset BTC --timeframe 5m --mode fast --save`
-   - Knob change: hpo_search_space.n_estimators = [100, 800] (confirm in best_knobs.json)
-   - Rationale: BTC/5m iter 104 ran only 11/40 trials (384s timeout for 11 trials, BTC/5m is the
-     slowest asset per trial due to 80K+ training samples). The current best 0.17605 was set with
-     just 11 trials — far below the 40-trial target. ETH/5m has the same training size and gets
-     23/40 with n_estimators=[100,800]. BTC/5m should benefit similarly. BTC/5m best_params from
-     iter 104 used lr=0.058, max_depth=5, num_leaves=98 — high num_leaves combined with high
-     n_estimators is the starvation driver. BTC/5m is the largest dataset (80K+ samples) so
-     starvation is expected to be severe.
+2. **BTC/5m n_splits=6 experiment (auditor conditional unlock)**
+   - Command: `--asset BTC --timeframe 5m --mode fast`
+   - Knob change: walk_forward.n_splits = 6 (from 8)
+   - Rationale: Auditor note 2 (iter 122 audit) conditionally suspends the BTC/5m n_splits blacklist
+     after items 3-6 of the strategy queue complete. BTC/5m remains the most starved asset at 22/40
+     trials even after the n_estimators=[100,800] fix (iter 122 DISCARD). Root cause: 929K
+     samples/8 folds = ~116K samples/fold, each fold taking ~50s. Reducing to 6 folds means ~155K
+     samples/fold (larger folds but fewer of them, net 25% time reduction). Expected: 28-32/40 trials.
+     n_estimators=709 near ceiling with 8 folds; with 6 folds, HPO may converge to lower n_estimators
+     (less starvation-driven ceiling pressure). Note: revert to n_splits=8 if DISCARD.
    - KEEP criterion: any Brier improvement from 0.17605 (iter 104 best)
-   - train_bars=10000, purge_period=24 (BTC-optimal), lr=[0.005,0.1] (keep wide for BTC sniper zone)
+   - Risk: smaller n_splits = less CV robustness; monitor OOS Brier carefully
 
-3. **BTC/15m anti-starvation: apply n_estimators=[100,800]**
-   - Command: `--asset BTC --timeframe 15m --mode fast --save`
-   - Knob change: hpo_search_space.n_estimators = [100, 800]
-   - Rationale: BTC/15m has structural starvation at 15-17/40 trials (iters 105, 114). Iter 114
-     confirmed starvation is per-fold time, not total dataset size (7500 train_bars gave same 17/40
-     as 10000). The n_estimators=[100,800] fix was NOT tried for BTC/15m. Best_params from iters
-     105/114 used n_estimators values that are within [100,800], so the fix should be safe. At
-     17/40 trials, BTC/15m has only explored 42% of the intended search space — there is likely
-     untapped improvement in the remaining 58%.
-   - KEEP criterion: any Brier improvement from 0.171913 (iter 66/95 best — note BTC/15m best was
-     set at 0.171913 in iter 95 or 66; verify exact best in results.tsv)
-   - train_bars=10000, purge_period=24 (BTC-optimal)
-
-4. **XRP/15m anti-starvation: apply n_estimators=[100,800]**
-   - Command: `--asset XRP --timeframe 15m --mode fast --save`
-   - Knob change: hpo_search_space.n_estimators = [100, 800]
-   - Rationale: XRP/15m iter 119 ran 22/40 trials — moderate starvation. XRP/15m is tick-dominant
-     and has the same architecture as ETH/15m and SOL/5m. Current best 0.218727 was set with 24/40
-     trials (iter 98). The anti-starvation fix should push trial count to 30-35/40, giving a more
-     thorough search. XRP/15m best_params from iter 119 used n_estimators=382 (within [100,800]),
-     confirming the ceiling reduction is safe.
+3. **XRP/15m further ceiling reduction: n_estimators=[100,600]**
+   - Command: `--asset XRP --timeframe 15m --mode fast`
+   - Knob change: hpo_search_space.n_estimators = [100, 600] (from [100, 800])
+   - Rationale: Iter 124 showed XRP/15m has n_estimators=658 near the 800 ceiling (same pattern as
+     BTC/5m with 709 near ceiling). XRP/15m dataset = 309K samples. Reducing ceiling to 600 forces
+     HPO to explore lower n_estimators; combined with XRP's num_leaves=106 per trial (high model
+     complexity), this should significantly reduce per-trial time. Risk: XRP/15m true optimum may
+     genuinely be at 600-700 n_estimators (similar to BTC/5m optimum near 709); test whether 600
+     ceiling binds or not.
    - KEEP criterion: any Brier improvement from 0.218727 (iter 98 best)
-   - train_bars=10000, purge_period=24 (XRP-optimal)
+   - Revert n_estimators to [100, 800] if DISCARD
 
-5. **SOL/1h reg_alpha investigation: widen reg_alpha [0.1, 20.0]**
-   - Command: `--asset SOL --timeframe 1h --mode fast --save`
-   - Knob change: hpo_search_space.reg_alpha = [0.1, 20.0] (widen from [1e-8, 10.0])
-   - Rationale: SOL/1h iter 118 produced reg_alpha=8.55 — the highest L1 regularization seen in any
-     multi-tp run. This is novel (all other assets have reg_alpha near 0 in multi-tp). The HPO is
-     pushing against the upper bound at 10.0, suggesting the true optimum may be above 10. SOL/1h
-     has 40/40 trials (starvation-free, 209s per run — very fast). Widening the reg_alpha ceiling
-     to 20.0 lets HPO find the true SOL/1h optimum. Even if no improvement occurs, confirming the
-     upper bound is not binding is valuable. SOL/1h current best is 0.221683.
-   - KEEP criterion: any Brier improvement from 0.221683 (iter 101 best)
-   - train_bars=10000, purge_period=24 (SOL-optimal)
-
-6. **ETH/5m follow-up: min_child_samples narrowing [300, 700]**
-   - Command: `--asset ETH --timeframe 5m --mode fast --save`
-   - Knob change: hpo_search_space.min_child_samples = [300, 700] (narrow from [100, 1000])
-   - Rationale: ETH/5m iter 117 found min_child=389 (mid-range). ETH/15m iter 116 found
-     min_child=989 (near upper bound). These two ETH assets at different timeframes suggest ETH
-     prefers min_child in the mid-to-high range (300-1000). This experiment is speculative but
-     has a clear reversal condition: if Brier regresses, revert to [100,1000]. ETH/5m has 23/40
-     trial coverage and is currently at 0.211888 — the weakest ETH timeframe by Brier distance
-     from single-tp floor (0.211888 vs 0.177772 single-tp = +19%). Min_child is the only
-     regularization lever not yet explored for ETH/5m post-OVERRIDE.
+4. **ETH/5m min_child narrowing [300,700] (deferred from item 6)**
+   - Command: `--asset ETH --timeframe 5m --mode fast`
+   - Knob change: hpo_search_space.min_child_samples = [300, 700] (from [100, 1000])
+   - Rationale: This was item 6 in the previous strategy queue. It is queued here LAST because the
+     auditor note 3 prohibits range contraction until anti-starvation is complete. After items 1-3
+     above complete the remaining starvation fixes, this experiment is eligible. ETH/5m best_params
+     min_child=389 (iter 117) — within [300,700] range. However, min_child narrowing has 0/5 KEEP
+     rate historically. Only attempt if items 1-3 above are completed and the queue needs filling.
    - KEEP criterion: any Brier improvement from 0.211888 (iter 117 best)
-   - Revert min_child_samples to [100, 1000] on DISCARD
+   - NOTE: High prior probability of DISCARD based on 0/5 historical KEEP rate for range narrowing
 
 ---
 
 ## Observations
 
-- **KEEP rates (iters 115-120, this strategist window):**
-  - No-knob HPO re-run: SOL/1h DISCARD (iter 118), XRP/15m DISCARD (iter 119) = 0/2 (0%)
-  - Anti-starvation fix (n_estimators=[100,800]): ETH/15m KEEP (iter 116), ETH/5m KEEP (iter 117) = 2/2 (100%)
-  - HPO range narrowing: ETH/1h lr [0.005,0.05] DISCARD (iter 120) = 0/1 (0%)
-  - XRP/1h re-run with wider num_leaves: KEEP (iter 115, marginal 0.018%) = 1/1
+**KEEP rates by category (multi-tp era, iters 92-125, only rows with numeric Brier):**
+- Anti-starvation n_estimators=[100,800]: 3/5 KEEP (60%): SOL/5m, ETH/15m, BTC/15m KEEP;
+  BTC/5m and XRP/15m DISCARD (structural starvation persists — dataset too large for 800 ceiling)
+- HPO range narrowing (lr, min_child, num_leaves): 0/6 KEEP (0%): iters 103, 105, 106, 108, 113,
+  120 all DISCARD; BLACKLISTED
+- HPO re-run (no knob changes): 4/8 KEEP (50%): iters 104, 107, 112, 115 KEEP; stochastic
+- Reg parameter widening (reg_alpha, reg_lambda): 1/2 KEEP (50%): SOL/1h iter 125 KEEP;
+  ETH/1h iter 113 DISCARD (reg_lambda widen)
+- Walk-forward parameter changes (train_bars, purge_period): 2/5 KEEP in this era
 
-- **Cumulative KEEP rates (post-OVERRIDE, iters 103-120):**
-  - Anti-starvation fix: 2/2 (100%) — ETH/15m, ETH/5m. HIGH CONFIDENCE.
-  - HPO re-run no knob change: 5/10 (50%) — BTC/5m, XRP/1h, ETH/15m, XRP/5m, BTC/1h kept;
-    SOL/5m, SOL/1h, XRP/15m, ETH/1h, BTC/15m discarded
-  - HPO range narrowing: 0/5 (0%) — lr narrowing, min_child narrowing all fail
-  - HPO range widening (selective): 1/3 (33%) — BTC/1h num_leaves [32,96] KEEP; reg_lambda
-    and ETH/1h lr widening DISCARD
+**Convergence patterns from KEEP rows (multi-tp era):**
+- n_estimators: Tick-dominant assets (ETH/SOL/XRP) converge to 182-274; BTC sniper assets prefer
+  235-381 but press against 800 ceiling when dataset is large (BTC/5m 709, XRP/15m 658)
+- learning_rate: BTC/1h uniquely low at 0.008-0.010; BTC/5m/15m: 0.021-0.027; ETH/SOL: 0.019-0.051;
+  XRP: 0.012-0.065; current range [0.005, 0.1] adequate — no narrowing recommended
+- max_depth: BTC consistent at 4-5; ETH/SOL/XRP consistent at 5-6; no ceiling hits
+- min_child_samples: Wide 291-989 across assets — NOT converging; leave bounds unchanged
+- reg_alpha: SOL/1h confirmed optimum ~0.919 (iter 125 KEY FINDING; current range [0.1, 20.0] is
+  technically wasteful above ~3.0 but does not cause starvation — low priority to narrow)
+- reg_lambda: Near-zero for most assets (1e-8 to 0.06); ETH/1h baseline was 9.42 but iter 113
+  widen DISCARD confirmed [1e-8, 10.0] is correct range
 
-- **Anti-starvation impact summary:**
-  - ETH/15m: 2/40 (iter 110) → 23/40 (iter 116) → KEEP
-  - ETH/5m: unknown prior (OVERRIDE era had 23/40) → 23/40 (iter 117) → KEEP (new baseline)
-  - SOL/5m: 2/40 (iter 111) → NOT YET RETRIED with fix
-  - BTC/5m: 11/40 (iter 104) → NOT YET RETRIED with fix
-  - BTC/15m: 17/40 (iter 114) → NOT YET RETRIED with fix
-  - XRP/15m: 22/40 (iter 119) → NOT YET RETRIED with fix
-  - Starvation-free assets (40/40 historical): SOL/1h (209s), ETH/1h (380s), XRP/1h (266s)
+**Feature importance stability (top-10 across all KEEP rows):**
+- Universal top-3: partial_bar_position, partial_range (or vol_norm_distance for BTC sniper),
+  elapsed_pct / time_remaining_pct
+- BTC assets: vol_norm_distance rank 1-2, distance_from_open rank 2-3 (sniper pattern)
+- ETH/SOL/XRP assets: partial_bar_position rank 1, partial_range rank 2
+- Alpha features: NONE appear in top-10 across any KEEP row in multi-tp era. Funding, liquidation,
+  OI features consistently absent from top-10 despite being in cached_features. These features
+  may be contributing below top-10 or not at all — flag for auditor review.
+- regime_vol_zscore: Appears in BTC KEEP rows (rank 6-10) but absent from ETH/SOL/XRP tick-dominant
+  assets; SOL/1h iter 125 does NOT have it in top-5 (consistent with tick-dominant pattern)
 
-- **SOL/1h anomaly (iter 118):**
-  - reg_alpha=8.55 is 4-40x higher than any other tick-dominant asset in multi-tp.
-  - Tick-dominant assets typically converge to reg_alpha near 0 (XRP/15m: 8e-6, ETH/15m: 0.0,
-    SOL/15m: 4e-4). SOL/1h at 8.55 suggests HPO is finding strong L1 sparsity beneficial at 1h.
-  - Possible explanation: 1h bars have sparser feature signal (fewer ticks per bar), requiring
-    heavier regularization to suppress noise. XRP/1h (iter 115) found lr=0.065 (high) suggesting
-    similar coarse-grained learning needed at 1h for tick-dominant assets.
-  - Despite this, iter 118 was a DISCARD (+0.086% regression). The 40/40 trial count means this
-    is a genuine floor. The reg_alpha widen experiment (item 5) may reveal whether the true
-    optimum is above the current bound.
-
-- **ETH Brier landscape in multi-tp regime:**
-  - ETH/5m: 0.211888 (single-tp best 0.177772, multi-tp gap +19%)
-  - ETH/15m: 0.208324 (single-tp best 0.174283, multi-tp gap +20%)
-  - ETH/1h: 0.211438 (single-tp best 0.176103, multi-tp gap +20%)
-  - The ETH gap is remarkably consistent across timeframes (~20%). This is the structural
-    overhead of training on 5 time buckets including noisy early-bar samples (t10, t20).
-    No HPO lever has been able to reduce this gap. The floor appears genuine.
-
-- **Portfolio Brier floor summary:**
-  - BTC sniper assets: consistently achieve 0.17-0.18 multi-tp (floor ~0.175)
-  - ETH tick-dominant: consistently at 0.208-0.212 multi-tp (floor ~0.208)
-  - SOL tick-dominant: 0.215-0.222 multi-tp (more room for improvement than ETH)
-  - XRP tick-dominant: 0.218-0.227 multi-tp (XRP/1h still highest in portfolio at 0.226907)
-
-- **lr convergence patterns (multi-tp, from all KEEPs):**
-  - BTC-class: lr=0.008-0.058 (wide range, BTC/5m iter 104 used 0.058 which is unusual vs
-    prior BTC optima 0.008-0.013 in single-tp). Multi-tp BTC lr is less well-characterized.
-  - ETH tick-dominant: lr=0.005-0.034 (well-concentrated in low range)
-  - SOL tick-dominant: lr=0.017-0.018 (extremely concentrated — SOL prefers lr~0.018)
-  - XRP: lr=0.025-0.065 (wider, consistent with intermediate BTC/ETH behavior)
+**Brier trajectory (multi-tp baselines vs current bests):**
+- BTC/5m: 0.177295 (baseline iter 92) -> 0.17605 (iter 104, -0.70%)
+- BTC/15m: 0.171913 (baseline iter 95) -> 0.171809 (iter 123, -0.061%)
+- BTC/1h: 0.175668 (baseline iter 99) -> 0.174864 (iter 107, -0.46%)
+- ETH/5m: 0.211888 (baseline iter 117) — no improvement yet (single run)
+- ETH/15m: 0.209819 (baseline iter 96) -> 0.208324 (iter 116, -0.71%)
+- ETH/1h: 0.211438 (baseline iter 100) — no improvement (narrowing attempts failed)
+- SOL/5m: 0.218209 (baseline iter 93) -> 0.218058 (iter 121, -0.069%)
+- SOL/15m: 0.215443 (baseline iter 97) — NO improvement yet (anti-starvation untried)
+- SOL/1h: 0.221683 (baseline iter 101) -> 0.220615 (iter 125, -0.048%)
+- XRP/5m: 0.221782 (baseline iter 94) -> 0.221503 (iter 112, -0.126%)
+- XRP/15m: 0.218727 (baseline iter 98) — no improvement (starvation prevents it)
+- XRP/1h: 0.226947 (baseline iter 102) -> 0.226907 (iter 115, -0.018%)
+- SUMMARY: 8/12 asset-timeframes have shown improvement from multi-tp baseline. SOL/15m and
+  XRP/15m have not improved — both starvation-limited. ETH/5m and ETH/1h also flat.
+  Largest gains: BTC/5m -0.70%, ETH/15m -0.71%, BTC/1h -0.46%.
 
 ---
 
 ## Risk Profile
 
-- Max drawdown trend: stable — BTC/5m=0.39 (iter 104), BTC/15m=0.17-0.18, BTC/1h=0.23;
-  ETH/SOL/XRP tick-dominant 0.06-0.09 (unchanged across all iterations)
-- Drawdown/PnL ratio: tick-dominant < 0.01 (excellent), BTC sniper 0.003-0.009 (good)
-- Trade count range across KEEPs (iters 115-120):
-  - XRP/1h: 19,292 (iter 115, stable vs iter 102)
-  - ETH/15m: 77,061 (iter 116), ETH/5m: 81,000 (iter 117) — within expected range
-  - SOL/1h: 19,255 (iter 118 DISCARD), XRP/15m: 77,189 (iter 119 DISCARD) — stable
-- Win rate stability: tick-dominant 49-51% (all iterations — no degradation detected)
-- HPO-OOS gap (hpo_objective vs oos_brier):
-  - ETH/15m iter 116: hpo_obj=0.295 vs brier=0.208 (stable ratio, tick-dominant composite penalty)
-  - ETH/5m iter 117: hpo_obj=0.279 vs brier=0.212 (similar)
-  - SOL/1h iter 118: hpo_obj=0.407 vs brier=0.224 — elevated ratio (high reg_alpha penalty)
-  - XRP/15m iter 119: hpo_obj=0.501 vs brier=0.220 — highest ratio seen (22/40 trials only)
-  - NOTE: XRP/15m hpo_objective 0.501 is anomalously high given brier=0.220. Investigate whether
-    trade penalty is driving this (XRP/15m has 77K trades which is near ETH/15m level). Not
-    a quality concern, but suggests XRP/15m is near penalty boundary.
+- Max drawdown trend: stable — BTC assets highest DD (0.22-0.39), ETH/XRP 1h lowest (0.063-0.088)
+  BTC/5m DD=0.39 is stable across iters 92/104/122; no growth trend detected
+- Max DD / PnL ratio: BTC/5m 0.39/56=$0.39 vs $56 PnL (ratio 0.007 — healthy); BTC/15m 0.18/$50
+  (ratio 0.004); BTC/1h 0.22/$12 (ratio 0.018); all within acceptable range (<1.0)
+- Trade count range (KEEP rows, multi-tp era): 5m ~80K, 15m ~60-77K, 1h ~18-19K; stable
+- Win rate range: BTC 62-67% (sniper), ETH/SOL/XRP ~49-51% (tick-dominant); STABLE
+- HPO-OOS gap: XRP/15m hpo_objective=0.498 elevated (Brier-scale penalty; consistent with XRP/15m
+  starvation generating suboptimal models); other assets: hpo_objective tracks oos_brier within 3%
+  typical gap; no widening trend detected
 
 ---
 
 ## Timeframe Coverage
 
-- 5m: 57 iterations (approx), ~20 KEEPs, best multi-tp Brier: BTC=0.17605, ETH=0.211888
-  (new baseline iter 117), SOL=0.218209 (stale — needs anti-starvation), XRP=0.221503
-- 15m: 29 iterations, ~14 KEEPs, best multi-tp Brier: BTC=0.171913, ETH=0.208324 (new best
-  iter 116), SOL=0.215443 (stale — starvation structural), XRP=0.218727 (stale)
-- 1h: 26 iterations, ~12 KEEPs, best multi-tp Brier: BTC=0.174864, ETH=0.211438, SOL=0.221683,
-  XRP=0.226907 (new best iter 115, marginal)
-- Recommendation: 5m is slightly over-represented in this window (ETH/5m, SOL/5m both need
-  attention). Priority queue is balanced: 2/6 to 5m (items 1, 2), 2/6 to 15m (items 3, 4),
-  1/6 to 1h (item 5), 1/6 to 5m (item 6 is ETH/5m). The anti-starvation rollout is the
-  unifying theme — not timeframe-specific.
+- 5m: 33 iterations, 16 KEEPs (11/12 KEEP+VALIDATION-PASS+KEEP-VERIFIED), best: BTC 0.17605
+- 15m: 29 iterations, 13 KEEPs, best: BTC 0.171809
+- 1h: 27 iterations, 12 KEEPs, best: BTC 0.174864
+- Recommendation: BALANCED — all timeframes adequately covered. Rotate per priority queue above.
+  SOL/15m anti-starvation (item 1) addresses the only untreated starvation case.
 
 ---
 
 ## Blacklist
 
-- **lr lower bound > 0.015 for BTC-class assets** (iters 103, 106 DISCARD) — BTC sniper zone
-  requires lr=0.008-0.013; raising lower bound excludes optimum
-- **train_bars increase beyond 10000 for BTC-class** (multiple DISCARDs including iters 52, 82)
-- **train_bars reduction to 7500 for BTC/15m** (iter 114 DISCARD) — starvation is per-fold time,
-  not dataset volume; accept 15-17/40 as structural floor pre-anti-starvation fix
-- **train_bars increase beyond 14000 for ETH** — ETH ceiling is 14000
-- **min_child_samples narrowing for any asset** (0/3 KEEP rate across iters 106, 108, and prior)
-- **funding features in cached_features** (iters 2, 27, 43 — 0/3 KEEP) — funding never in top-10
-- **interaction features** (iter 6 DISCARD — massive Brier regression) — do not re-enable
-- **n_splits reduction to 6** (iters 31, 33) — consistently worse
-- **SOL/15m HPO re-run without anti-starvation fix** (iters 97, 109 — structural 16/40) —
-  must apply n_estimators=[100,800] before attempting SOL/15m again
-- **ETH/1h reg_lambda widening above 10.0** (iter 113 DISCARD) — multi-tp ETH/1h optimal
-  reg_lambda near 1.0-1.4, NOT the single-tp artifact of 9.42
-- **ETH/1h lr narrowing above 0.05** (iter 120 DISCARD) — lr=0.009 confirmed optimal but
-  narrowing provides no lift; leave [0.005, 0.1] wide to avoid over-constraining
-- **No-knob HPO re-run for SOL/1h without reg_alpha investigation** (iter 118 DISCARD at 40/40
-  trials) — floor is genuine at current knobs; only widening reg_alpha ceiling may help
+- HPO range narrowing (lr, min_child, num_leaves, reg_lambda bounds): 0/6 KEEP across all
+  assets/timeframes (iters 103, 105, 106, 108, 113, 120). PERMANENT BLACKLIST until further notice.
+  Exception: widen-type experiments (expanding bounds) remain eligible (1/2 KEEP from reg_alpha
+  widen iter 125)
+- BTC/5m n_splits=8 for HPO coverage improvement: DISCARD at iters 104 and 122 — 8 folds causes
+  structural starvation at BTC/5m scale; n_splits=6 is the conditional path (item 2 above)
+- max_depth > 6 for any asset: DISCARD at iter 41 (SOL); current [2,6] range confirmed correct
+- train_bars increases above per-asset ceiling (BTC 10K, SOL/XRP 10K, ETH 14K): multiple DISCARDs
+- drawdown_penalty_weight increases: non-binding for tick-dominant assets (iters 40, 54); DISCARD
+- objective.primary = sharpe: no improvement vs brier-primary (iter 42); DISCARD
+- ETH/5m min_child narrowing [300,700]: HIGH PRIOR PROBABILITY OF DISCARD (0/5 narrowing rate);
+  only attempt as queue-filler after items 1-3 complete
 
 ---
 
 ## HPO Range Recommendations
 
-- **n_estimators: reduce ceiling to [100, 800] for ALL remaining starvation-prone assets**
-  Evidence: 100% KEEP rate (2/2) for ETH assets after fix. Apply to: SOL/5m, BTC/5m,
-  BTC/15m, XRP/15m. This is the single highest-confidence recommendation in this directive.
-- **n_estimators ceiling is ALREADY [100, 800] in best_knobs.json** — researcher should
-  verify best_knobs.json is the base config before each experiment.
-- **reg_alpha for SOL/1h: test [0.1, 20.0]** — evidence: iter 118 produced reg_alpha=8.55
-  pushing against current upper bound 10.0. Widen to explore whether true optimum is above 10.
-- **learning_rate for SOL: confirmed [0.015, 0.025]** — SOL/5m iters 39/93/101 consistently
-  find lr=0.017-0.023. SOL/1h iter 118 found lr=0.080 (deviation — suspicious given DISCARD).
-  SOL/1h true optimum may be in the low-lr range like SOL/5m. Investigate.
-- **num_leaves for tick-dominant assets**: no change recommended — [16, 128] continues to
-  find diverse optima (SOL/5m 59, ETH/15m 70, XRP/15m 52) with no consistent upper-bound hitting.
-- **min_child_samples**: maintain [100, 1000] — narrowing has 0% KEEP rate; wide range correct.
-- **reg_lambda for tick-dominant multi-tp**: candidate future narrowing to [1e-8, 5.0] —
-  not yet tested; ETH/1h evidence accumulating (optimal~1.0-1.4). Defer to next directive.
+- n_estimators: KEEP [100, 800] for all assets. BTC/5m and XRP/15m may need further ceiling
+  reduction (see priority items 2 and 3 above), but global range stays at [100, 800].
+- learning_rate: KEEP [0.005, 0.1]. Lower bound 0.005 is needed for BTC/1h (optimal lr=0.008-0.010).
+  Upper bound 0.1 occasionally used by XRP. No change.
+- reg_alpha: SOL/1h optimum ~0.919 confirmed. Current range [0.1, 20.0] is mildly wasteful above
+  ~3.0 but does NOT cause starvation at SOL/1h scale (40/40 trials, 241s). Low priority to narrow;
+  leave unchanged for now.
+- reg_lambda: KEEP [1e-8, 10.0]. ETH/1h confirms optimal near lower end (~0.014). No change.
+- min_child_samples: KEEP [100, 1000]. No convergence signal; changing this causes DISCARDs.
+- num_leaves: KEEP [16, 128]. XRP/1h consistently optimizes to 34 (mid-range); BTC uses 40-100;
+  ETH/SOL use 33-70. Range is adequate.
+
+---
+
+## Notes for Next Auditor
+
+- SOL/15m anti-starvation (item 1) is the clearest remaining anti-starvation lever. A KEEP here
+  would complete the anti-starvation rollout for all 6 originally identified starved assets.
+- After item 1, if BTC/5m n_splits=6 (item 2) yields a KEEP, consider whether the BTC/5m
+  blacklist for n_splits should be updated to allow n_splits=6 as the BTC/5m standard.
+- Alpha features (funding, liquidation, OI, IV, polymarket) have NOT appeared in any top-10
+  feature importance across the multi-tp era. This is a potential signal that these features
+  are not contributing — consider adding an explicit alpha-ablation experiment to future queue.
+- Tick-dominant pattern (partial_bar_position + partial_range dominating SHAP) is remarkably
+  stable across all assets/timeframes in multi-tp era. This suggests the model primarily learns
+  bar micro-structure rather than market context. The Polymarket deployment value depends on
+  whether this micro-structure edge is exploitable via limit orders.
