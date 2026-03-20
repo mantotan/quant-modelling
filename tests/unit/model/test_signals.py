@@ -70,6 +70,36 @@ class TestSignalGenerator:
         )
         assert sig_wide is None
 
+    def test_min_confidence_rejects_near_50(self):
+        """Predictions at 0.505 (confidence=0.01) rejected by min_confidence=0.02."""
+        gen = SignalGenerator(min_edge=0.0, min_confidence=0.02)
+        sig = gen.generate(
+            timestamp=datetime(2026, 3, 18, 12, 0, tzinfo=timezone.utc),
+            asset=Asset.BTC, market_type=MarketType.FIVE_MIN,
+            model_prob_up=0.505, market_prob_up=0.40, market_spread=0.02,
+        )
+        assert sig is None
+
+    def test_min_confidence_allows_clear_signal(self):
+        """Predictions at 0.52 (confidence=0.04) pass min_confidence=0.02."""
+        gen = SignalGenerator(min_edge=0.0, min_confidence=0.02)
+        sig = gen.generate(
+            timestamp=datetime(2026, 3, 18, 12, 0, tzinfo=timezone.utc),
+            asset=Asset.BTC, market_type=MarketType.FIVE_MIN,
+            model_prob_up=0.52, market_prob_up=0.40, market_spread=0.02,
+        )
+        assert sig is not None
+
+    def test_min_confidence_boundary_passes(self):
+        """Predictions at exactly 0.51 (confidence=0.02) pass (< not <=)."""
+        gen = SignalGenerator(min_edge=0.0, min_confidence=0.02)
+        sig = gen.generate(
+            timestamp=datetime(2026, 3, 18, 12, 0, tzinfo=timezone.utc),
+            asset=Asset.BTC, market_type=MarketType.FIVE_MIN,
+            model_prob_up=0.51, market_prob_up=0.40, market_spread=0.02,
+        )
+        assert sig is not None
+
     def test_batch_generation(self):
         gen = SignalGenerator(min_edge=0.03)
         n = 10

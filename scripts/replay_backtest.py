@@ -358,6 +358,15 @@ def compute_divergences(
     synthetic_edge_up = model_probs - 0.50
     edge_sign_flip = np.mean(np.sign(real_edge_up) != np.sign(synthetic_edge_up))
 
+    # Edge-weighted flip: weights each flip by |synthetic_edge|
+    # A flip on a 0.001-edge trade is noise; a flip on 0.10-edge is catastrophic
+    flipped = np.sign(real_edge_up) != np.sign(synthetic_edge_up)
+    abs_synthetic_edge = np.abs(synthetic_edge_up)
+    total_edge = abs_synthetic_edge.sum()
+    edge_weighted_flip = float(
+        (flipped * abs_synthetic_edge).sum() / total_edge
+    ) if total_edge > 0 else 0.0
+
     # Paper PnL vs replay PnL (both in real USD now)
     paper_total = float(arrays["paper_pnls"].sum())
     replay_a_total = float(replay_metrics["mode_a"].get("total_pnl", 0))
@@ -380,6 +389,7 @@ def compute_divergences(
         "market_odds_max_dev": float(odds_deviation.max()),
         "market_odds_mean": float(real_odds.mean()),
         "edge_sign_flip_pct": float(edge_sign_flip * 100),
+        "edge_weighted_flip_pct": float(edge_weighted_flip * 100),
         "pnl_paper": paper_total,
         "pnl_replay_real_odds": replay_a_total,
         "pnl_replay_synthetic_odds": replay_b_total,
@@ -397,7 +407,7 @@ def assess_trust(divergences: dict) -> dict:
     """Classify trust level based on divergence thresholds."""
     checks = {
         "market_odds_mae_ok": divergences["market_odds_mae"] < 0.03,
-        "edge_sign_flip_ok": divergences["edge_sign_flip_pct"] < 5.0,
+        "edge_sign_flip_ok": divergences["edge_weighted_flip_pct"] < 5.0,
         "pnl_sign_match": (
             (divergences["pnl_paper"] >= 0) == (divergences["pnl_replay_real_odds"] >= 0)
             if divergences["pnl_paper"] != 0 else True
@@ -500,6 +510,7 @@ def main() -> None:
     logger.info("  Checks passed:     %d/%d", trust["n_checks_passed"], trust["n_checks_total"])
     logger.info("  Market odds MAE:   %.4f", divergences["market_odds_mae"])
     logger.info("  Edge sign flip %%:  %.1f%%", divergences["edge_sign_flip_pct"])
+    logger.info("  Edge wt flip %%:   %.1f%%", divergences["edge_weighted_flip_pct"])
     logger.info("  Paper PnL:         $%.2f", divergences["pnl_paper"])
     logger.info("  Replay PnL (real): $%.2f", divergences["pnl_replay_real_odds"])
     logger.info("  Replay PnL (syn):  $%.2f", divergences["pnl_replay_synthetic_odds"])

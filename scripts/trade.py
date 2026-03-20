@@ -419,7 +419,14 @@ async def main_loop(args: argparse.Namespace) -> None:
         fraction=0.25, max_bet_pct=0.05,
         max_bet_usd=args.max_bet, min_bet_usd=1.0,
     )
-    signal_gen = SignalGenerator(min_edge=args.min_edge)
+    # Load trading config from knobs
+    _knobs = json.loads(_KNOBS_PATH.read_text()) if _KNOBS_PATH.exists() else {}
+    trading_cfg = _knobs.get("trading", {})
+
+    signal_gen = SignalGenerator(
+        min_edge=args.min_edge,
+        min_confidence=trading_cfg.get("min_confidence", 0.02),
+    )
     trade_filter = TradeFilter(
         risk_manager=risk_manager,
         min_edge=args.min_edge,
@@ -433,10 +440,6 @@ async def main_loop(args: argparse.Namespace) -> None:
         asset=args.asset,
         timeframe=args.timeframe,
     )
-
-    # Load trading strategy from knobs (default: first_confident)
-    _knobs = json.loads(_KNOBS_PATH.read_text()) if _KNOBS_PATH.exists() else {}
-    trading_cfg = _knobs.get("trading", {})
     accumulator = BarEdgeAccumulator(
         strategy=trading_cfg.get("strategy", "first_confident"),
         confidence_threshold=trading_cfg.get("confidence_threshold", 0.05),

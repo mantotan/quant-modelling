@@ -28,7 +28,7 @@ class SignalGenerator:
     def __init__(
         self,
         min_edge: float = 0.05,
-        min_confidence: float = 0.0,
+        min_confidence: float = 0.02,
     ) -> None:
         self.min_edge = min_edge
         self.min_confidence = min_confidence
