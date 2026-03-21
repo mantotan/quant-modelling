@@ -79,6 +79,11 @@ class DutchConfig:
     # fraction of bar_budget is spent. Prevents instant bilateral buying.
     rebalance_warmup: float = 0.10
 
+    # V5: Sell logic — dump losing side to recycle capital
+    sell_loss_threshold: float = 0.05  # sell when model edge < -this (5c)
+    sell_max_fraction: float = 0.50    # sell at most 50% of net shares
+    sell_min_shares: float = 10.0      # minimum net shares to consider selling
+
 
 @dataclass(frozen=True, slots=True)
 class DutchOrder:
@@ -91,49 +96,78 @@ class DutchOrder:
     time_pct: float
     placed_at: datetime
     reason: str
+    action: str = "BUY"  # V5: "BUY" or "SELL"
 
 
 @dataclass
 class DutchInventory:
-    """Bilateral inventory tracker — shares and cost for both sides."""
+    """Bilateral inventory tracker with sell support (V5).
 
+    All public properties return NET values (buy - sell) so callers
+    automatically get sell-adjusted numbers without code changes.
+    """
+
+    # Gross buy tracking
     shares_up: float = 0.0
     shares_dn: float = 0.0
     cost_up: float = 0.0
     cost_dn: float = 0.0
 
+    # V5: Sell tracking
+    sell_revenue_up: float = 0.0
+    sell_revenue_dn: float = 0.0
+    sold_shares_up: float = 0.0
+    sold_shares_dn: float = 0.0
+
+    @property
+    def net_shares_up(self) -> float:
+        return self.shares_up - self.sold_shares_up
+
+    @property
+    def net_shares_dn(self) -> float:
+        return self.shares_dn - self.sold_shares_dn
+
+    @property
+    def net_cost_up(self) -> float:
+        return self.cost_up - self.sell_revenue_up
+
+    @property
+    def net_cost_dn(self) -> float:
+        return self.cost_dn - self.sell_revenue_dn
+
     @property
     def matched(self) -> float:
-        return min(self.shares_up, self.shares_dn)
+        return min(self.net_shares_up, self.net_shares_dn)
 
     @property
     def total_cost(self) -> float:
-        return self.cost_up + self.cost_dn
+        """Net cost = buy cost - sell revenue."""
+        return self.net_cost_up + self.net_cost_dn
 
     @property
     def avg_pair_cost(self) -> float:
-        """Average cost per matched pair. < 1.0 = guaranteed profit."""
+        """Average cost per matched pair (net). < 1.0 = guaranteed profit."""
         m = self.matched
         if m <= 0:
             return 1.0
-        frac_up = m / self.shares_up if self.shares_up > 0 else 0.0
-        frac_dn = m / self.shares_dn if self.shares_dn > 0 else 0.0
-        return (self.cost_up * frac_up + self.cost_dn * frac_dn) / m
+        up_avg = self.net_cost_up / self.net_shares_up if self.net_shares_up > 0 else 0.0
+        dn_avg = self.net_cost_dn / self.net_shares_dn if self.net_shares_dn > 0 else 0.0
+        return up_avg + dn_avg
 
     @property
     def imbalance(self) -> float:
-        """Positive = more UP than DN."""
-        return self.shares_up - self.shares_dn
+        """Positive = more UP than DN (net)."""
+        return self.net_shares_up - self.net_shares_dn
 
     @property
     def pnl_if_up(self) -> float:
-        """Profit if UP wins: UP shares pay $1 each, minus total cost."""
-        return self.shares_up * 1.0 - self.total_cost
+        """Profit if UP wins: net UP shares pay $1 each, minus net cost."""
+        return self.net_shares_up * 1.0 - self.total_cost
 
     @property
     def pnl_if_dn(self) -> float:
-        """Profit if DN wins: DN shares pay $1 each, minus total cost."""
-        return self.shares_dn * 1.0 - self.total_cost
+        """Profit if DN wins: net DN shares pay $1 each, minus net cost."""
+        return self.net_shares_dn * 1.0 - self.total_cost
 
     @property
     def worst_case_pnl(self) -> float:
@@ -448,11 +482,11 @@ class DutchAccumulationEngine:
             # -- Share match monitor (highest priority, after warm-up) --
             # Don't force rebalance until enough budget spent to judge
             if self._inventory.total_cost >= self._config.bar_budget * self._config.rebalance_warmup:
-                max_sh = max(self._inventory.shares_up, self._inventory.shares_dn)
-                min_sh = min(self._inventory.shares_up, self._inventory.shares_dn)
+                max_sh = max(self._inventory.net_shares_up, self._inventory.net_shares_dn)
+                min_sh = min(self._inventory.net_shares_up, self._inventory.net_shares_dn)
                 share_match = min_sh / max_sh if max_sh > 0 else 1.0
                 light_side = (
-                    "UP" if self._inventory.shares_up < self._inventory.shares_dn
+                    "UP" if self._inventory.net_shares_up < self._inventory.net_shares_dn
                     else "DN"
                 )
                 if (
@@ -465,6 +499,10 @@ class DutchAccumulationEngine:
                     reason = f"match_rebalance sm={share_match:.0%}"
 
             # -- Time-windowed tier logic (only if share match didn't fire) --
+            warmup_passed = (
+                self._inventory.total_cost
+                >= self._config.bar_budget * self._config.rebalance_warmup
+            )
             if not can_buy:
                 if remaining_s <= self._config.min_time_remaining:
                     # Last 30s: emergency balance only
@@ -485,7 +523,8 @@ class DutchAccumulationEngine:
                         can_buy = True
                         reason = f"edge={my_cheap:.3f}"
                     elif (
-                        needs_balance and need_side == side
+                        warmup_passed
+                        and needs_balance and need_side == side
                         and ask < self._config.max_hedge_ask
                     ):
                         can_buy = True
@@ -501,16 +540,18 @@ class DutchAccumulationEngine:
                     elif my_cheap > adjusted_threshold:
                         can_buy = True
                         reason = f"edge={my_cheap:.3f}"
-                    # Tier 3: Hedge — other side has value, buy this side
+                    # Tier 3: Hedge — after warm-up, other side has value
                     elif (
-                        other_cheap > self._config.cheap_threshold
+                        warmup_passed
+                        and other_cheap > self._config.cheap_threshold
                         and ask < self._config.max_hedge_ask
                     ):
                         can_buy = True
                         reason = f"hedge ask={ask:.3f}"
-                    # Tier 4: Balance — worst-case PnL negative
+                    # Tier 4: Balance — after warm-up, worst-case PnL negative
                     elif (
-                        needs_balance and need_side == side
+                        warmup_passed
+                        and needs_balance and need_side == side
                         and ask < self._config.max_hedge_ask
                     ):
                         can_buy = True
@@ -562,16 +603,16 @@ class DutchAccumulationEngine:
             # -- R6: Price improvement gate (balance/hedge/rebalance exempt) --
             if is_balance or "hedge" in reason or "match_rebalance" in reason:
                 pass  # skip VWAP — these tiers buy at inherently worse prices
-            elif side == "UP" and self._inventory.shares_up > 0:
-                avg_fill = self._inventory.cost_up / self._inventory.shares_up
+            elif side == "UP" and self._inventory.net_shares_up > 0:
+                avg_fill = self._inventory.net_cost_up / self._inventory.net_shares_up
                 if limit_price > avg_fill * (1 + self._config.vwap_tolerance):
                     self._emit(
                         "gate_vwap", time_pct=time_pct, side=side,
                         limit=limit_price, avg_fill=avg_fill,
                     )
                     continue
-            elif side == "DN" and self._inventory.shares_dn > 0:
-                avg_fill = self._inventory.cost_dn / self._inventory.shares_dn
+            elif side == "DN" and self._inventory.net_shares_dn > 0:
+                avg_fill = self._inventory.net_cost_dn / self._inventory.net_shares_dn
                 if limit_price > avg_fill * (1 + self._config.vwap_tolerance):
                     self._emit(
                         "gate_vwap", time_pct=time_pct, side=side,
@@ -587,9 +628,9 @@ class DutchAccumulationEngine:
             elif "match_rebalance" in reason or (needs_balance and need_side == side):
                 # Balance/rebalance: buy shares to reduce imbalance
                 if side == "UP":
-                    shares_needed = self._inventory.total_cost - self._inventory.shares_up
+                    shares_needed = self._inventory.total_cost - self._inventory.net_shares_up
                 else:
-                    shares_needed = self._inventory.total_cost - self._inventory.shares_dn
+                    shares_needed = self._inventory.total_cost - self._inventory.net_shares_dn
                 shares_needed = max(0, shares_needed)
                 dollar_size = min(
                     shares_needed * limit_price,
@@ -652,6 +693,64 @@ class DutchAccumulationEngine:
             # trader_a median gap between first UP and first DN is 72 seconds.
             break
 
+        # -- V5: SELL PASS — dump losing side to recycle capital --
+        buy_side = orders[0].side if orders else None
+        warmup_for_sell = (
+            self._inventory.total_cost
+            >= self._config.bar_budget * self._config.rebalance_warmup
+        )
+        if warmup_for_sell:
+            for side in sides:
+                # Don't sell the same side we just bought
+                if side == buy_side:
+                    continue
+
+                if side == "UP":
+                    net_shares = self._inventory.net_shares_up
+                    my_cheap_sell = cheap_up
+                    bid = book_up.best_bid
+                else:
+                    net_shares = self._inventory.net_shares_dn
+                    my_cheap_sell = cheap_dn
+                    bid = book_dn.best_bid
+
+                # Must have enough shares to sell
+                if net_shares < self._config.sell_min_shares:
+                    continue
+
+                # Model must strongly disagree (losing side)
+                if my_cheap_sell > -self._config.sell_loss_threshold:
+                    continue
+
+                # Sell up to sell_max_fraction of net shares
+                max_sellable = net_shares * self._config.sell_max_fraction
+                sell_shares = min(self._config.order_size / bid, max_sellable) if bid > 0 else 0
+
+                if sell_shares * bid < self._config.min_order_usd:
+                    continue
+
+                sell_order = DutchOrder(
+                    side=side,
+                    limit_price=round(bid, 4),
+                    shares=round(sell_shares, 4),
+                    dollars=round(sell_shares * bid, 2),
+                    time_pct=round(time_pct, 4),
+                    placed_at=datetime.now(UTC),
+                    reason=f"sell_losing edge={my_cheap_sell:.3f}",
+                    action="SELL",
+                )
+                orders.append(sell_order)
+                self._decision_log.append(
+                    f"t={time_pct:.2f}: SELL {side} edge={my_cheap_sell:.3f} "
+                    f"limit={bid:.4f} ${sell_shares * bid:.2f}"
+                )
+                self._emit(
+                    "order", time_pct=time_pct, side=side,
+                    reason=f"sell_losing edge={my_cheap_sell:.3f}",
+                    limit=bid, dollars=sell_shares * bid,
+                )
+                break  # one sell per tick
+
         return orders
 
     def on_fill(
@@ -662,12 +761,24 @@ class DutchAccumulationEngine:
     ) -> None:
         """Update inventory when a limit order fills."""
         cost = filled_shares * fill_price
-        if order.side == "UP":
-            self._inventory.shares_up += filled_shares
-            self._inventory.cost_up += cost
+        action = getattr(order, "action", "BUY")
+
+        if action == "SELL":
+            # V5: Sell — track revenue and sold shares
+            if order.side == "UP":
+                self._inventory.sell_revenue_up += cost
+                self._inventory.sold_shares_up += filled_shares
+            else:
+                self._inventory.sell_revenue_dn += cost
+                self._inventory.sold_shares_dn += filled_shares
         else:
-            self._inventory.shares_dn += filled_shares
-            self._inventory.cost_dn += cost
+            # Buy — existing logic
+            if order.side == "UP":
+                self._inventory.shares_up += filled_shares
+                self._inventory.cost_up += cost
+            else:
+                self._inventory.shares_dn += filled_shares
+                self._inventory.cost_dn += cost
 
         self._orders.append({
             "side": order.side,
@@ -690,8 +801,8 @@ class DutchAccumulationEngine:
         """Compute PnL at bar end and return summary."""
         inv = self._inventory
         matched = inv.matched
-        unmatched_up = max(0, inv.shares_up - inv.shares_dn)
-        unmatched_dn = max(0, inv.shares_dn - inv.shares_up)
+        unmatched_up = max(0, inv.net_shares_up - inv.net_shares_dn)
+        unmatched_dn = max(0, inv.net_shares_dn - inv.net_shares_up)
 
         summary = DutchBarSummary(
             bar_id=self._bar_id,
@@ -700,11 +811,13 @@ class DutchAccumulationEngine:
             condition_id=self._condition_id,
             orders=list(self._orders),
             inventory={
-                "up_shares": round(inv.shares_up, 4),
-                "dn_shares": round(inv.shares_dn, 4),
+                "up_shares": round(inv.net_shares_up, 4),
+                "dn_shares": round(inv.net_shares_dn, 4),
                 "matched": round(matched, 4),
                 "unmatched_up": round(unmatched_up, 4),
                 "unmatched_dn": round(unmatched_dn, 4),
+                "sold_up": round(inv.sold_shares_up, 4),
+                "sold_dn": round(inv.sold_shares_dn, 4),
             },
             cost={
                 "total": round(inv.total_cost, 4),
@@ -781,18 +894,18 @@ class DutchAccumulationEngine:
         inv = self._inventory
         matched = inv.matched
         return {
-            "shares_up": round(inv.shares_up, 4),
-            "shares_dn": round(inv.shares_dn, 4),
-            "cost_up": round(inv.cost_up, 4),
-            "cost_dn": round(inv.cost_dn, 4),
+            "shares_up": round(inv.net_shares_up, 4),
+            "shares_dn": round(inv.net_shares_dn, 4),
+            "cost_up": round(inv.net_cost_up, 4),
+            "cost_dn": round(inv.net_cost_dn, 4),
             "matched": round(matched, 4),
             "avg_pair_cost": round(inv.avg_pair_cost, 4),
             "total_cost": round(inv.total_cost, 4),
             "budget_remaining": round(
                 self._config.bar_budget - inv.total_cost, 4,
             ),
-            "unmatched_up": round(max(0, inv.shares_up - inv.shares_dn), 4),
-            "unmatched_dn": round(max(0, inv.shares_dn - inv.shares_up), 4),
+            "unmatched_up": round(max(0, inv.net_shares_up - inv.net_shares_dn), 4),
+            "unmatched_dn": round(max(0, inv.net_shares_dn - inv.net_shares_up), 4),
             "pnl_if_up": round(inv.pnl_if_up, 4),
             "pnl_if_dn": round(inv.pnl_if_dn, 4),
             "worst_case_pnl": round(inv.worst_case_pnl, 4),
@@ -806,16 +919,21 @@ class DutchAccumulationEngine:
                 self._config.bar_budget * self._config.max_side_fraction, 2,
             ),
             "avg_fill_up": (
-                round(inv.cost_up / inv.shares_up, 4)
-                if inv.shares_up > 0 else 0
+                round(inv.net_cost_up / inv.net_shares_up, 4)
+                if inv.net_shares_up > 0 else 0
             ),
             "avg_fill_dn": (
-                round(inv.cost_dn / inv.shares_dn, 4)
-                if inv.shares_dn > 0 else 0
+                round(inv.net_cost_dn / inv.net_shares_dn, 4)
+                if inv.net_shares_dn > 0 else 0
+            ),
+            "sold_up": round(inv.sold_shares_up, 1),
+            "sold_dn": round(inv.sold_shares_dn, 1),
+            "sell_revenue": round(
+                inv.sell_revenue_up + inv.sell_revenue_dn, 2,
             ),
             "share_match_pct": round(
-                min(inv.shares_up, inv.shares_dn)
-                / max(inv.shares_up, inv.shares_dn) * 100, 1,
-            ) if max(inv.shares_up, inv.shares_dn) > 0 else 0,
+                min(inv.net_shares_up, inv.net_shares_dn)
+                / max(inv.net_shares_up, inv.net_shares_dn) * 100, 1,
+            ) if max(inv.net_shares_up, inv.net_shares_dn) > 0 else 0,
         }
 

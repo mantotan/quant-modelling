@@ -101,9 +101,12 @@ class LimitOrderSimulator:
         book_up/book_dn are TokenBook | None.
         Returns list of fills that occurred this tick.
         """
-        # --- Chase pass: check if market moved away ---
+        # --- Chase pass: check if market moved away (BUY orders only) ---
         for po in self._pending:
             if po.state not in ("PENDING", "CROSSING"):
+                continue
+            # V5: skip chase for sell orders (they sit at bid)
+            if getattr(po.order, "action", "BUY") == "SELL":
                 continue
             book = book_up if po.order.side == "UP" else book_dn
             if book is None or book.best_bid <= 0:
@@ -150,24 +153,43 @@ class LimitOrderSimulator:
                 remaining.append(po)
                 continue
 
-            ask = book.best_ask
             limit = po.order.limit_price
+            is_sell = getattr(po.order, "action", "BUY") == "SELL"
 
-            if ask <= limit:
-                po.consecutive_ticks_at_limit += 1
-                if po.consecutive_ticks_at_limit >= self._fill_ticks:
-                    fill = self._execute_fill(po, time_pct, book)
-                    fills.append(fill)
-                    po.state = "FILLED"
+            if is_sell:
+                # V5: Sell fills when bid >= limit
+                bid = book.best_bid
+                if bid >= limit:
+                    po.consecutive_ticks_at_limit += 1
+                    if po.consecutive_ticks_at_limit >= self._fill_ticks:
+                        fill = self._execute_fill(po, time_pct, book)
+                        fills.append(fill)
+                        po.state = "FILLED"
+                    else:
+                        remaining.append(po)
                 else:
+                    if po.consecutive_ticks_at_limit > 0:
+                        po.would_fill_count += 1
+                    po.consecutive_ticks_at_limit = 0
+                    po.state = "PENDING"
                     remaining.append(po)
             else:
-                # Ask bounced above limit
-                if po.consecutive_ticks_at_limit > 0:
-                    po.would_fill_count += 1
-                po.consecutive_ticks_at_limit = 0
-                po.state = "PENDING"
-                remaining.append(po)
+                # Buy fills when ask <= limit
+                ask = book.best_ask
+                if ask <= limit:
+                    po.consecutive_ticks_at_limit += 1
+                    if po.consecutive_ticks_at_limit >= self._fill_ticks:
+                        fill = self._execute_fill(po, time_pct, book)
+                        fills.append(fill)
+                        po.state = "FILLED"
+                    else:
+                        remaining.append(po)
+                else:
+                    if po.consecutive_ticks_at_limit > 0:
+                        po.would_fill_count += 1
+                    po.consecutive_ticks_at_limit = 0
+                    po.state = "PENDING"
+                    remaining.append(po)
 
         self._pending = remaining
         return fills

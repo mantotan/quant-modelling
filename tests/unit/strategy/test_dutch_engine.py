@@ -132,7 +132,9 @@ class TestDutchEngine:
 
     def test_hedge_tier_replaces_contra(self):
         """V4: Hedge tier fires where old contra used to, without model gate."""
-        engine = self._make_engine(cheap_threshold=0.10, max_hedge_ask=0.80)
+        engine = self._make_engine(
+            cheap_threshold=0.10, max_hedge_ask=0.80, rebalance_warmup=0.0,
+        )
         # ask_UP = 0.58, model P(UP)=0.40 → cheap_UP = 0.40-0.58 = -0.18 (negative)
         # cheap_DN = 0.60 - 0.35 = +0.25 > threshold 0.10 → hedge fires for UP
         book_up = make_book(0.50, 0.58)
@@ -601,7 +603,7 @@ class TestDutchV4BilateralGrid:
     def test_hedge_buys_expensive_side(self):
         """Tier 3: hedge fires when other side has edge and ask < max_hedge_ask."""
         engine = self._make_engine(
-            cheap_threshold=0.10, max_hedge_ask=0.80,
+            cheap_threshold=0.10, max_hedge_ask=0.80, rebalance_warmup=0.0,
         )
         # Model P(UP)=0.40 → cheap_DN = 0.60 - 0.35 = +0.25 (strong DN edge)
         # ask_UP = 0.65 (expensive but < 0.80)
@@ -786,6 +788,7 @@ class TestDutchV4BilateralGrid:
         """Hedge orders skip R6 VWAP gate (they inherently buy at worse prices)."""
         engine = self._make_engine(
             cheap_threshold=0.10, max_hedge_ask=0.80, vwap_tolerance=0.10,
+            rebalance_warmup=0.0,
         )
         # Fill UP at 0.50 to set a VWAP baseline
         fill_order = DutchOrder(
@@ -890,6 +893,166 @@ class TestDutchV4BilateralGrid:
         orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
         rebalance = [o for o in orders if "match_rebalance" in o.reason]
         assert len(rebalance) >= 1
+
+
+class TestDutchV5Sells:
+    """Tests for V5: sell logic + warm-up gate."""
+
+    def _make_engine(self, **kwargs) -> DutchAccumulationEngine:
+        config = DutchConfig(**kwargs)
+        return DutchAccumulationEngine(config)
+
+    def test_sell_losing_side(self):
+        """Sell fires when model strongly disagrees with held side."""
+        engine = self._make_engine(
+            sell_loss_threshold=0.05, sell_min_shares=5.0,
+            rebalance_warmup=0.0, max_hedge_ask=0.80,
+        )
+        # Hold 50 UP shares at 0.30 ($15)
+        engine._inventory.shares_up = 50.0
+        engine._inventory.cost_up = 15.0
+
+        # Model P(UP)=0.20. Both asks > 0.80 → no buy triggers at all.
+        # Sell pass: cheap_UP = 0.20 - 0.90 = -0.70 < -0.05 → sell UP
+        book_up = make_book(0.85, 0.90)
+        book_dn = make_book(0.08, 0.10)  # DN is cheap but loop starts UP, no buy
+        orders = engine.on_tick(0.50, 0.20, book_up, book_dn)
+        sell_orders = [o for o in orders if getattr(o, "action", "BUY") == "SELL"]
+        assert len(sell_orders) >= 1
+        assert sell_orders[0].side == "UP"
+        assert "sell_losing" in sell_orders[0].reason
+
+    def test_no_sell_when_model_agrees(self):
+        """No sell when model says this side is fine."""
+        engine = self._make_engine(
+            sell_loss_threshold=0.05, sell_min_shares=5.0,
+            rebalance_warmup=0.0,
+        )
+        engine._inventory.shares_up = 50.0
+        engine._inventory.cost_up = 15.0
+
+        # Model says P(UP)=0.60 → cheap_UP = 0.60 - 0.50 = +0.10 (positive)
+        book_up = make_book(0.48, 0.50)
+        book_dn = make_book(0.48, 0.50)
+        orders = engine.on_tick(0.50, 0.60, book_up, book_dn)
+        sell_orders = [o for o in orders if getattr(o, "action", "BUY") == "SELL"]
+        assert len(sell_orders) == 0
+
+    def test_sell_max_fraction(self):
+        """Sell respects max fraction of net shares."""
+        engine = self._make_engine(
+            sell_loss_threshold=0.05, sell_max_fraction=0.50,
+            sell_min_shares=5.0, order_size=1000.0,  # large to not limit
+            rebalance_warmup=0.0,
+        )
+        engine._inventory.shares_up = 100.0
+        engine._inventory.cost_up = 30.0
+
+        book_up = make_book(0.48, 0.50)
+        book_dn = make_book(0.48, 0.50)
+        orders = engine.on_tick(0.50, 0.20, book_up, book_dn)
+        sell_orders = [o for o in orders if getattr(o, "action", "BUY") == "SELL"]
+        if sell_orders:
+            assert sell_orders[0].shares <= 50.0  # 50% of 100
+
+    def test_sell_updates_net_inventory(self):
+        """Sell fill updates net shares and revenue."""
+        engine = self._make_engine()
+        engine._inventory.shares_up = 100.0
+        engine._inventory.cost_up = 30.0
+
+        sell_order = DutchOrder(
+            side="UP", limit_price=0.40, shares=50.0, dollars=20.0,
+            time_pct=0.5, placed_at=datetime.now(UTC), reason="sell_losing",
+            action="SELL",
+        )
+        engine.on_fill(sell_order, fill_price=0.40, filled_shares=50.0)
+
+        assert engine._inventory.sold_shares_up == 50.0
+        assert engine._inventory.sell_revenue_up == 20.0
+        assert engine._inventory.net_shares_up == 50.0  # 100 - 50
+        assert engine._inventory.net_cost_up == 10.0  # 30 - 20
+
+    def test_sell_concurrent_with_buy(self):
+        """Buy and sell can fire on same tick (different sides)."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, sell_loss_threshold=0.05,
+            sell_min_shares=5.0, rebalance_warmup=0.0,
+            max_hedge_ask=0.80,
+        )
+        # Hold UP shares, model says UP losing
+        engine._inventory.shares_up = 50.0
+        engine._inventory.cost_up = 15.0
+
+        # DN ask=0.30 < 0.50 → cheap buy DN
+        # UP ask=0.85 > max_hedge_ask → no hedge, but sell pass: edge=-0.65 → sell UP
+        book_up = make_book(0.83, 0.85)
+        book_dn = make_book(0.13, 0.15)
+        orders = engine.on_tick(0.50, 0.20, book_up, book_dn)
+
+        buy_orders = [o for o in orders if getattr(o, "action", "BUY") == "BUY"]
+        sell_orders = [o for o in orders if getattr(o, "action", "BUY") == "SELL"]
+        assert len(buy_orders) >= 1  # DN cheap buy
+        assert len(sell_orders) >= 1  # UP sell
+
+    def test_sell_not_same_side_as_buy(self):
+        """Can't sell the same side we just bought."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, sell_loss_threshold=0.05,
+            sell_min_shares=5.0, rebalance_warmup=0.0,
+            max_hedge_ask=0.80, min_share_match=0.0,  # disable share match
+        )
+        # Hold DN shares. Model P(UP)=0.80 → DN is losing.
+        # DN ask=0.30 < 0.50 → cheap BUY DN fires (loop starts DN since count=0→UP first,
+        # but UP ask=0.85 > 0.50, no edge → skips to DN).
+        engine._inventory.shares_dn = 50.0
+        engine._inventory.cost_dn = 15.0
+
+        book_up = make_book(0.83, 0.85)  # not cheap, not hedge-eligible
+        book_dn = make_book(0.28, 0.30)  # cheap → buy DN
+        orders = engine.on_tick(0.50, 0.80, book_up, book_dn)
+
+        buy_dn = [o for o in orders if getattr(o, "action", "BUY") == "BUY" and o.side == "DN"]
+        sell_dn = [o for o in orders if getattr(o, "action", "BUY") == "SELL" and o.side == "DN"]
+        assert len(buy_dn) >= 1, f"Should buy DN cheap, got {[o.reason for o in orders]}"
+        assert len(sell_dn) == 0  # can't sell same side we bought
+
+    def test_warm_up_blocks_hedge(self):
+        """Hedge doesn't fire before warm-up."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, max_hedge_ask=0.80, rebalance_warmup=0.10,
+        )
+        # $0 spent → warm-up not passed
+        book_up = make_book(0.55, 0.60)  # hedge candidate
+        book_dn = make_book(0.30, 0.35)  # other side has edge
+        orders = engine.on_tick(0.50, 0.40, book_up, book_dn)
+        hedge = [o for o in orders if "hedge" in o.reason]
+        assert len(hedge) == 0
+
+    def test_warm_up_blocks_balance(self):
+        """Balance doesn't fire before warm-up."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, max_hedge_ask=0.80, rebalance_warmup=0.10,
+        )
+        engine._inventory.shares_dn = 50
+        engine._inventory.cost_dn = 5.0  # only 2.5% of $200 budget
+        book_up = make_book(0.55, 0.60)
+        book_dn = make_book(0.55, 0.60)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        balance = [o for o in orders if "balance" in o.reason]
+        assert len(balance) == 0
+
+    def test_cheap_fires_before_warmup(self):
+        """Cheap tier fires regardless of warm-up."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, rebalance_warmup=0.10,
+        )
+        # $0 spent, but ask < 0.50 → cheap fires
+        book_up = make_book(0.30, 0.35)
+        book_dn = make_book(0.55, 0.60)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        assert len(orders) >= 1
+        assert "cheap" in orders[0].reason
 
 
 class TestDutchBarSummary:
