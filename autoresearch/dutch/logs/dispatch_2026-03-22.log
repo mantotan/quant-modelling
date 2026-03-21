@@ -4,3 +4,4 @@
 2026-03-22T00:30:00Z iter=4 role=monitor outcome=healthy 0/3 PM2 (replay mode), pair_cost_stuck WARNING active 5m=1.034 15m=1.028, no new CRITICAL alerts
 2026-03-22T06:27:00Z iter=5 role=researcher outcome=BTC_1h BASELINE pair_cost=0.9382 max_dd=27.3% bars=16 next=risk_ceil_0.15->0.10
 2026-03-22T06:35:00Z iter=5 role=strategist outcome=KEEP_rate=0% best_pair=BTC_1h(0.9382) worst_pair=BTC_5m(0.9676) sell_ratio_zero_all_pairs
+2026-03-22T06:39:33Z iter=6 role=researcher outcome=BTC_1h DISCARD pair_cost=0.9588 max_dd=29.78% next=pace_urgency_hi_2.0->2.5
