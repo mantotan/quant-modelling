@@ -190,7 +190,13 @@ Accept that mid-bar inventory may be lost. The `min_eval_bars=8` evaluation wind
 
 ## Phase 7: Update Dispatch State
 
-**BACKTEST MODE:** Skip this phase entirely (no incubation needed).
+**BACKTEST MODE:** Advance pair rotation. Read `dispatch_state.json`, then:
+- `pair_index = (pair_index + 1) % len(pair_rotation)`
+- `current_pair = pair_rotation[pair_index]`
+- `last_role = "researcher"`
+- `total_iterations` = re-count data rows in results.tsv
+- Write back `dispatch_state.json`.
+**This is critical** — if you skip this, the loop stays on the same pair forever.
 
 **LIVE MODE:**
 Read `autoresearch/dutch/dispatch_state.json`. Update:
