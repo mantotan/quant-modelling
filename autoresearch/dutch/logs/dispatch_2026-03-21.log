@@ -9,3 +9,4 @@
 2026-03-21T19:20:48Z iter=1 EXIT reason=incubating elapsed=15991s alerts=0
 2026-03-21T20:00:53Z iter=1 EXIT reason=incubating elapsed=18396s alerts=0
 2026-03-21T22:37:43Z iter=1 role=researcher outcome=BTC_5m BASELINE pair_cost=0.9676 profit=$-5.63 max_dd=482.5% bars=164 next=sell_loss_start:0.70->0.50
+2026-03-21T22:47:42Z iter=2 role=researcher outcome=BTC_15m BASELINE pair_cost=0.9631 max_dd=167.63% bars=57; experiment queued: max_marginal_pair_cost 1.03->0.99

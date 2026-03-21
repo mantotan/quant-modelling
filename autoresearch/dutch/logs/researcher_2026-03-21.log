@@ -7,3 +7,6 @@
 2026-03-21T22:37:43Z iter=0 pair=BTC_5m status=BASELINE param=- ->(no change)
   eval: pair_cost=0.9676 profit=$-5.63 max_dd=482.47% bars=164
   hypothesis: "BASELINE run. sell_ratio=0.0 indicates sells never fired in 164 bars. max_dd=482% catastrophic from unresolved inventory. Next: lower sell_loss_start 0.70->0.50 to trigger loss-cut sells sooner and reduce drawdown accumulation."
+2026-03-21T22:47:42Z iter=2 pair=BTC_15m status=BASELINE param=- -(no change)
+  eval: pair_cost=0.9631 profit=$-5.8816 total_profit=$-335.25 matched=0.6072 fill=0.8296 correct=0.1404 max_dd=167.63% bars=57 sell_ratio=0.000
+  hypothesis: "BASELINE for BTC_15m. sell_ratio=0.000 — no sells in 57 bars (same as BTC_5m baseline). pair_cost=0.9631 under warning threshold. max_dd=167.63% driven by unresolved inventory. Hypothesis: tighten max_marginal_pair_cost 1.03->0.99 to gate out expensive order fills and reduce pair cost. Sell triggers will be investigated in subsequent iterations after pair cost baseline is established."

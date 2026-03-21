@@ -1,0 +1,4 @@
+2026-03-22T05:41:12Z iter=1 pair=BTC_5m status=DISCARD param=sell_loss_start 0.70->0.50
+  eval: pair_cost=1.0027 profit=$-6.03 total_profit=$-994.73 matched=0.7064 fill=0.8934 correct=0.1758 max_dd=518.23% bars=165
+  reason: all 3 KEEP criteria failed (pair_cost 1.0027>0.9676 baseline, avg_profit -6.03<0, max_dd 518%>30%). Premature loss-cut sells at 0.50 forced exits before recovery, reducing matched pairs and raising pair cost.
+  hypothesis: "Pair cost stuck WARNING active (monitor). Try tightening max_marginal_pair_cost 1.03->0.99 to block orders priced above 0.99. Should directly cut the high-cost tail that drives avg_pair_cost up. Pair rotation advanced to BTC_15m."
