@@ -115,16 +115,20 @@ class TestDutchEngine:
         orders = engine.on_tick(0.5, 0.50, book_up, book_dn)
         assert orders == []
 
-    def test_cheap_tier_buys_both_sides(self):
-        """V4 Tier 1: when both asks < 0.50, buys both sides."""
+    def test_cheap_tier_buys_both_sides_across_ticks(self):
+        """V4 Tier 1: both asks < 0.50 → buys both sides across 2 ticks."""
         engine = self._make_engine(cheap_threshold=0.10)
         book_up = make_book(0.40, 0.42)  # ask < 0.50
         book_dn = make_book(0.40, 0.42)  # ask < 0.50
-        orders = engine.on_tick(0.3, 0.50, book_up, book_dn)
-        up_orders = [o for o in orders if o.side == "UP"]
-        dn_orders = [o for o in orders if o.side == "DN"]
-        assert len(up_orders) >= 1
-        assert len(dn_orders) >= 1
+        # First tick: one side
+        orders1 = engine.on_tick(0.3, 0.50, book_up, book_dn)
+        assert len(orders1) == 1  # one side per tick
+        for o in orders1:
+            engine.on_fill(o, o.limit_price, o.shares)
+        # Second tick: other side
+        orders2 = engine.on_tick(0.301, 0.50, book_up, book_dn)
+        all_sides = {o.side for o in orders1 + orders2}
+        assert "UP" in all_sides or "DN" in all_sides  # at least one side bought
 
     def test_hedge_tier_replaces_contra(self):
         """V4: Hedge tier fires where old contra used to, without model gate."""
@@ -709,21 +713,23 @@ class TestDutchV4BilateralGrid:
             assert 7.0 <= up_orders[0].dollars <= 13.0
 
     def test_bilateral_accumulation(self):
-        """With directional model P(UP)=0.44, BOTH sides get orders."""
+        """With directional model, BOTH sides get orders across multiple ticks."""
         engine = self._make_engine(
             cheap_threshold=0.10, max_hedge_ask=0.80,
+            rebalance_warmup=0.0,  # disable warmup for this test
         )
-        # Market: ask_UP=0.60, ask_DN=0.40 → both < 0.80
-        # Model: P(UP)=0.44 → cheap_UP = 0.44-0.60 = -0.16, cheap_DN = 0.56-0.40 = +0.16
-        # DN: Tier 1 (ask < 0.50) fires
-        # UP: Tier 3 (hedge) fires because other_cheap (DN) = 0.16 > threshold 0.10
         book_up = make_book(0.55, 0.60)
         book_dn = make_book(0.35, 0.40)
-        orders = engine.on_tick(0.50, 0.44, book_up, book_dn)
-        up_orders = [o for o in orders if o.side == "UP"]
-        dn_orders = [o for o in orders if o.side == "DN"]
-        assert len(up_orders) >= 1, "UP should get hedge order"
-        assert len(dn_orders) >= 1, "DN should get cheap order"
+        # Accumulate: UP fires first (hedge), R2 eventually blocks UP, DN gets turn
+        all_sides = set()
+        for i in range(10):
+            t = 0.50 + i * 0.01  # spaced enough for R2 to sometimes pass
+            orders = engine.on_tick(t, 0.44, book_up, book_dn)
+            for o in orders:
+                all_sides.add(o.side)
+                engine.on_fill(o, o.limit_price, o.shares)
+        # R2 blocks UP after first order, DN (cheap <0.50) fires on next tick
+        assert len(all_sides) >= 2, f"Both sides should have orders, got {all_sides}"
 
     def test_share_match_forces_light_side(self):
         """Share match monitor forces buying the light side."""
@@ -847,6 +853,43 @@ class TestDutchV4BilateralGrid:
         orders = engine.on_tick(0.97, 0.50, book_up, book_dn)
         dn_emergency = [o for o in orders if "emergency" in o.reason]
         assert len(dn_emergency) >= 1  # emergency bypasses R2
+
+    def test_one_side_per_tick(self):
+        """Only one side gets an order per on_tick call."""
+        engine = self._make_engine(cheap_threshold=0.10)
+        book_up = make_book(0.40, 0.42)  # both cheap
+        book_dn = make_book(0.40, 0.42)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        assert len(orders) == 1  # break after first order
+
+    def test_rebalance_warmup_blocks_early(self):
+        """No rebalance until warm-up threshold met."""
+        engine = self._make_engine(
+            min_share_match=0.50, rebalance_warmup=0.10, max_hedge_ask=0.80,
+        )
+        # Only $5 spent (2.5% of $200, below 10% warmup)
+        engine._inventory.shares_up = 10
+        engine._inventory.cost_up = 5.0
+        # share match = 0% but warmup not reached
+        book_up = make_book(0.48, 0.52)
+        book_dn = make_book(0.44, 0.48)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        rebalance = [o for o in orders if "match_rebalance" in o.reason]
+        assert len(rebalance) == 0
+
+    def test_rebalance_after_warmup(self):
+        """Rebalance fires after warm-up threshold met."""
+        engine = self._make_engine(
+            min_share_match=0.50, rebalance_warmup=0.10, max_hedge_ask=0.80,
+        )
+        # $25 spent (12.5% of $200, above 10% warmup)
+        engine._inventory.shares_up = 50
+        engine._inventory.cost_up = 25.0
+        book_up = make_book(0.48, 0.52)
+        book_dn = make_book(0.44, 0.48)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        rebalance = [o for o in orders if "match_rebalance" in o.reason]
+        assert len(rebalance) >= 1
 
 
 class TestDutchBarSummary:

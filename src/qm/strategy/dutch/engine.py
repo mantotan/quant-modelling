@@ -75,6 +75,10 @@ class DutchConfig:
     # V4: Cheap tier ask threshold (buy any side below this, no model gate)
     cheap_ask_max: float = 0.50
 
+    # V4: Rebalance warm-up — don't force share match rebalance until this
+    # fraction of bar_budget is spent. Prevents instant bilateral buying.
+    rebalance_warmup: float = 0.10
+
 
 @dataclass(frozen=True, slots=True)
 class DutchOrder:
@@ -422,7 +426,9 @@ class DutchAccumulationEngine:
 
         orders: list[DutchOrder] = []
 
-        for side in ("UP", "DN"):
+        # Alternate starting side to avoid UP bias with break
+        sides = ("DN", "UP") if self._order_count % 2 else ("UP", "DN")
+        for side in sides:
             if side == "UP":
                 bid = book_up.best_bid
                 ask = book_up.best_ask
@@ -439,9 +445,9 @@ class DutchAccumulationEngine:
             reason = ""
             is_balance = False
 
-            # -- Share match monitor (highest priority) --
-            # If shares are heavily imbalanced, force-buy the light side
-            if self._inventory.shares_up > 0 or self._inventory.shares_dn > 0:
+            # -- Share match monitor (highest priority, after warm-up) --
+            # Don't force rebalance until enough budget spent to judge
+            if self._inventory.total_cost >= self._config.bar_budget * self._config.rebalance_warmup:
                 max_sh = max(self._inventory.shares_up, self._inventory.shares_dn)
                 min_sh = min(self._inventory.shares_up, self._inventory.shares_dn)
                 share_match = min_sh / max_sh if max_sh > 0 else 1.0
@@ -641,6 +647,10 @@ class DutchAccumulationEngine:
                 "order", time_pct=time_pct, side=side, reason=reason,
                 limit=limit_price, dollars=dollar_size,
             )
+
+            # One side per tick — let prices update before buying other side.
+            # trader_a median gap between first UP and first DN is 72 seconds.
+            break
 
         return orders
 
