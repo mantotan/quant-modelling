@@ -1,12 +1,10 @@
 {
-  "total_iterations": 1,
+  "current_pair": "BTC_5m",
+  "pair_rotation": ["BTC_5m","BTC_15m","BTC_1h","ETH_5m","ETH_15m","ETH_1h","SOL_5m","SOL_15m","SOL_1h","XRP_5m","XRP_15m","XRP_1h"],
+  "pair_index": 0,
+  "last_updated": "2026-03-22T00:00:00Z",
+  "last_role": "none",
+  "last_monitor_at": null,
   "last_strategist_at": 0,
-  "last_auditor_at": 0,
-  "last_monitor_at": "2026-03-21T19:10:32Z",
-  "last_role": "exit",
-  "last_updated": "2026-03-21T20:00:53Z",
-  "experiment_started_at": "2026-03-21T14:54:17Z",
-  "experiment_start_bar_ids": {"5m": 1774103700, "15m": 1774103400, "1h": 0},
-  "min_eval_bars": 8,
-  "incubation_complete": false
+  "last_auditor_at": 0
 }

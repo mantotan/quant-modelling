@@ -9,22 +9,42 @@ Autonomously optimize DutchConfig parameters for bilateral accumulation of Polym
 | Metric | Target | Description |
 |--------|--------|-------------|
 | avg_pair_cost | < 0.85 | Average cost per matched pair (< 1.0 = profit) |
+| avg_profit | > 0 | Mean profit per bar |
+| max_dd_pct | < 30% | Max drawdown as % of bar budget |
 | correct_side_pct | > 0.55 | Fraction of bars where unmatched side wins |
-| matched_ratio | > 0.30 | min(UP,DN) / max(UP,DN) shares |
-| fill_rate | > 0.50 | Filled orders / placed orders |
 | sell_ratio | 0.10-0.40 | Sell events / buy events (capital recycling) |
+
+Note: `matched_ratio` and `fill_rate` are tracked but NOT KEEP gates — backtest produces
+lower values than live (12% fill, 6% match) due to tick density differences. These improve
+when moving to live execution.
 
 ## Architecture
 
-Single dispatch loop (`/loop 20m dutch-dispatch`) with 4 roles:
-- **Monitor**: Check PM2 health + anomaly detection (runs ~hourly)
-- **Researcher**: ONE parameter change → wait 8 bars → evaluate KEEP/DISCARD
-- **Strategist**: Every ~5 iterations, analyze KEEP rates, write priority queue
-- **Auditor**: Every ~20 iterations, deep analysis, issue directives
+### Per-Pair Config System
+
+Each of 12 asset/timeframe pairs has independent knobs:
+- `knobs_{ASSET}_{TF}.json` — working config for that pair
+- `best_knobs_{ASSET}_{TF}.json` — last KEEP checkpoint for that pair
+- Pairs: BTC_5m, BTC_15m, BTC_1h, ETH_5m, ETH_15m, ETH_1h, SOL_5m, SOL_15m, SOL_1h, XRP_5m, XRP_15m, XRP_1h
+- Fallback: `knobs.json` / `best_knobs.json` (shared defaults)
+
+### Dispatch Loop
+
+- **Backtest mode**: `/loop 2m dutch-dispatch` — researcher rotates through pairs (~10s each)
+- **Live mode**: `/loop 20m dutch-dispatch` — EXIT while incubating
+- **Pair rotation**: dispatch advances `current_pair` after each researcher invocation
+- **Full rotation**: 12 iterations = all pairs tested once
+
+### Roles
+
+- **Researcher**: ONE parameter change on ONE pair → run backtest → KEEP/DISCARD
+- **Strategist**: Every 12 iterations (1 rotation), per-pair analysis + priority queues
+- **Auditor**: Every 24 iterations (2 rotations), deep analysis, FREEZE/PRIORITIZE/RESET directives
+- **Monitor**: Check PM2 health + anomaly detection (skips PM2 in backtest mode)
 
 ## Tunable Parameters (V7)
 
-See `knobs.json` for all parameters. Key categories:
+See `knobs_{PAIR}.json` for per-pair parameters. Key categories:
 - Pair cost (cheap_threshold, max_marginal_pair_cost)
 - Pacing (pace_urgency_lo/hi, max_per_prediction, bar_budget, order_size)
 - Risk budget (risk_floor, risk_ceil, risk_t_start, risk_t_end, risk_exponent)
@@ -47,16 +67,28 @@ Maker-only simulation matching production `post_only=True` behavior:
 
 ## Data Sources
 
+### Backtest mode (primary)
+- Tick Parquet: `data/raw/polymarket_ticks/asset={A}/timeframe={TF}/date={D}/ticks_*.parquet`
+- Backtest output: `autoresearch/dutch/backtest_results.tsv` (10 metrics + max_dd_pct)
+- Backtest bar JSONL: `data/dutch_backtest/{A}_{TF}/bars_*.jsonl` (optional, `--save-bars`)
+- Script: `scripts/dutch_backtest.py --knobs-dir autoresearch/dutch/ --pair {PAIR}`
+
+### Live mode
 - Bar summaries: `data/dutch_paper/BTC_{tf}/bars_*.jsonl`
 - Events: `data/dutch_paper/BTC_{tf}/events_*.jsonl`
-- Tick snapshots: `data/dutch_paper/BTC_{tf}/ticks_*.jsonl` (for future replay)
 - PM2 logs: `data/dutch_{tf}.err.log`, `data/dutch_{tf}.out.log`
 
-## Phase 2: Backtest Replay (IMPLEMENTED)
+## results.tsv Format
 
-Replay recorded Polymarket tick Parquet through the engine with different knobs for rapid offline iteration.
-- Script: `scripts/dutch_backtest.py`
-- Data: `data/raw/polymarket_ticks/` (Hive-partitioned Parquet, 4 assets x 3 TFs)
-- Activation: set `phase.json` `sub_phase: "replay_available"`
-- Iteration time: ~10-30s (vs ~40-80 min for live)
-- Output: TSV with 9 standard metrics (same format as researcher evaluation)
+```
+iteration  pair  timestamp  status  avg_pair_cost  avg_profit  total_profit  matched_ratio  fill_rate  correct_side_pct  budget_util  sell_ratio  max_dd_pct  bars_evaluated  description  param_changed
+```
+
+## Auditor Directives
+
+| Directive | Effect |
+|-----------|--------|
+| FREEZE {pair} | Lock pair's best_knobs, skip in rotation |
+| PRIORITIZE {pair} | Give pair 2 extra iterations |
+| RESET {pair} {hash} | Restore pair's knobs from git commit |
+| CONTINUE | Keep rotating normally |

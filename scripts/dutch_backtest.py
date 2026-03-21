@@ -9,6 +9,7 @@ Usage:
     uv run scripts/dutch_backtest.py --verbose --assets BTC --timeframes 15m
     uv run scripts/dutch_backtest.py --output autoresearch/dutch/backtest_results.tsv
     uv run scripts/dutch_backtest.py --save-bars --date 2026-03-21
+    uv run scripts/dutch_backtest.py --knobs-dir autoresearch/dutch/ --pair BTC_5m --verbose
 """
 
 from __future__ import annotations
@@ -61,7 +62,15 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Dutch Accumulation Backtest")
     p.add_argument(
         "--knobs", default="autoresearch/dutch/knobs.json",
-        help="Path to knobs.json config (default: autoresearch/dutch/knobs.json)",
+        help="Shared knobs file (fallback if --knobs-dir not set)",
+    )
+    p.add_argument(
+        "--knobs-dir", default=None,
+        help="Directory with per-pair knobs_{ASSET}_{TF}.json files",
+    )
+    p.add_argument(
+        "--pair", default=None,
+        help="Run only this pair (e.g. BTC_5m). Default: all pairs.",
     )
     p.add_argument(
         "--ticks-dir", default="data/raw/polymarket_ticks",
@@ -95,10 +104,24 @@ def parse_args() -> argparse.Namespace:
 
 # -- Config loading (mirrors monitor_pulse.py:676-704) ---------------------
 
+def _resolve_knobs_path(
+    knobs_dir: Path | None, knobs_fallback: Path,
+    asset: str, tf_label: str,
+) -> Path:
+    """Resolve knobs file: per-pair first, then shared fallback."""
+    if knobs_dir:
+        pair_path = knobs_dir / f"knobs_{asset}_{tf_label}.json"
+        if pair_path.exists():
+            return pair_path
+    return knobs_fallback
+
+
 def load_dutch_config(
-    knobs_path: Path, tf: Timeframe,
+    knobs_dir: Path | None, knobs_fallback: Path,
+    asset: str, tf_label: str, tf: Timeframe,
 ) -> tuple[DutchConfig, dict]:
-    """Load DutchConfig from knobs.json."""
+    """Load DutchConfig — tries per-pair file first, falls back to shared."""
+    knobs_path = _resolve_knobs_path(knobs_dir, knobs_fallback, asset, tf_label)
     kwargs: dict = {"bar_seconds": BAR_SECONDS[tf]}
     sim_kwargs: dict = {}
 
@@ -145,18 +168,17 @@ def load_model(
 
 def warm_up_cache(
     cache: LiveFeatureCache, asset_enum: Asset, tf: Timeframe,
-) -> list[dict]:
-    """Populate feature cache from historical bars. Returns bar dicts for reuse."""
+) -> None:
+    """Populate feature cache from historical bars."""
     store = ParquetStore(base_dir=Path("data/raw/ohlcv"))
     pipeline = FeaturePipeline()
     bars_df = store.read_bars(asset_enum, tf)
     if bars_df.is_empty():
         logger.warning("No OHLCV data for %s/%s warm-up", asset_enum.value, tf.value)
-        return []
+        return
 
     n = min(500, len(bars_df))
-    tail = bars_df.tail(n)
-    featured = pipeline.compute(tail)
+    featured = pipeline.compute(bars_df.tail(n))
     last_row = featured.row(-1, named=True)
     cache_dict = {}
     for name in pipeline.feature_names:
@@ -169,7 +191,6 @@ def warm_up_cache(
         "Warm-up %s/%s: cached %d features from %d bars",
         asset_enum.value, tf.value, len(cache_dict), n,
     )
-    return tail.to_dicts()
 
 
 # -- TokenBook reconstruction from BBO tick data --------------------------
@@ -229,8 +250,24 @@ def _compute_sell_ratio(summaries: list[DutchBarSummary]) -> float:
     return sells / max(buys, 1)
 
 
+def _compute_max_drawdown_pct(summaries: list[DutchBarSummary], bar_budget: float) -> float:
+    """Max drawdown as % of bar_budget from running equity curve."""
+    if not summaries or bar_budget <= 0:
+        return 0.0
+    cumulative = 0.0
+    peak = 0.0
+    max_dd = 0.0
+    for s in summaries:
+        profit = s.pnl.get("profit", 0)
+        cumulative += profit
+        peak = max(peak, cumulative)
+        dd = peak - cumulative
+        max_dd = max(max_dd, dd)
+    return (max_dd / bar_budget) * 100
+
+
 def compute_metrics(summaries: list[DutchBarSummary], bar_budget: float) -> dict:
-    """Compute the 9 standard evaluation metrics."""
+    """Compute the 10 standard evaluation metrics."""
     resolved = [s for s in summaries if s.pnl]
     with_matched = [s for s in resolved if s.inventory.get("matched", 0) > 0]
 
@@ -259,6 +296,7 @@ def compute_metrics(summaries: list[DutchBarSummary], bar_budget: float) -> dict
         "correct_side_pct": _compute_correct_side_pct(resolved),
         "budget_util": safe_mean([s.cost["total"] / bar_budget for s in resolved]),
         "sell_ratio": _compute_sell_ratio(resolved),
+        "max_dd_pct": round(_compute_max_drawdown_pct(resolved, bar_budget), 2),
         "bars_evaluated": len(resolved),
     }
 
@@ -268,7 +306,8 @@ def compute_metrics(summaries: list[DutchBarSummary], bar_budget: float) -> dict
 def run_backtest(
     asset: str,
     tf_label: str,
-    knobs_path: Path,
+    knobs_dir: Path | None,
+    knobs_fallback: Path,
     ticks_dir: Path,
     model_dir: Path,
     inference_interval: float,
@@ -281,7 +320,9 @@ def run_backtest(
     tf_enum = TF_MAP[tf_label]
 
     # -- Config --
-    config, sim_kwargs = load_dutch_config(knobs_path, tf_enum)
+    config, sim_kwargs = load_dutch_config(
+        knobs_dir, knobs_fallback, asset, tf_label, tf_enum,
+    )
 
     # -- Model --
     model, calibrator = load_model(model_dir, asset, tf_label)
@@ -293,7 +334,7 @@ def run_backtest(
     feat_cache = LiveFeatureCache.from_model_dir(
         cache_dir, asset=asset_enum, timeframe=tf_enum,
     )
-    warmup_bars = warm_up_cache(feat_cache, asset_enum, tf_enum)
+    warm_up_cache(feat_cache, asset_enum, tf_enum)
 
     # -- BarBuilder --
     bar_builder = BarBuilder(assets=[asset_enum], timeframes=[tf_enum])
@@ -338,7 +379,7 @@ def run_backtest(
         engine.set_event_callback(dutch_logger.log_event)
 
     # -- Replay loop --
-    recent_bars: list[dict] = warmup_bars  # seed with historical bars
+    recent_bars: list[dict] = []  # empty — matches paper trading (monitor_pulse.py:833)
     bar_summaries: list[DutchBarSummary] = []
     bar_groups = ticks_df.group_by("window_start", maintain_order=True)
 
@@ -527,7 +568,7 @@ def run_backtest(
 TSV_HEADER = (
     "asset\ttimeframe\tavg_pair_cost\tavg_profit\ttotal_profit\t"
     "matched_ratio\tfill_rate\tcorrect_side_pct\tbudget_util\t"
-    "sell_ratio\tbars_evaluated"
+    "sell_ratio\tmax_dd_pct\tbars_evaluated"
 )
 
 
@@ -539,6 +580,7 @@ def metrics_to_tsv_row(m: dict) -> str:
         f"{m.get('total_profit', 0):.4f}\t{m.get('matched_ratio', 0):.4f}\t"
         f"{m.get('fill_rate', 0):.4f}\t{m.get('correct_side_pct', 0):.4f}\t"
         f"{m.get('budget_util', 0):.4f}\t{m.get('sell_ratio', 0):.4f}\t"
+        f"{m.get('max_dd_pct', 0):.2f}\t"
         f"{m.get('bars_evaluated', 0)}"
     )
 
@@ -550,8 +592,8 @@ def print_summary(all_metrics: list[dict]) -> None:
     print("=" * 90)
     print(f"\n  {'Asset':<6} {'TF':<4} {'PairCost':>9} {'AvgPnL':>9} {'TotalPnL':>10} "
           f"{'Match%':>7} {'Fill%':>6} {'Correct%':>9} {'BudgUse%':>9} "
-          f"{'SellR':>6} {'Bars':>5} {'Time':>6}")
-    print("  " + "-" * 86)
+          f"{'SellR':>6} {'MaxDD%':>7} {'Bars':>5} {'Time':>6}")
+    print("  " + "-" * 96)
     for m in all_metrics:
         if m.get("skipped"):
             continue
@@ -568,10 +610,11 @@ def print_summary(all_metrics: list[dict]) -> None:
             f"{m.get('correct_side_pct', 0):>8.1%} "
             f"{m.get('budget_util', 0):>8.1%} "
             f"{m.get('sell_ratio', 0):>6.2f} "
+            f"{m.get('max_dd_pct', 0):>6.1f}% "
             f"{bars:>5} "
             f"{m.get('elapsed_s', 0):>5.1f}s"
         )
-    print("=" * 90)
+    print("=" * 100)
 
 
 # -- Main ------------------------------------------------------------------
@@ -579,11 +622,22 @@ def print_summary(all_metrics: list[dict]) -> None:
 def main() -> None:
     args = parse_args()
 
-    assets = [a.strip() for a in args.assets.split(",")]
-    timeframes = [t.strip() for t in args.timeframes.split(",")]
-    knobs_path = Path(args.knobs)
+    knobs_dir = Path(args.knobs_dir) if args.knobs_dir else None
+    knobs_fallback = Path(args.knobs)
     ticks_dir = Path(args.ticks_dir)
     model_dir = Path(args.model_dir)
+
+    # Parse --pair shorthand (e.g. BTC_5m → assets=BTC, timeframes=5m)
+    if args.pair:
+        parts = args.pair.split("_", 1)
+        if len(parts) != 2 or parts[0] not in ASSET_MAP or parts[1] not in TF_MAP:
+            logger.error("Invalid --pair '%s'. Format: ASSET_TF (e.g. BTC_5m)", args.pair)
+            sys.exit(1)
+        assets = [parts[0]]
+        timeframes = [parts[1]]
+    else:
+        assets = [a.strip() for a in args.assets.split(",")]
+        timeframes = [t.strip() for t in args.timeframes.split(",")]
 
     filter_date = None
     if args.date:
@@ -592,9 +646,10 @@ def main() -> None:
     print("=" * 60)
     print("  Dutch Accumulation Backtest")
     print("=" * 60)
-    print(f"  Knobs:      {knobs_path}")
+    print(f"  Knobs:      {knobs_dir or knobs_fallback}")
     print(f"  Ticks:      {ticks_dir}")
     print(f"  Models:     {model_dir}")
+    print(f"  Pair:       {args.pair or 'all'}")
     print(f"  Assets:     {assets}")
     print(f"  Timeframes: {timeframes}")
     print(f"  Date:       {filter_date or 'all'}")
@@ -616,7 +671,8 @@ def main() -> None:
             metrics = run_backtest(
                 asset=asset,
                 tf_label=tf_label,
-                knobs_path=knobs_path,
+                knobs_dir=knobs_dir,
+                knobs_fallback=knobs_fallback,
                 ticks_dir=ticks_dir,
                 model_dir=model_dir,
                 inference_interval=args.inference_interval,
@@ -641,6 +697,7 @@ def main() -> None:
         for key in [
             "avg_pair_cost", "avg_profit", "matched_ratio",
             "fill_rate", "correct_side_pct", "budget_util", "sell_ratio",
+            "max_dd_pct",
         ]:
             weighted = sum(
                 m.get(key, 0) * m["bars_evaluated"] for m in evaluated
