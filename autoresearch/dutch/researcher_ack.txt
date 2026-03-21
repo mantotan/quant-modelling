@@ -1,1 +1,3 @@
-Reset for per-pair V7 backtest autoresearch. 12 pairs, rotation mode. Awaiting BASELINE runs.
+iter=0 pair=BTC_5m timestamp=2026-03-21T22:37:43Z status=BASELINE
+Baseline run complete. avg_pair_cost=0.9676 avg_profit=-5.63 max_dd_pct=482.5% bars=164
+Next experiment: lower sell_loss_start 0.70->0.50 to trigger sells sooner and reduce inventory blowup.

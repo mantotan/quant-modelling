@@ -1,1 +1,2 @@
 iteration	pair	timestamp	status	avg_pair_cost	avg_profit	total_profit	matched_ratio	fill_rate	correct_side_pct	budget_util	sell_ratio	max_dd_pct	bars_evaluated	description	param_changed
+0	BTC_5m	2026-03-21T22:37:43Z	BASELINE	0.9676	-5.6294	-923.2165	0.6788	0.8868	0.1585	0.3778	0.0000	482.47	164	baseline observation — no changes	-

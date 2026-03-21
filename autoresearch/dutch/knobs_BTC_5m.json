@@ -27,7 +27,7 @@
   "profit_protect_min_pairs": 5,
   "min_unmatched_shares": 20.0,
   "unmatched_ratio": 0.50,
-  "sell_loss_start": 0.70,
+  "sell_loss_start": 0.50,
   "sell_dump_start": 0.90,
   "fill_simulator": {
     "fill_ticks": 10,
