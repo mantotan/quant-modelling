@@ -35,6 +35,8 @@ class DutchSummaryLogger:
         self._bar_date: str = ""
         self._tick_file = None
         self._tick_date: str = ""
+        self._event_file = None
+        self._event_date: str = ""
 
     def log_bar(self, summary: DutchBarSummary) -> None:
         """Append a bar summary to the daily JSONL file."""
@@ -62,6 +64,27 @@ class DutchSummaryLogger:
         except Exception as e:
             logger.warning("Failed to log dutch tick: %s", e)
 
+    def log_event(self, event: dict) -> None:
+        """Log a single action event. Compact: ~10-50 events per bar."""
+        try:
+            today = datetime.now(UTC).strftime("%Y-%m-%d")
+            if today != self._event_date:
+                self._rotate_event_file(today)
+
+            event["ts"] = datetime.now(UTC).isoformat()
+            self._event_file.write(json.dumps(event, default=str) + "\n")
+            self._event_file.flush()
+        except Exception as e:
+            logger.warning("Failed to log dutch event: %s", e)
+
+    def _rotate_event_file(self, date_str: str) -> None:
+        if self._event_file is not None:
+            self._event_file.close()
+        path = self._dir / f"events_{date_str}.jsonl"
+        self._event_file = open(path, "a")  # noqa: SIM115
+        self._event_date = date_str
+        logger.info("Dutch event log: %s", path)
+
     def _rotate_bar_file(self, date_str: str) -> None:
         if self._bar_file is not None:
             self._bar_file.close()
@@ -85,3 +108,6 @@ class DutchSummaryLogger:
         if self._tick_file is not None:
             self._tick_file.close()
             self._tick_file = None
+        if self._event_file is not None:
+            self._event_file.close()
+            self._event_file = None

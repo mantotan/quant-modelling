@@ -20,12 +20,25 @@ ML system predicting crypto price movements (BTC/ETH/XRP/SOL) on 5m/15m/1h timef
 - Scripts: `scripts/train_sentinel.py`, `scripts/train_pulse.py`
 - Model dirs: `data/models/sentinel/{ASSET}_{TF}/`, `data/models/pulse/{ASSET}_{TF}/`
 
-## Current Focus: Deployment Ready
-All 12 pulse_v2 models (4 assets × 3 timeframes) pass acceptance criteria. Regime-bucketed validation confirms deployment readiness on multi-tp models.
-- **ETH**: PBO=0.18 (genuine pass). Deployment cleared.
-- **BTC**: Regime FULL PASS on multi-tp models (Sharpe: low=51, normal=70, high=88, crisis=98 at 5m). PBO=0.96 suspended per Ruling 1 (regime-seesaw artifact, 100% OOS paths profitable).
-- **SOL**: Regime FULL PASS on multi-tp models (flat Sharpe ~240 across all regimes at 5m, tick-dominant). PBO=0.64 suspended per Ruling 1.
-- **XRP**: Multi-tp revalidation complete (iter 102). Baseline established.
+## Current Focus: Deployment + Live Validation
+All 12 pulse_v2 models (4 assets × 3 timeframes) pass acceptance criteria. 151 autoresearch iterations complete — HPO optimization exhausted (structural floors reached on all 12 models).
+
+### Autoresearch Status: COMPLETE (iter 151)
+- **KEEP rate declined** from 100% (OVERRIDE) → 35% → 25% → 22% — structural floors confirmed
+- **All exploitable HPO levers exhausted**: anti-starvation, num_leaves narrowing, lr tuning, reg_alpha forcing, n_splits, train_bars, purge_period
+- **Auditor rulings**: Alpha features (funding, OI, IV, liquidation) formally blocked — zero top-10 SHAP across 44+ KEEPs
+- **Further HPO iteration yields <0.1% improvement** — diminishing returns
+
+### MTF-1 Decision: NOT NEEDED for Polymarket
+Each Polymarket contract (5m, 15m, 1h) is a separate market with separate odds. Cross-timeframe signal combination would merge 3 independent bets into 1, which is wrong. Instead:
+- **Deploy 12 models independently** (one per Polymarket contract)
+- **Correlation-aware risk management** across timeframes (don't oversize same-asset exposure)
+- **Portfolio-level position limits** per asset across all timeframes
+
+### Next Steps
+1. Improve model performance (backtest-to-live gap investigation)
+2. Correlation-aware position sizing across timeframes
+3. Live Polymarket execution (Steps 5-8)
 
 ## Architecture
 - **Platform**: Python 3.11 (Windows dev/backtest, Ubuntu Linux production)
@@ -63,7 +76,10 @@ All 12 pulse_v2 models (4 assets × 3 timeframes) pass acceptance criteria. Regi
 - `scripts/train_sentinel.py` — End-to-end Sentinel training
 - `scripts/train_pulse.py` — End-to-end Pulse training
 - `scripts/trade.py` — Unified trading script (paper/dry-run/live, --verbose for per-prediction logs)
-- `scripts/monitor_pulse.py` — Read-only BTC Pulse monitor (5m/15m/1h, live Polymarket odds)
+- `scripts/monitor_pulse.py` — BTC Pulse monitor + Dutch accumulation paper trading (--dutch flag)
+- `src/qm/strategy/dutch/engine.py` — Dutch accumulation V3 engine (6 pacing gates, bilateral discipline)
+- `src/qm/strategy/dutch/fill_simulator.py` — Limit order fill simulator (consecutive-tick model)
+- `src/qm/strategy/dutch/summary_logger.py` — JSONL logger (bars + events + optional ticks)
 
 ## Data
 - `data/raw/ohlcv/` — Hive-partitioned Parquet (asset=X/timeframe=Y/date=Z/)

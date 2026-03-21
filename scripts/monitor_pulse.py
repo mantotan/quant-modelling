@@ -119,6 +119,18 @@ def parse_args() -> argparse.Namespace:
         "--dutch-tick-log", action="store_true",
         help="Enable per-tick JSONL logging (verbose)",
     )
+    p.add_argument(
+        "--dutch-max-side-frac", type=float, default=0.65,
+        help="Max fraction of budget per side (default: 0.65)",
+    )
+    p.add_argument(
+        "--dutch-max-per-prediction", type=float, default=100.0,
+        help="Max spend per model prediction cycle (default: 100)",
+    )
+    p.add_argument(
+        "--dutch-vwap-tol", type=float, default=0.02,
+        help="Price improvement tolerance vs avg fill (default: 0.02)",
+    )
     return p.parse_args()
 
 
@@ -732,6 +744,9 @@ async def main_loop(args: argparse.Namespace) -> None:
         dutch_config = DutchConfig(
             bar_budget=args.dutch_budget,
             order_size=args.dutch_order_size,
+            max_side_fraction=args.dutch_max_side_frac,
+            max_per_prediction=args.dutch_max_per_prediction,
+            vwap_tolerance=args.dutch_vwap_tol,
             bar_seconds=BAR_SECONDS[tf],
         )
         dutch_engine = DutchAccumulationEngine(dutch_config)
@@ -741,6 +756,7 @@ async def main_loop(args: argparse.Namespace) -> None:
             asset="BTC",
             timeframe=tf_label,
         )
+        dutch_engine.set_event_callback(dutch_logger.log_event)
         # Load persisted session state
         dutch_state_file = Path("data/dutch_paper/state.json")
         if dutch_state_file.exists():

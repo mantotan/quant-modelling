@@ -340,6 +340,248 @@ class TestDutchEngine:
         assert orders == []
 
 
+class TestDutchPacingGates:
+    """Tests for the V3 pacing gates (R1-R6)."""
+
+    def _make_engine(self, **kwargs) -> DutchAccumulationEngine:
+        config = DutchConfig(**kwargs)
+        return DutchAccumulationEngine(config)
+
+    def _fill_order(self, engine, order):
+        """Simulate immediate fill at limit price."""
+        engine.on_fill(order, order.limit_price, order.shares)
+
+    def test_envelope_blocks_burst_at_low_time_pct(self):
+        """Rapid on_tick calls at t=0.05 should not produce 5 orders."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, order_size=5.0, bar_budget=200.0,
+        )
+        book_up = make_book(0.48, 0.52)
+        book_dn = make_book(0.20, 0.25)  # cheap_dn = 0.35 - 0.25 = huge edge
+        total_orders = 0
+        for i in range(5):
+            t = 0.05 + i * 0.001  # ~1ms apart
+            orders = engine.on_tick(t, 0.65, book_up, book_dn)
+            for o in orders:
+                self._fill_order(engine, o)
+            total_orders += len(orders)
+        # Envelope at t=0.05 with edge ~0.40: urgency=2.0, pace=0.05^0.5=0.224
+        # allowed=$44.7. At $5/order, ~9 orders max, but spacing gate should
+        # further limit. Should NOT be all 5*2=10.
+        assert total_orders < 8
+
+    def test_envelope_allows_more_at_high_time_pct(self):
+        """At t=0.80, envelope allows substantial spend."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, order_size=5.0, bar_budget=200.0,
+        )
+        book_up = make_book(0.48, 0.52)
+        book_dn = make_book(0.20, 0.25)
+        orders = engine.on_tick(0.80, 0.65, book_up, book_dn)
+        assert len(orders) >= 1
+
+    def test_envelope_handles_zero_time_pct(self):
+        """t=0.0 should still allow first order (floor at 0.01)."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, order_size=5.0, bar_budget=200.0,
+        )
+        book_up = make_book(0.20, 0.25)  # cheap_up = 0.65 - 0.25 = 0.40
+        book_dn = make_book(0.48, 0.52)
+        orders = engine.on_tick(0.0, 0.65, book_up, book_dn)
+        # pace(0.01) with urgency=2.0 = 0.01^0.5 = 0.1 → allowed=$20
+        assert len(orders) >= 1
+
+    def test_slot_spacing_blocks_rapid_same_side(self):
+        """Two ticks ~0.001 apart should block the second order on same side."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, order_size=5.0, bar_budget=200.0,
+        )
+        book_up = make_book(0.20, 0.25)
+        book_dn = make_book(0.48, 0.52)
+        # First tick
+        orders1 = engine.on_tick(0.10, 0.65, book_up, book_dn)
+        assert len(orders1) >= 1
+        for o in orders1:
+            self._fill_order(engine, o)
+        # Second tick, almost immediately
+        orders2 = engine.on_tick(0.101, 0.65, book_up, book_dn)
+        # UP side should be blocked by spacing
+        up_orders = [o for o in orders2 if o.side == "UP"]
+        assert len(up_orders) == 0
+
+    def test_slot_spacing_exempts_balance(self):
+        """Balance orders bypass spacing gate."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, order_size=5.0, bar_budget=200.0,
+        )
+        # Build UP inventory → need DN for balance
+        engine._inventory.shares_up = 40
+        engine._inventory.cost_up = 20
+        # Place an order to set last_order_time
+        engine._last_order_time_pct_dn = 0.89
+
+        # DN is fairly priced (cheap_dn = 0.50 - 0.48 = 0.02 > 0)
+        book_up = make_book(0.48, 0.52)
+        book_dn = make_book(0.44, 0.48)
+        # Late bar (urgent window), very close to previous order
+        orders = engine.on_tick(0.895, 0.50, book_up, book_dn)
+        dn_orders = [o for o in orders if o.side == "DN"]
+        # Balance should fire despite spacing
+        assert len(dn_orders) >= 1
+
+    def test_side_cap_blocks_heavy_side(self):
+        """65% budget on UP → next UP order blocked, DN still allowed."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, max_side_fraction=0.65, bar_budget=200.0,
+        )
+        # UP already at 65% of budget = $130
+        engine._inventory.shares_up = 260
+        engine._inventory.cost_up = 130
+
+        book_up = make_book(0.20, 0.25)  # UP is very cheap
+        book_dn = make_book(0.20, 0.25)  # DN is also cheap
+        orders = engine.on_tick(0.50, 0.65, book_up, book_dn)
+        up_orders = [o for o in orders if o.side == "UP"]
+        dn_orders = [o for o in orders if o.side == "DN"]
+        assert len(up_orders) == 0  # blocked by side cap
+        assert len(dn_orders) >= 1  # DN is fine
+
+    def test_side_cap_exempts_balance(self):
+        """Balance order on heavy side still fires (it reduces risk)."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, max_side_fraction=0.65, bar_budget=200.0,
+        )
+        # DN heavy at cap, need UP to balance
+        engine._inventory.cost_dn = 135  # over 65% cap ($130)
+        engine._inventory.shares_dn = 270
+        engine._inventory.cost_up = 0
+        engine._inventory.shares_up = 0
+        # pnl_if_up = 0 - 135 = -135, pnl_if_dn = 270 - 135 = 135
+        # need_side = UP (pnl_if_dn > pnl_if_up)
+        book_up = make_book(0.44, 0.48)  # cheap_up = 0.50 - 0.48 = 0.02 > 0
+        book_dn = make_book(0.44, 0.48)
+        orders = engine.on_tick(0.90, 0.50, book_up, book_dn)
+        up_orders = [o for o in orders if o.side == "UP"]
+        # Balance on UP should fire despite it not being the capped side
+        assert len(up_orders) >= 1
+
+    def test_per_prediction_cap(self):
+        """$100 per prediction: blocks after spending, resets on new cal_prob."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, order_size=5.0, bar_budget=200.0,
+            max_per_prediction=100.0,
+        )
+        book_up = make_book(0.20, 0.25)
+        book_dn = make_book(0.20, 0.25)
+        # Accumulate ~$95 of prediction spend
+        engine._prediction_spend = 95.0
+        engine._current_cal_prob = 0.65
+        # Next order at same cal_prob — only $5 left
+        orders = engine.on_tick(0.50, 0.65, book_up, book_dn)
+        total_dollars = sum(o.dollars for o in orders)
+        assert total_dollars <= 6.0  # clamped to ~$5 remaining
+
+        # Fill and try again — should be blocked
+        for o in orders:
+            self._fill_order(engine, o)
+        engine._prediction_spend = 100.0
+        orders2 = engine.on_tick(0.51, 0.65, book_up, book_dn)
+        assert orders2 == []
+
+        # New cal_prob → counter resets
+        orders3 = engine.on_tick(0.52, 0.66, book_up, book_dn)
+        assert len(orders3) >= 1
+
+    def test_per_prediction_clamps_order_size(self):
+        """At $90 prediction spend, $20 order should be clamped to $10."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, order_size=20.0, bar_budget=200.0,
+            max_per_prediction=100.0,
+        )
+        engine._prediction_spend = 90.0
+        engine._current_cal_prob = 0.65
+        book_up = make_book(0.20, 0.25)
+        book_dn = make_book(0.48, 0.52)
+        orders = engine.on_tick(0.50, 0.65, book_up, book_dn)
+        if orders:
+            assert orders[0].dollars <= 11.0  # clamped to ~$10
+
+    def test_vwap_gate_blocks_worse_price(self):
+        """After filling at 0.45, skip order at 0.50 (> 0.459)."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, vwap_tolerance=0.02,
+        )
+        # Simulate prior fill on UP side at 0.45
+        fill_order = DutchOrder(
+            side="UP", limit_price=0.45, shares=10.0, dollars=4.5,
+            time_pct=0.3, placed_at=datetime.now(UTC), reason="cheap",
+        )
+        engine.on_fill(fill_order, fill_price=0.45, filled_shares=10.0)
+
+        # Now book has ask=0.50, which is > 0.45 * 1.02 = 0.459
+        book_up = make_book(0.48, 0.50)
+        book_dn = make_book(0.44, 0.48)
+        orders = engine.on_tick(0.50, 0.70, book_up, book_dn)
+        up_orders = [o for o in orders if o.side == "UP"]
+        assert len(up_orders) == 0
+
+    def test_vwap_gate_allows_first_order(self):
+        """No prior fills → VWAP gate skipped, first order goes through."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, vwap_tolerance=0.02,
+        )
+        book_up = make_book(0.48, 0.52)
+        book_dn = make_book(0.44, 0.48)
+        orders = engine.on_tick(0.50, 0.65, book_up, book_dn)
+        up_orders = [o for o in orders if o.side == "UP"]
+        assert len(up_orders) >= 1
+
+    def test_reset_clears_new_state(self):
+        """All pacing state cleared on reset."""
+        engine = self._make_engine()
+        engine._last_order_time_pct_up = 0.5
+        engine._last_order_time_pct_dn = 0.6
+        engine._current_cal_prob = 0.55
+        engine._prediction_spend = 50.0
+        engine._last_allowed_spend = 100.0
+        engine._last_gate_emitted["gate_envelope"] = 0.3
+
+        engine.reset()
+
+        assert engine._last_order_time_pct_up == -1.0
+        assert engine._last_order_time_pct_dn == -1.0
+        assert engine._current_cal_prob is None
+        assert engine._prediction_spend == 0.0
+        assert engine._last_allowed_spend == 0.0
+        assert engine._last_gate_emitted == {}
+
+    def test_event_callback_fires_on_order(self):
+        """Event callback receives order events."""
+        events = []
+        engine = self._make_engine(cheap_threshold=0.10)
+        engine.set_event_callback(lambda e: events.append(e))
+
+        book_up = make_book(0.20, 0.25)
+        book_dn = make_book(0.48, 0.52)
+        orders = engine.on_tick(0.50, 0.65, book_up, book_dn)
+        assert len(orders) >= 1
+        order_events = [e for e in events if e["type"] == "order"]
+        assert len(order_events) >= 1
+        assert order_events[0]["side"] == "UP"
+
+    def test_auto_max_orders(self):
+        """max_orders=0 auto-derives from bar_budget / min_order_usd."""
+        engine = self._make_engine(
+            bar_budget=200.0, min_order_usd=1.0,
+        )
+        assert engine._effective_max == 200
+
+        engine2 = self._make_engine(
+            bar_budget=200.0, min_order_usd=1.0, max_orders=50,
+        )
+        assert engine2._effective_max == 50
+
+
 class TestDutchBarSummary:
     def test_compute_pnl_up_wins(self):
         summary = DutchBarSummary()
