@@ -1,11 +1,24 @@
 {
-  "current_pair": "BTC_1h",
-  "pair_rotation": ["BTC_5m","BTC_15m","BTC_1h","ETH_5m","ETH_15m","ETH_1h","SOL_5m","SOL_15m","SOL_1h","XRP_5m","XRP_15m","XRP_1h"],
-  "pair_index": 2,
-  "last_updated": "2026-03-21T23:42:10Z",
+  "current_pair": "ETH_15m",
+  "pair_rotation": [
+    "BTC_5m",
+    "BTC_15m",
+    "BTC_1h",
+    "ETH_5m",
+    "ETH_15m",
+    "ETH_1h",
+    "SOL_5m",
+    "SOL_15m",
+    "SOL_1h",
+    "XRP_5m",
+    "XRP_15m",
+    "XRP_1h"
+  ],
+  "pair_index": 4,
+  "last_updated": "2026-03-21T23:52:21Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T06:50:00Z",
   "last_strategist_at": 5,
   "last_auditor_at": 0,
-  "total_iterations": 7
+  "total_iterations": 8
 }

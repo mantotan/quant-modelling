@@ -1,12 +1,4 @@
-iter=6 pair=BTC_1h timestamp=2026-03-21T23:42:10Z
-status=DISCARD param=pace_urgency_hi old=2.0 new=2.5
-result: pair_cost 0.9382=0.9382 (NO IMPROVEMENT), max_dd 27.3%=27.34% (flat)
-reason: pace_urgency_hi 2.0->2.5 produced no measurable change in backtest outcomes;
-  identical pair_cost to baseline (0.9382), matched_ratio unchanged (0.674),
-  fill_rate unchanged (0.807). Urgency in 1h bars likely saturated — bar is long enough
-  that urgency doesn't constrain pair formation. pace_urgency_hi on BLACKLIST for BTC_1h.
-
-next hypothesis: sell_loss_start 0.70->0.60
-  allow sells earlier in bar (at 60% elapsed=2160s vs 70%=2520s).
-  sell_ratio=0.0 across all TFs; earlier trigger may activate capital recycling.
-  1h bars have enough time to form new pairs after early exits.
+iter=7 pair=ETH_5m timestamp=2026-03-21T23:51:14Z
+Status: BASELINE run — no ETH_5m data yet. Running baseline observation with no parameter changes.
+Mode: BACKTEST (replay_available)
+Next hypothesis (after baseline): unmatched_ratio 0.50->0.35 to improve pair matching (cross-pair from BTC_5m learnings).
