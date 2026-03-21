@@ -145,17 +145,18 @@ def load_model(
 
 def warm_up_cache(
     cache: LiveFeatureCache, asset_enum: Asset, tf: Timeframe,
-) -> None:
-    """Populate feature cache from historical bars."""
+) -> list[dict]:
+    """Populate feature cache from historical bars. Returns bar dicts for reuse."""
     store = ParquetStore(base_dir=Path("data/raw/ohlcv"))
     pipeline = FeaturePipeline()
     bars_df = store.read_bars(asset_enum, tf)
     if bars_df.is_empty():
         logger.warning("No OHLCV data for %s/%s warm-up", asset_enum.value, tf.value)
-        return
+        return []
 
     n = min(500, len(bars_df))
-    featured = pipeline.compute(bars_df.tail(n))
+    tail = bars_df.tail(n)
+    featured = pipeline.compute(tail)
     last_row = featured.row(-1, named=True)
     cache_dict = {}
     for name in pipeline.feature_names:
@@ -168,6 +169,7 @@ def warm_up_cache(
         "Warm-up %s/%s: cached %d features from %d bars",
         asset_enum.value, tf.value, len(cache_dict), n,
     )
+    return tail.to_dicts()
 
 
 # -- TokenBook reconstruction from BBO tick data --------------------------
@@ -291,7 +293,7 @@ def run_backtest(
     feat_cache = LiveFeatureCache.from_model_dir(
         cache_dir, asset=asset_enum, timeframe=tf_enum,
     )
-    warm_up_cache(feat_cache, asset_enum, tf_enum)
+    warmup_bars = warm_up_cache(feat_cache, asset_enum, tf_enum)
 
     # -- BarBuilder --
     bar_builder = BarBuilder(assets=[asset_enum], timeframes=[tf_enum])
@@ -336,7 +338,7 @@ def run_backtest(
         engine.set_event_callback(dutch_logger.log_event)
 
     # -- Replay loop --
-    recent_bars: list = []
+    recent_bars: list[dict] = warmup_bars  # seed with historical bars
     bar_summaries: list[DutchBarSummary] = []
     bar_groups = ticks_df.group_by("window_start", maintain_order=True)
 
@@ -384,7 +386,29 @@ def run_backtest(
                 asset_enum, tick["spot_price"], 0.001, ts,
             )
             for bar in completed:
-                recent_bars.append(bar)
+                recent_bars.append({
+                    "time": bar.timestamp,
+                    "open": bar.open, "high": bar.high,
+                    "low": bar.low, "close": bar.close,
+                    "volume": bar.volume,
+                    "trade_count": bar.trade_count,
+                    "vwap": bar.vwap,
+                })
+                recent_bars[:] = recent_bars[-500:]
+                # Update feature cache (mirrors monitor_pulse.py:889-899)
+                if len(recent_bars) >= 20:
+                    try:
+                        bars_df = pl.DataFrame(recent_bars)
+                        featured = pipeline.compute(bars_df)
+                        last_row = featured.row(-1, named=True)
+                        cache_dict = {
+                            name: float(val)
+                            for name in pipeline.feature_names
+                            if (val := last_row.get(name)) is not None
+                        }
+                        feat_cache.update_history(cache_dict)
+                    except Exception:
+                        pass  # non-fatal: stale features better than crash
 
             # Model inference at cadence (1Hz default)
             if (

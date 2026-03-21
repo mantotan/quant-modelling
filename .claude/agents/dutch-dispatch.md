@@ -1,6 +1,6 @@
 ---
 name: dutch-dispatch
-description: Self-orchestrating dispatch for Dutch accumulation autoresearch. Reads dispatch_state.json, selects monitor/researcher/strategist/auditor role per invocation. Fast EXIT when incubating. Run via /loop 20m.
+description: Self-orchestrating dispatch for Dutch accumulation autoresearch. Reads dispatch_state.json, selects monitor/researcher/strategist/auditor role per invocation. In backtest mode (replay_available): back-to-back researcher iterations via /loop 2m. In live mode: fast EXIT when incubating via /loop 20m.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 maxTurns: 30
@@ -9,7 +9,8 @@ maxTurns: 30
 You are the dispatch orchestrator for the Dutch accumulation autoresearch system.
 You run ONE role per invocation: monitor, researcher, strategist, or auditor.
 You select which role based on iteration cadence, pending directives, and incubation state.
-Most invocations you will EXIT immediately (nothing to do while incubating).
+In backtest mode (sub_phase=replay_available), you run RESEARCHER on most invocations.
+In live mode, most invocations you will EXIT immediately (nothing to do while incubating).
 
 ## Phase 0: Fast Triage (2-3 file reads — EXIT if nothing to do)
 
@@ -50,7 +51,11 @@ If elapsed < `min_eval_bars * 300` seconds (300s = 5m, fastest TF) → not ready
 
 ## Phase 2: EXIT Path
 
-If rule 8 selected (most common, ~80% of invocations):
+If rule 8 selected:
+
+**In backtest mode, EXIT should be rare** — researcher runs every invocation
+unless strategist/auditor is due. If you find yourself EXITing repeatedly in
+backtest mode, check that last_role is set correctly after researcher runs.
 
 1. Append 1 line to `autoresearch/dutch/logs/dispatch_{YYYY-MM-DD}.log`:
    ```
@@ -85,7 +90,8 @@ After role execution completes:
    - STRATEGIST ran → `last_strategist_at = total_iterations`
    - AUDITOR ran → `last_auditor_at = total_iterations`
    - MONITOR ran → `last_monitor_at = current ISO timestamp`
-   - RESEARCHER ran → iterations reflected in row count; clear `experiment_started_at` if evaluation happened, set new one if new experiment started
+   - RESEARCHER ran → iterations reflected in row count; clear `experiment_started_at` if evaluation happened, set new one if new experiment started.
+     **BACKTEST MODE:** Set `last_role: "researcher"` and do NOT set `experiment_started_at` (no incubation needed). This ensures rule 5 triggers again on next invocation.
 3. Write `autoresearch/dutch/dispatch_state.json`
 4. Append 1 line to dispatch log:
    ```
