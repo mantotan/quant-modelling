@@ -25,7 +25,7 @@ All state files in `autoresearch/dutch/` — never read Sentinel's `autoresearch
 - Kill switch: kill_switch_after
 - Edge: edge_scale_lo/hi, vwap_tolerance
 - Sell: sell_loss_threshold, sell_max_fraction, sell_min_shares
-- Fill sim: fill_ticks, chase_threshold, max_chase, spread_offset, cancel_distance
+- Fill sim: fill_ticks, sweep_threshold, chase_threshold, max_chase, spread_offset, cancel_distance
 
 **Read-only params** (never suggest changing): strategy, version, min_order_usd
 

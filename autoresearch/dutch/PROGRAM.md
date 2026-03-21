@@ -29,7 +29,18 @@ See `knobs.json` for all parameters. Key categories:
 - Pacing (pace_urgency, max_per_prediction, bar_budget, order_size)
 - Balance (max_side_fraction, min_share_match, rebalance_warmup)
 - Sell logic (sell_loss_threshold, sell_max_fraction, sell_min_shares)
-- Fill simulator (fill_ticks, chase_threshold, max_chase)
+- Fill simulator (fill_ticks, sweep_threshold, chase_threshold, max_chase, cancel_distance)
+
+## Fill Simulator V3 (2026-03-21)
+
+Maker-only simulation matching production `post_only=True` behavior:
+- **Buy orders**: placed at bid (maker) or at ask-0.01 (aggressive tiers). Never at/above ask.
+- **Sell orders**: placed at ask (maker on sell side). Fill when bid >= ask.
+- **fill_ticks=10** (~5s): ask must stay at/below limit for 10 consecutive book updates.
+- **Sweep detection**: price passes through limit by >= 1c → instant fill on tick 1.
+- **Zero-depth rejection**: no depth at limit price → order stays pending.
+- **Chase**: below ask only, max 2 chases, cancel at >= 5c drift.
+- **Sell depth**: checks `book.bids` (not asks) for sell-side liquidity.
 
 ## Data Sources
 
