@@ -30,7 +30,7 @@ import random
 import string
 import time
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import aiohttp
@@ -74,6 +74,8 @@ TICK_SCHEMA = {
     "is_heartbeat": pl.Boolean,
     "is_stale": pl.Boolean,
     "spot_price": pl.Float64,
+    "window_start": pl.Datetime("us", "UTC"),
+    "window_end": pl.Datetime("us", "UTC"),
 }
 
 
@@ -121,6 +123,8 @@ class TickSnapshot:
     is_heartbeat: bool
     is_stale: bool
     spot_price: float
+    window_start: datetime
+    window_end: datetime
 
     def to_dict(self) -> dict:
         return {
@@ -142,6 +146,8 @@ class TickSnapshot:
             "is_heartbeat": self.is_heartbeat,
             "is_stale": self.is_stale,
             "spot_price": self.spot_price,
+            "window_start": self.window_start,
+            "window_end": self.window_end,
         }
 
 
@@ -257,6 +263,8 @@ class StreamSlot:
         self.feed: PolymarketWSFeed | None = None
         self._feed_task: asyncio.Task | None = None
         self._subscribed_cid: str = ""
+        self._window_start: datetime | None = None
+        self._window_end: datetime | None = None
         self._tick_count: int = 0
 
     async def run(
@@ -333,6 +341,11 @@ class StreamSlot:
             ),
         )
         self._subscribed_cid = market.condition_id
+        # Derive window_start from window_end - bar_seconds
+        bar_secs = {"5m": 300, "15m": 900, "1h": 3600}
+        tf_label = TF_LABELS[self.timeframe]
+        self._window_end = market.window_end
+        self._window_start = market.window_end - timedelta(seconds=bar_secs.get(tf_label, 900))
         logger.info(
             "StreamSlot %s subscribed: %s (ends %s)",
             label, market.condition_id[:16],
@@ -379,6 +392,8 @@ class StreamSlot:
             is_heartbeat=is_heartbeat,
             is_stale=is_stale,
             spot_price=self._spot_feed.get(self.asset),
+            window_start=self._window_start or datetime.now(UTC),
+            window_end=self._window_end or datetime.now(UTC),
         )
 
 
