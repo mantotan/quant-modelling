@@ -10,3 +10,6 @@
 2026-03-21T22:47:42Z iter=2 pair=BTC_15m status=BASELINE param=- -(no change)
   eval: pair_cost=0.9631 profit=$-5.8816 total_profit=$-335.25 matched=0.6072 fill=0.8296 correct=0.1404 max_dd=167.63% bars=57 sell_ratio=0.000
   hypothesis: "BASELINE for BTC_15m. sell_ratio=0.000 — no sells in 57 bars (same as BTC_5m baseline). pair_cost=0.9631 under warning threshold. max_dd=167.63% driven by unresolved inventory. Hypothesis: tighten max_marginal_pair_cost 1.03->0.99 to gate out expensive order fills and reduce pair cost. Sell triggers will be investigated in subsequent iterations after pair cost baseline is established."
+2026-03-21T23:42:10Z iter=6 pair=BTC_1h status=DISCARD param=pace_urgency_hi 2.0→2.5
+  eval: pair_cost=0.9382 profit=$-3.42 max_dd=27.34% bars=16
+  hypothesis: "sell_loss_start 0.70→0.60 — allow sells earlier in 1h bar (at 60% elapsed=2160s vs 70%=2520s). sell_ratio=0.0 on all TFs; earlier trigger may activate capital recycling. 1h bars have enough time to form new pairs after early exits. Priority queue item #3 for BTC_1h."

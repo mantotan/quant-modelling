@@ -1,9 +1,12 @@
-iter=5 pair=BTC_1h timestamp=2026-03-22T06:39:33Z
-status=DISCARD param=risk_ceil old=0.15 new=0.10
-result: pair_cost 0.9382->0.9588 (WORSE), max_dd 27.3->29.8% (WORSE)
-reason: lower risk_ceil reduced per-prediction budget, fewer fills, matched_ratio 0.674->0.647,
-  pair formation degraded. risk_ceil on BLACKLIST for BTC_1h — do not re-attempt below 0.15.
+iter=6 pair=BTC_1h timestamp=2026-03-21T23:42:10Z
+status=DISCARD param=pace_urgency_hi old=2.0 new=2.5
+result: pair_cost 0.9382=0.9382 (NO IMPROVEMENT), max_dd 27.3%=27.34% (flat)
+reason: pace_urgency_hi 2.0->2.5 produced no measurable change in backtest outcomes;
+  identical pair_cost to baseline (0.9382), matched_ratio unchanged (0.674),
+  fill_rate unchanged (0.807). Urgency in 1h bars likely saturated — bar is long enough
+  that urgency doesn't constrain pair formation. pace_urgency_hi on BLACKLIST for BTC_1h.
 
-next hypothesis: pace_urgency_hi 2.0->2.5
-  1h bars have 3600s; raising urgency at bar-end window drives more aggressive second-side fill
-  for open pairs before expiry. Should improve matched_ratio without touching risk budget.
+next hypothesis: sell_loss_start 0.70->0.60
+  allow sells earlier in bar (at 60% elapsed=2160s vs 70%=2520s).
+  sell_ratio=0.0 across all TFs; earlier trigger may activate capital recycling.
+  1h bars have enough time to form new pairs after early exits.

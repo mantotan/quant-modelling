@@ -9,7 +9,7 @@
   "emergency_balance_time": 120.0,
   "spread_offset": 0.01,
   "pace_urgency_lo": 0.5,
-  "pace_urgency_hi": 2.5,
+  "pace_urgency_hi": 2.0,
   "max_side_fraction": 0.55,
   "max_per_prediction": 100.0,
   "vwap_tolerance": 0.10,
@@ -27,7 +27,7 @@
   "profit_protect_min_pairs": 5,
   "min_unmatched_shares": 20.0,
   "unmatched_ratio": 0.50,
-  "sell_loss_start": 0.70,
+  "sell_loss_start": 0.60,
   "sell_dump_start": 0.90,
   "fill_simulator": {
     "fill_ticks": 10,
