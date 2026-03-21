@@ -112,7 +112,20 @@ class ParquetStore:
             return pl.DataFrame()
 
         dfs = [pl.read_parquet(f) for f in parquet_files]
-        return pl.concat(dfs).sort("time")
+        # Handle schema mismatches (e.g. different column sets across dates)
+        if len(dfs) > 1:
+            target_cols = set(dfs[0].columns)
+            compatible = [df for df in dfs if set(df.columns) == target_cols]
+            if len(compatible) < len(dfs):
+                logger.warning(
+                    "Skipped %d/%d parquet files with mismatched schema",
+                    len(dfs) - len(compatible), len(dfs),
+                )
+                dfs = compatible
+        if not dfs:
+            return pl.DataFrame()
+        time_col = "time" if "time" in dfs[0].columns else dfs[0].columns[0]
+        return pl.concat(dfs).sort(time_col)
 
     def write_df(
         self,
