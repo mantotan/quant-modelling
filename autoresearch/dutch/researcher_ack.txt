@@ -1,6 +1,4 @@
-iter=3 pair=BTC_15m timestamp=2026-03-22T05:52:06Z status=DISCARD next_hypothesis=cheap_threshold_0.10->0.07
-DISCARD reason: max_marginal_pair_cost 1.03->0.99 collapsed matched_ratio from 61%->8%, pair formation blocked.
-avg_pair_cost=0.9915 (worse than baseline 0.9631), profit=$-27.32, max_dd=15.3%.
-Next experiment: cheap_threshold 0.10->0.07 — select only genuinely cheap prices to reduce pair cost
-without blocking pair formation.
-Rotation advancing to pair_index=2 (BTC_1h).
+iter=4 pair=BTC_1h timestamp=2026-03-22T06:26:57Z status=BASELINE
+Mode: BACKTEST (replay_available)
+Result: BASELINE recorded — avg_pair_cost=0.9382 profit=$-54.68 max_dd=27.3% bars=16
+Next hypothesis: risk_ceil 0.15->0.10 — reduce per-prediction risk cap to address max_dd near 30% threshold.
