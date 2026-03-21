@@ -3,14 +3,21 @@
     "severity": "CRITICAL",
     "type": "sell_race",
     "detected_at": "2026-03-21T11:24:07Z",
-    "evidence": "19/37 bars in 5m and 8/20 bars in 15m have sell_losing events with time_pct gap < 0.005 on same bar_id. Minimum gap observed: 0.000001.",
+    "evidence": "15m: 6/10 recent bars have sell_losing events with time_pct gap < 0.005. 5m: 1/10 bars. Reduced from pre-V3 but NOT fixed.",
     "resolved": false
   },
   {
     "severity": "CRITICAL",
     "type": "negative_shares",
     "detected_at": "2026-03-21T11:24:07Z",
-    "evidence": "8 bars in 5m and 2 bars in 15m end with negative up_shares or dn_shares (e.g. 5m bar 1774089000: up=-20.88, dn=-46.87). Sells exceed purchased inventory.",
+    "evidence": "15m: 2 bars (bar 1774084500 dn=-7.10, bar 1774088100 dn=-23.35). 5m now clean.",
+    "resolved": false
+  },
+  {
+    "severity": "WARNING",
+    "type": "one_sided_accumulation",
+    "detected_at": "2026-03-21T19:02:00Z",
+    "evidence": "5m: 9 consecutive bars matched_ratio < 20%. 15m: 5 consecutive bars. Root cause of negative PnL.",
     "resolved": false
   }
 ]}

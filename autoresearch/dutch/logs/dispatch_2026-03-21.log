@@ -1,2 +1,3 @@
 2026-03-21T11:10:56Z iter=0 role=researcher outcome=BASELINE pair_cost=0.7689 profit=$-750.40 bars=37, started experiment max_side_fraction=0.65->0.55
 2026-03-21T11:24:07Z iter=1 role=monitor outcome=2_CRITICAL(sell_race,negative_shares)+2_WARNING(one_sided,pair_cost_stuck) 3/3_online
+2026-03-21T19:02:00Z iter=0 role=monitor outcome=3/3 healthy, 2 CRITICAL alerts (sell_race, negative_shares), 1 WARNING (one_sided_accumulation)
