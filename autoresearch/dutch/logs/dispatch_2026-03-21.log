@@ -5,3 +5,4 @@
 2026-03-21T15:01:54Z iter=1 EXIT reason=incubating elapsed=447s alerts=0
 2026-03-21T15:28:22Z iter=1 EXIT reason=incubating elapsed=2045s alerts=0
 2026-03-21T16:03:44Z iter=1 role=monitor outcome=3_CRITICAL_resolved,1_WARNING_pair_cost_stuck_15m,3/3_processes_healthy
+2026-03-21T19:10:32Z iter=1 role=monitor outcome=3/3 online no_new_criticals pair_cost_stuck_warning_active 5m_apc=0.983 15m_apc=1.005

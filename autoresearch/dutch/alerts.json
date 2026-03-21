@@ -30,7 +30,9 @@
     "severity": "WARNING",
     "type": "pair_cost_stuck",
     "detected_at": "2026-03-21T16:03:44Z",
-    "evidence": "15m avg_pair_cost=1.005 across last 10 bars, 8/10 consecutive bars above 0.98. Pair cost above 1.00 guarantees net losses per pair. 5m avg_pair_cost=0.983 (borderline).",
-    "resolved": false
+    "evidence": "5m avg_pair_cost=0.983 (7/10 bars >0.98), 15m avg_pair_cost=1.005 (8/10 bars >0.98). Cumulative PnL: 5m=-$1981.70 (73 bars), 15m=-$891.18 (29 bars). Structural issue — high pair cost driving sustained losses.",
+    "resolved": false,
+    "last_checked": "2026-03-21T19:10:32Z",
+    "check_note": "Neither TF has 5 consecutive high-cost bars at tail right now, but persistent across session. Not resolved."
   }
 ]}
