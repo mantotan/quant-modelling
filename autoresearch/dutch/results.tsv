@@ -2,3 +2,4 @@ iteration	pair	timestamp	status	avg_pair_cost	avg_profit	total_profit	matched_ra
 0	BTC_5m	2026-03-21T22:37:43Z	BASELINE	0.9676	-5.6294	-923.2165	0.6788	0.8868	0.1585	0.3778	0.0000	482.47	164	baseline observation — no changes	-
 1	BTC_5m	2026-03-22T05:41:12Z	DISCARD	1.0027	-6.0287	-994.7291	0.7064	0.8934	0.1758	0.3332	0.0000	518.23	165	earlier sell trigger made pair_cost and dd worse — premature exits reduced matched pairs	sell_loss_start
 2	BTC_15m	2026-03-21T22:47:42Z	BASELINE	0.9631	-5.8816	-335.2540	0.6072	0.8296	0.1404	0.3294	0.0000	167.63	57	baseline observation — no changes	-
+3	BTC_15m	2026-03-22T05:52:06Z	DISCARD	0.9915	-0.4793	-27.3174	0.0836	0.3801	0.3913	0.0106	0.0000	15.30	57	max_marginal_pair_cost 1.03->0.99 collapsed matched_ratio 61%->8%, pair formation blocked	max_marginal_pair_cost

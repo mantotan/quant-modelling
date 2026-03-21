@@ -1,5 +1,6 @@
-iter=2 pair=BTC_15m timestamp=2026-03-21T22:47:42Z status=BASELINE_recorded_experiment_queued (BACKTEST MODE)
-Baseline: avg_pair_cost=0.9631 avg_profit=-5.8816 total_profit=-335.25 max_dd=167.63% bars=57 sell_ratio=0.000
-Hypothesis: reduce max_marginal_pair_cost 1.03->0.99 to gate out expensive pairs.
-Zero sells (sell_ratio=0.000) noted — pair cost gate tightening is primary lever before sell changes.
-Next experiment will evaluate whether tighter pair cost gate reduces avg_pair_cost below 0.9631.
+iter=3 pair=BTC_15m timestamp=2026-03-22T05:52:06Z status=DISCARD next_hypothesis=cheap_threshold_0.10->0.07
+DISCARD reason: max_marginal_pair_cost 1.03->0.99 collapsed matched_ratio from 61%->8%, pair formation blocked.
+avg_pair_cost=0.9915 (worse than baseline 0.9631), profit=$-27.32, max_dd=15.3%.
+Next experiment: cheap_threshold 0.10->0.07 — select only genuinely cheap prices to reduce pair cost
+without blocking pair formation.
+Rotation advancing to pair_index=2 (BTC_1h).
