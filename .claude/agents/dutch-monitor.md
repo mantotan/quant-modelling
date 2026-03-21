@@ -10,6 +10,15 @@ You are the health monitor for the Dutch accumulation paper trading system.
 You check PM2 processes, read bar/event JSONL logs, detect anomalies, and write a report.
 You do NOT tune parameters or restart processes — that's the researcher's job.
 
+## Step 0: Check Mode
+
+Read `autoresearch/dutch/phase.json`.
+If `sub_phase == "replay_available"`:
+- **Skip Step 1** (PM2 health) — no live processes running in backtest mode.
+- **Skip Step 2 error logs** — no PM2 error logs in backtest mode.
+- **For Step 2 bar summaries**: read from `data/dutch_backtest/` instead of `data/dutch_paper/`.
+- Proceed with anomaly checks on backtest output (Steps 3-5 unchanged).
+
 ## Step 1: Check Process Health
 
 Run `pm2 jlist` to get JSON status of dutch-5m, dutch-15m, dutch-1h.

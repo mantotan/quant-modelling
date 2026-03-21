@@ -15,11 +15,12 @@ Most invocations you will EXIT immediately (nothing to do while incubating).
 
 1. Read `autoresearch/dutch/dispatch_state.json`. If missing, create with defaults.
 2. Read `autoresearch/dutch/alerts.json`.
-3. Count data rows in `autoresearch/dutch/results.tsv` (lines after header = total_iterations).
+3. Read `autoresearch/dutch/phase.json` — check `sub_phase` for backtest mode.
+4. Count data rows in `autoresearch/dutch/results.tsv` (lines after header = total_iterations).
    This is ground truth — never trust dispatch_state.json iteration count.
-4. Reconcile `last_strategist_at` from `autoresearch/dutch/strategy.md` header (if exists).
-5. Reconcile `last_auditor_at` from `autoresearch/dutch/audit.md` header (if exists).
-6. Compute `iters_since_strategist` and `iters_since_auditor`.
+5. Reconcile `last_strategist_at` from `autoresearch/dutch/strategy.md` header (if exists).
+6. Reconcile `last_auditor_at` from `autoresearch/dutch/audit.md` header (if exists).
+7. Compute `iters_since_strategist` and `iters_since_auditor`.
 
 ## Phase 1: Select Role
 
@@ -29,17 +30,23 @@ Priority order (first match wins):
 2. **Unexecuted auditor directive** in audit.md → **RESEARCHER**
 3. `iters_since_auditor >= 20` AND `total_iterations > 10` → **AUDITOR**
 4. `iters_since_strategist >= 5` AND `total_iterations > 0` → **STRATEGIST**
-5. **Incubation complete** → **RESEARCHER** (evaluate + start new experiment)
+5. **Incubation complete** OR (**replay_available** AND `last_role == "researcher"`) → **RESEARCHER** (evaluate + start new experiment)
 6. `total_iterations == 0` (no experiments yet) → **RESEARCHER** (baseline run)
 7. **Periodic health check** (`last_monitor_at` is null or > 1 hour ago) → **MONITOR**
 8. **Default** → **EXIT immediately**
 
 ### Incubation Check (lightweight)
 
-**Fast path:** If `experiment_started_at` is set, compute elapsed = now - experiment_started_at.
+**Backtest fast path:** If `phase.json` `sub_phase == "replay_available"`:
+- Skip time-based incubation entirely — backtest runs in seconds.
+- After researcher completes (`last_role == "researcher"`), immediately treat incubation as complete.
+- This enables back-to-back researcher iterations.
+- Strategist/auditor cadence unchanged (every 5/20 iterations).
+
+**Live fast path:** If `experiment_started_at` is set, compute elapsed = now - experiment_started_at.
 If elapsed < `min_eval_bars * 300` seconds (300s = 5m, fastest TF) → not ready, skip to rule 7/8.
 
-**Full check (only when fast path says maybe ready):** Count bars in latest `data/dutch_paper/BTC_{tf}/bars_*.jsonl` for each TF (5m, 15m, 1h) where `bar_id > experiment_start_bar_ids[tf]`. When at least 2 of 3 TFs have >= `min_eval_bars` new bars → incubation_complete = true.
+**Live full check (only when fast path says maybe ready):** Count bars in latest `data/dutch_paper/BTC_{tf}/bars_*.jsonl` for each TF (5m, 15m, 1h) where `bar_id > experiment_start_bar_ids[tf]`. When at least 2 of 3 TFs have >= `min_eval_bars` new bars → incubation_complete = true.
 
 ## Phase 2: EXIT Path
 

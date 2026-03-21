@@ -52,6 +52,11 @@ Maker-only simulation matching production `post_only=True` behavior:
 - Tick snapshots: `data/dutch_paper/BTC_{tf}/ticks_*.jsonl` (for future replay)
 - PM2 logs: `data/dutch_{tf}.err.log`, `data/dutch_{tf}.out.log`
 
-## Phase 2 (FUTURE): Backtest Replay
+## Phase 2: Backtest Replay (IMPLEMENTED)
 
-Replay recorded tick JSONL through the engine with different knobs for rapid offline iteration.
+Replay recorded Polymarket tick Parquet through the engine with different knobs for rapid offline iteration.
+- Script: `scripts/dutch_backtest.py`
+- Data: `data/raw/polymarket_ticks/` (Hive-partitioned Parquet, 4 assets x 3 TFs)
+- Activation: set `phase.json` `sub_phase: "replay_available"`
+- Iteration time: ~10-30s (vs ~40-80 min for live)
+- Output: TSV with 9 standard metrics (same format as researcher evaluation)

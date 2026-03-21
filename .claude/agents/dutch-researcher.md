@@ -186,9 +186,29 @@ git commit -m "dutch-research: {STATUS} -- {description} [{param_changed}]"
 RESEARCHER iter={N} {STATUS} param={param_changed} {old}→{new} pair_cost={X}
 ```
 
-## Phase 2 (FUTURE): Backtest Replay
+## Phase 2 (Backtest Mode): Evaluate via Replay
 
 When `phase.json` has `"sub_phase": "replay_available"`:
-- Run: `uv run scripts/dutch_replay.py --knobs autoresearch/dutch/knobs.json --ticks data/dutch_paper/BTC_15m/ticks_{date}.jsonl`
-- Evaluate same metrics as live
-- Much faster iteration (minutes vs hours)
+
+1. **Run backtest** (replaces reading live JSONL):
+   ```bash
+   uv run scripts/dutch_backtest.py \
+     --knobs autoresearch/dutch/knobs.json \
+     --output autoresearch/dutch/backtest_results.tsv \
+     --model-dir data/models/pulse_v2
+   ```
+
+2. **Parse the ALL row** from `autoresearch/dutch/backtest_results.tsv` — extract the 9 standard metrics:
+   avg_pair_cost, avg_profit, total_profit, matched_ratio, fill_rate, correct_side_pct, budget_util, sell_ratio, bars_evaluated.
+
+3. **Apply identical KEEP/DISCARD criteria** from Phase 2 above.
+
+4. **Skip Phase 6** (PM2 restart) — config is only used by backtest script.
+
+5. **Skip Phase 7** (experiment_start_bar_ids) — not needed, backtest is deterministic.
+
+All other phases (0, 1, 3, 4, 5, 8, 9) remain unchanged.
+
+**Backtest mode note for Phase 5:** After editing knobs.json, no PM2 restart needed. The next
+dispatch invocation will immediately trigger researcher (instant incubation),
+which re-runs the backtest with updated knobs.
