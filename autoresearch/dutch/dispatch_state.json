@@ -4,7 +4,7 @@
   "last_auditor_at": 0,
   "last_monitor_at": "2026-03-21T19:10:32Z",
   "last_role": "exit",
-  "last_updated": "2026-03-21T19:20:48Z",
+  "last_updated": "2026-03-21T20:00:53Z",
   "experiment_started_at": "2026-03-21T14:54:17Z",
   "experiment_start_bar_ids": {"5m": 1774103700, "15m": 1774103400, "1h": 0},
   "min_eval_bars": 8,
