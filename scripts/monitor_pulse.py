@@ -131,10 +131,7 @@ def parse_args() -> argparse.Namespace:
         "--dutch-vwap-tol", type=float, default=0.10,
         help="Price improvement tolerance vs avg fill (default: 0.10)",
     )
-    p.add_argument(
-        "--dutch-max-hedge-ask", type=float, default=0.80,
-        help="Max ask price for hedge buys (default: 0.80)",
-    )
+    # --dutch-max-hedge-ask removed in V6 (no hedge tier)
     return p.parse_args()
 
 
@@ -614,17 +611,21 @@ def print_dutch_panel(
     if s_up == 0 and s_dn == 0:
         print(f"  (empty)")
 
-    if engine_snap["stopped"]:
-        print(f"\n  ** STOPPED (kill switch triggered) **")
-
     # Projected P/L
     if matched > 0 or unm_up > 0 or unm_dn > 0:
         tc = engine_snap["total_cost"]
         payout_up = matched + unm_up  # if UP wins
         payout_dn = matched + unm_dn  # if DN wins
-        print(f"\n  PROJECTED P/L")
+        risk_budget = engine_snap.get("risk_budget", 0)
+        worst_loss = engine_snap.get("worst_case_loss", 0)
+        print(f"\n  PROJECTED P/L  (risk={worst_loss:.1f}/{risk_budget:.1f})")
         print(f"  If UP: ${payout_up:.2f} - ${tc:.2f} = ${payout_up - tc:+.2f}")
         print(f"  If DN: ${payout_dn:.2f} - ${tc:.2f} = ${payout_dn - tc:+.2f}")
+
+    # Pair cost
+    pair_cost_live = engine_snap.get("pair_cost_live", 0)
+    if pair_cost_live > 0:
+        print(f"\n  PAIR COST  {pair_cost_live:.4f}")
 
     # Market data
     if has_book and ws_feed:
@@ -680,7 +681,6 @@ def load_dutch_config(
         "max_side_fraction": args.dutch_max_side_frac,
         "max_per_prediction": args.dutch_max_per_prediction,
         "vwap_tolerance": args.dutch_vwap_tol,
-        "max_hedge_ask": args.dutch_max_hedge_ask,
         "bar_seconds": BAR_SECONDS[tf],
     }
     sim_kwargs: dict = {}
@@ -780,9 +780,10 @@ async def main_loop(args: argparse.Namespace) -> None:
         dutch_config, sim_kwargs = load_dutch_config(args, tf)
         dutch_engine = DutchAccumulationEngine(dutch_config)
         dutch_sim = LimitOrderSimulator(**sim_kwargs) if sim_kwargs else LimitOrderSimulator()
-        logger.info("Dutch config: budget=$%.0f, order=$%.0f, sell_threshold=%.2f",
+        logger.info("Dutch V6.1 config: budget=$%.0f, order=$%.0f, pair_cost<%.2f, risk=%.0f%%->%.0f%%",
                      dutch_config.bar_budget, dutch_config.order_size,
-                     dutch_config.sell_loss_threshold)
+                     dutch_config.max_marginal_pair_cost,
+                     dutch_config.risk_floor * 100, dutch_config.risk_ceil * 100)
         dutch_logger = DutchSummaryLogger(
             base_dir=Path("data/dutch_paper"),
             asset="BTC",
@@ -911,8 +912,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                 # Cancel unfilled orders and release pending sell reservations
                 cancelled = dutch_sim.cancel_all()
                 for order in cancelled:
-                    if getattr(order, "action", "BUY") == "SELL":
-                        dutch_engine.on_sell_cancelled(order)
+                    dutch_engine.on_order_cancelled(order)
                 # Create summary (outcome pending — will be filled by resolution)
                 summary = dutch_engine.resolve("")
                 summary.fill_stats = {

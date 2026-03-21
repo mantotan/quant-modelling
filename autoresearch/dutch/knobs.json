@@ -1,11 +1,10 @@
 {
   "strategy": "dutch_accumulation",
-  "version": "v5",
+  "version": "v6.1",
   "bar_budget": 200.0,
   "order_size": 5.0,
-  "cheap_threshold": 0.10,
-  "max_pair_cost": 1.05,
   "min_order_usd": 1.0,
+  "cheap_threshold": 0.10,
   "min_time_remaining": 30.0,
   "emergency_balance_time": 120.0,
   "spread_offset": 0.01,
@@ -14,16 +13,20 @@
   "max_side_fraction": 0.55,
   "max_per_prediction": 100.0,
   "vwap_tolerance": 0.10,
-  "kill_switch_after": 0.60,
-  "max_hedge_ask": 0.80,
-  "min_share_match": 0.50,
   "edge_scale_lo": 0.8,
   "edge_scale_hi": 1.2,
-  "cheap_ask_max": 0.50,
   "rebalance_warmup": 0.10,
-  "sell_loss_threshold": 0.05,
   "sell_max_fraction": 0.50,
   "sell_min_shares": 10.0,
+  "max_marginal_pair_cost": 1.03,
+  "sell_profit_only": true,
+  "risk_floor": 0.05,
+  "risk_ceil": 0.15,
+  "risk_t_start": 0.10,
+  "risk_t_end": 0.80,
+  "risk_exponent": 2.0,
+  "edge_decay_start": 0.70,
+  "edge_decay_end": 0.85,
   "fill_simulator": {
     "fill_ticks": 10,
     "chase_threshold": 0.03,
@@ -33,5 +36,5 @@
     "sweep_threshold": 0.01
   },
   "_readonly": ["strategy", "version", "min_order_usd"],
-  "_notes": "bar_seconds is TF-specific (300/900/3600), not tunable here"
+  "_deprecated": ["sell_loss_threshold", "cheap_ask_max", "min_share_match", "max_hedge_ask", "kill_switch_after", "max_pair_cost", "pnl_gap_tolerance", "allow_paired_buys"]
 }

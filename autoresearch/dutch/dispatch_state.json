@@ -1,12 +1,12 @@
 {
-  "total_iterations": 0,
+  "total_iterations": 1,
   "last_strategist_at": 0,
   "last_auditor_at": 0,
   "last_monitor_at": "2026-03-21T19:02:00Z",
-  "last_role": "monitor",
-  "last_updated": "2026-03-21T19:02:00Z",
-  "experiment_started_at": null,
-  "experiment_start_bar_ids": {"5m": 0, "15m": 0, "1h": 0},
+  "last_role": "exit",
+  "last_updated": "2026-03-21T15:01:44Z",
+  "experiment_started_at": "2026-03-21T14:54:17Z",
+  "experiment_start_bar_ids": {"5m": 1774103700, "15m": 1774103400, "1h": 0},
   "min_eval_bars": 8,
   "incubation_complete": false
 }

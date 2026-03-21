@@ -1,3 +1,6 @@
 2026-03-21T11:10:56Z iter=0 status=BASELINE param=- -
   eval: pair_cost=0.7689 profit=$-20.28 matched=0.2136 fill=0.9898 bars=37
   hypothesis: "Baseline recorded. matched_ratio=0.21 is critically low — one-sided accumulation dominates. Tighten max_side_fraction 0.65->0.55 to force earlier rebalancing."
+2026-03-21T14:54:17Z iter=0 status=BASELINE param=- -→-
+  eval: pair_cost=0.4195 profit=$-31.35 total_profit=$-2852.72 matched=0.3240 fill=0.9545 bars=91
+  hypothesis: "First run - observing V6.1 defaults. Sell race detected (monitor report). Negative pair costs on 5m from excessive sell_losing events. One-sided accumulation dominant on both 5m (9 consec) and 15m (5 consec). sell_ratio=2.55. BASELINE established, no changes made. Incubation started at 5m=1774103700, 15m=1774103400."

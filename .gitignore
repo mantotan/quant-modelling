@@ -87,3 +87,6 @@ coverage.xml
 # Grafana/Prometheus local data
 prometheus_data/
 grafana_data/
+
+# Runtime state (not code)
+autoresearch/reconciliation_state.json

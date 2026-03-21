@@ -77,7 +77,7 @@ Each Polymarket contract (5m, 15m, 1h) is a separate market with separate odds. 
 - `scripts/train_pulse.py` — End-to-end Pulse training
 - `scripts/trade.py` — Unified trading script (paper/dry-run/live, --verbose for per-prediction logs)
 - `scripts/monitor_pulse.py` — BTC Pulse monitor + Dutch accumulation paper trading (--dutch flag)
-- `src/qm/strategy/dutch/engine.py` — Dutch accumulation V3 engine (6 pacing gates, bilateral discipline)
+- `src/qm/strategy/dutch/engine.py` — Dutch accumulation V6 engine (P/L parity targeting, per-order pair cost guard, paired buys)
 - `src/qm/strategy/dutch/fill_simulator.py` — Limit order fill simulator (consecutive-tick model)
 - `src/qm/strategy/dutch/summary_logger.py` — JSONL logger (bars + events + optional ticks)
 

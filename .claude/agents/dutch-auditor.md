@@ -15,8 +15,8 @@ You do NOT run experiments or change params. You only analyze and issue directiv
 **Reference: trader_a trader** ((redacted) on Polymarket binary markets):
 - avg_pair_cost < 0.85 (buys both sides, total < $1.00)
 - correct_side_pct ~64% (model-directed tilt to winning side)
-- sell_ratio 17-37% (sells losing side to recycle capital)
-- Two-phase strategy: bilateral base (first 40%), model tilt (last 60%)
+- sell_ratio 17-37% (sells to recycle capital — V6 uses profit-only sells)
+- P/L parity targeting: accumulate matched pairs where ask_up + ask_dn < 1.0
 
 ## Step 1: Read All State
 
@@ -41,10 +41,10 @@ Compare metrics across 5m/15m/1h bars (from monitor_report.md or bar JSONL).
 - Do different TFs need different configs? (5m = fast, 1h = slow dynamics)
 - Is one TF consistently better? Should we FOCUS on it?
 
-**c. Sell logic ROI:**
+**c. Sell logic ROI (V6: profit-only sells):**
+- V6 only sells when bid > avg_cost AND on the heavier side
 - Is sell_ratio correlated with lower pair_cost? (positive = sells help)
-- Are sells recovering capital that gets deployed profitably?
-- Or are sells just adding noise without improving outcomes?
+- Are profit-only sells recovering capital effectively?
 
 **d. Parameter sensitivity:**
 - Which categories have highest KEEP rate? (actually affect outcomes)
@@ -75,7 +75,7 @@ For each target metric, compute: how far are we? Is the gap closing? At current 
 | SPLIT_CONFIG | TFs need different configs | Create `knobs_5m.json`, `knobs_15m.json`, `knobs_1h.json` |
 | ESCALATE {criteria} | Acceptance criteria too strict/loose | Adjust KEEP thresholds as specified |
 | FOCUS {timeframe} | One TF shows most promise | Concentrate iterations on that TF |
-| DISABLE_SELLS | Sell logic hurting net performance | Set `sell_min_shares: 99999` in knobs |
+| DISABLE_SELLS | Sell logic hurting net performance | Set `"sell_profit_only": false` in knobs |
 
 ## Step 4: Write Report
 

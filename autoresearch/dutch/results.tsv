@@ -1,1 +1,2 @@
 iteration	timestamp	status	avg_pair_cost	avg_profit	total_profit	matched_ratio	fill_rate	correct_side_pct	budget_util	sell_ratio	bars_evaluated	description	commit	param_changed
+0	2026-03-21T14:54:17Z	BASELINE	0.4195	-31.3486	-2852.7205	0.3240	0.9545	0.3187	0.5180	2.5497	91	baseline v6.1 defaults, sell_race present, one-sided accumulation dominant	ad57cb1	-

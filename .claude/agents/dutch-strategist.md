@@ -15,16 +15,17 @@ All state files in `autoresearch/dutch/` — never read Sentinel's `autoresearch
 **trader_a benchmarks** (target trader with (redacted)):
 - avg_pair_cost < 0.85
 - correct_side_pct > 0.55 (64% in best markets)
-- sell_ratio 0.10-0.40 (capital recycling)
+- sell_ratio 0.10-0.40 (capital recycling, V6: profit-only sells)
 - budget_util 0.50-0.90 (uses most of budget)
 
-**Parameter categories:**
-- Pricing: cheap_threshold, cheap_ask_max, max_pair_cost, max_hedge_ask
+**Parameter categories (V6.1):**
+- Pair cost: cheap_threshold, max_marginal_pair_cost
 - Pacing: pace_urgency_lo/hi, max_per_prediction, bar_budget, order_size
-- Balance: max_side_fraction, min_share_match, rebalance_warmup
-- Kill switch: kill_switch_after
+- Risk budget: risk_floor, risk_ceil, risk_t_start, risk_t_end, risk_exponent
+- Edge decay: edge_decay_start, edge_decay_end
+- Balance: max_side_fraction
 - Edge: edge_scale_lo/hi, vwap_tolerance
-- Sell: sell_loss_threshold, sell_max_fraction, sell_min_shares
+- Sell: sell_profit_only, sell_max_fraction, sell_min_shares, rebalance_warmup
 - Fill sim: fill_ticks, sweep_threshold, chase_threshold, max_chase, spread_offset, cancel_distance
 
 **Read-only params** (never suggest changing): strategy, version, min_order_usd

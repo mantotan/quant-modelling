@@ -1,13 +1,12 @@
-"""Dutch accumulation engine V2 — buy both sides throughout a bar.
+"""Dutch accumulation engine V6.1 — time-progressive risk budget.
 
 Core state machine that tracks one bar's lifecycle:
   - Holds bilateral inventory (shares_up, shares_dn, cost_up, cost_dn)
-  - PnL-aware balancing (only urgently balance when worst-case outcome loses)
-  - 3-tier buy decision: cheap (underpriced), contra (other side overpriced),
-    balance (worst-case PnL negative)
-  - Marginal kill switch (stops when next pair costs > threshold)
+  - Time-progressive risk budget: worst-case loss capped by quadratic curve
+  - Per-order pair cost guard (simulated avg_pair_cost < threshold)
+  - Edge decay: wind down heavy-side buying late in bar
+  - Profit-only sells: bid > avg_cost AND heavy side only
   - Book health checks (spread, depth)
-  - Edge-scaled + PnL-aware order sizing
 
 The engine is pure logic — no I/O, no async. It receives TokenBook
 snapshots and returns DutchOrder decisions. The fill simulator and
@@ -31,15 +30,15 @@ logger = logging.getLogger(__name__)
 class DutchConfig:
     """Configuration for dutch accumulation strategy.
 
-    V4: Bilateral grid accumulation (matching trader_a strategy).
-    Two-phase: build bilateral base early, model-tilt late.
+    V6.1: Time-progressive risk budget — worst-case loss grows quadratically
+    from risk_floor to risk_ceil over the bar. Edge decay winds down heavy
+    side buying late in bar.
     """
 
     bar_budget: float = 200.0
     order_size: float = 5.0
     max_orders: int = 0  # 0 = auto-derive from bar_budget / min_order_usd
     cheap_threshold: float = 0.10
-    max_pair_cost: float = 1.05  # V4: relaxed from 0.97, allow convergence
     min_order_usd: float = 1.0
     min_time_remaining: float = 30.0
     emergency_balance_time: float = 120.0
@@ -50,39 +49,54 @@ class DutchConfig:
     pace_urgency_lo: float = 0.5
     pace_urgency_hi: float = 2.0
 
-    # Side discipline: max fraction of budget to one side (balance exempt)
+    # Side discipline: max fraction of budget to one side (trailing exempt)
     max_side_fraction: float = 0.65
 
     # Per-prediction spend cap
     max_per_prediction: float = 100.0
 
-    # Price improvement: wider for bilateral accumulation (V4: 0.10 from 0.02)
+    # Price improvement: wider for bilateral accumulation
     vwap_tolerance: float = 0.10
 
-    # V4: Kill switch delay — don't check before this fraction of bar elapsed
-    kill_switch_after: float = 0.60
-
-    # V4: Hedge tier — buy expensive side up to this ask price
-    max_hedge_ask: float = 0.80
-
-    # V4: Share match monitor — force rebalance below this ratio
-    min_share_match: float = 0.50
-
-    # V4: Narrowed edge scaling (was implicit 0.5-2.0)
+    # Edge scaling bounds for non-trailing orders
     edge_scale_lo: float = 0.8
     edge_scale_hi: float = 1.2
 
-    # V4: Cheap tier ask threshold (buy any side below this, no model gate)
-    cheap_ask_max: float = 0.50
-
-    # V4: Rebalance warm-up — don't force share match rebalance until this
-    # fraction of bar_budget is spent. Prevents instant bilateral buying.
+    # Warm-up: don't sell until this fraction of bar_budget is spent
     rebalance_warmup: float = 0.10
 
-    # V5: Sell logic — dump losing side to recycle capital
-    sell_loss_threshold: float = 0.05  # sell when model edge < -this (5c)
+    # Sell limits (used by V6 profit-only sell)
     sell_max_fraction: float = 0.50    # sell at most 50% of net shares
     sell_min_shares: float = 10.0      # minimum net shares to consider selling
+
+    # V6: Per-order pair cost guard — block buy if sim avg_pair_cost exceeds this
+    # Set above 1.0 because ask-based pair_cost includes vig (~1-2c per side),
+    # but actual fill prices (at bid+offset) are lower than ask.
+    max_marginal_pair_cost: float = 1.03
+
+    # V6: Profit-only sells — only sell when bid > avg_cost for that side
+    sell_profit_only: bool = True
+
+    # V6.1: Time-progressive risk budget
+    risk_floor: float = 0.05        # 5% of budget at bar start ($10 on $200)
+    risk_ceil: float = 0.15         # 15% max at t_end
+    risk_t_start: float = 0.10      # risk starts growing here
+    risk_t_end: float = 0.80        # risk maxes out here
+    risk_exponent: float = 2.0      # quadratic curve
+
+    # V6.1: Edge decay — wind down heavy side buying late in bar
+    edge_decay_start: float = 0.70  # start decaying heavy side edge
+    edge_decay_end: float = 0.85    # fully zeroed by here
+
+    # --- Deprecated V5/V6 fields (kept for backward compat, ignored by V6.1 on_tick) ---
+    max_pair_cost: float = 1.05
+    kill_switch_after: float = 0.60
+    max_hedge_ask: float = 0.80
+    min_share_match: float = 0.50
+    cheap_ask_max: float = 0.50
+    sell_loss_threshold: float = 0.05
+    pnl_gap_tolerance: float = 5.0  # dollars
+    allow_paired_buys: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,6 +187,26 @@ class DutchInventory:
     def worst_case_pnl(self) -> float:
         return min(self.pnl_if_up, self.pnl_if_dn)
 
+    def simulated_avg_pair_cost(
+        self, side: str, shares: float, price: float,
+    ) -> float:
+        """What would avg_pair_cost be if we bought `shares` of `side` at `price`?
+
+        Returns 1.0 if no matched pairs would exist after the simulated buy.
+        """
+        new_cost = shares * price
+        new_up = self.net_shares_up + (shares if side == "UP" else 0)
+        new_dn = self.net_shares_dn + (shares if side == "DN" else 0)
+        new_cost_up = self.net_cost_up + (new_cost if side == "UP" else 0)
+        new_cost_dn = self.net_cost_dn + (new_cost if side == "DN" else 0)
+        matched = min(new_up, new_dn)
+        if matched <= 0:
+            return 1.0
+        up_avg = new_cost_up / new_up if new_up > 0 else 0.0
+        dn_avg = new_cost_dn / new_dn if new_dn > 0 else 0.0
+        return up_avg + dn_avg
+
+
 
 @dataclass
 class DutchBarSummary:
@@ -238,12 +272,17 @@ class DutchBarSummary:
 
 
 class DutchAccumulationEngine:
-    """Core engine: decides when to buy each side, tracks inventory.
+    """V6.1 engine: time-progressive risk budget for Dutch accumulation.
 
-    Buy decision uses 3 tiers:
-      Tier 1 (cheap): side is underpriced vs model (edge > threshold)
-      Tier 2 (contra): other side is overpriced → this side is value play
-      Tier 3 (balance): worst-case PnL is negative, need to hedge
+    Worst-case loss is capped by a quadratic curve that grows from risk_floor
+    to risk_ceil over the bar. Edge decay winds down heavy-side buying late
+    in bar. Per-order pair cost guard blocks expensive buys.
+
+    Decision flow:
+      Phase A: Pair opportunity detection (ask_up + ask_dn < threshold?)
+      Phase B: Risk budget + lighter-side-first ordering
+      Per-side: Sizing, edge decay, pair cost guard, risk budget gate
+      Phase F: Profit-only sell (bid > avg_cost AND heavy side only)
     """
 
     def __init__(self, config: DutchConfig) -> None:
@@ -261,7 +300,6 @@ class DutchAccumulationEngine:
         self._condition_id: str = ""
         self._window_start: str = ""
         self._window_end: str = ""
-        self._stopped = False
 
         # Pacing: per-side last order time for slot spacing (R2)
         self._last_order_time_pct_up: float = -1.0
@@ -271,15 +309,25 @@ class DutchAccumulationEngine:
         self._current_cal_prob: float | None = None
         self._prediction_spend: float = 0.0
 
-        # V5: Sell cooldown to prevent rapid-fire sells reading stale inventory
+        # V6: Track committed (placed but unfilled) spend to prevent budget overshoot
+        self._committed_spend: float = 0.0
+
+        # Sell cooldown to prevent rapid-fire sells reading stale inventory
         self._last_sell_time_pct: float = -1.0
 
-        # V5: Track shares committed to pending sell orders (not yet filled)
+        # Track shares committed to pending sell orders (not yet filled)
         self._pending_sell_shares_up: float = 0.0
         self._pending_sell_shares_dn: float = 0.0
 
         # Envelope tracking for snapshot display (R1)
         self._last_allowed_spend: float = 0.0
+
+        # V6: Stash last asks for snapshot display
+        self._last_ask_up: float = 0.0
+        self._last_ask_dn: float = 0.0
+
+        # V6.1: Track last time_pct for snapshot risk budget
+        self._last_time_pct: float = 0.0
 
         # Effective max orders (derived once, reused)
         self._effective_max: int = (
@@ -331,6 +379,17 @@ class DutchAccumulationEngine:
             return False
         return True
 
+    def _risk_budget(self, time_pct: float) -> float:
+        """Max allowed worst-case loss at this point in the bar."""
+        cfg = self._config
+        if cfg.risk_t_end <= cfg.risk_t_start:
+            t_norm = 1.0
+        else:
+            t_norm = (time_pct - cfg.risk_t_start) / (cfg.risk_t_end - cfg.risk_t_start)
+        t_clamped = max(0.0, min(1.0, t_norm))
+        risk_pct = cfg.risk_floor + (cfg.risk_ceil - cfg.risk_floor) * (t_clamped ** cfg.risk_exponent)
+        return cfg.bar_budget * risk_pct
+
     def on_tick(
         self,
         time_pct: float,
@@ -338,26 +397,19 @@ class DutchAccumulationEngine:
         book_up,
         book_dn,
     ) -> list[DutchOrder]:
-        """Core decision logic. Called on every book update.
+        """V6.1 decision logic. Called on every book update.
 
-        Returns 0, 1, or 2 DutchOrder objects to place.
+        Returns 0-3 DutchOrder objects (up to 2 buys + 1 sell).
         book_up/book_dn are TokenBook | None.
 
-        Gate order (checked before the per-side loop):
-          R4a  Per-prediction reset (new cal_prob → reset counter)
-          E    Kill switch (avg_pair_cost on matched inventory)
-          F    Budget remaining
-          R4b  Per-prediction spend cap
-          R5   Max orders (auto-derived)
-          R1   Budget envelope pacing
+        Pre-screening gates: B (model stats), C (book health),
+          R4a (prediction reset), F (budget), R4b (per-prediction cap),
+          R5 (max orders), R1 (envelope pacing).
 
-        Per-side gates (inside the loop, after tier decision):
-          R2   Slot-based minimum spacing (balance/emergency exempt)
-          R3   Per-side budget cap (balance/emergency exempt)
-          R6   Price improvement gate (no prior fills → skipped)
+        Decision phases: A (pair opportunity), B (risk budget),
+          Per-side (sizing, edge decay, pair cost, risk gate),
+          F (profit-only sell).
         """
-        if self._stopped:
-            return []
 
         # -- B: Track model stats (incremental flip counting) --
         if self._model_probs:
@@ -383,9 +435,9 @@ class DutchAccumulationEngine:
         self._spreads_up.append(book_up.spread)
         self._spreads_dn.append(book_dn.spread)
 
-        # -- I' (moved up): Compute cheap scores — needed by R1 envelope --
-        cheap_up = cal_prob - book_up.best_ask
-        cheap_dn = (1.0 - cal_prob) - book_dn.best_ask
+        # Stash asks for snapshot display
+        self._last_ask_up = book_up.best_ask
+        self._last_ask_dn = book_dn.best_ask
 
         # -- R4a: Per-prediction reset — new model output resets counter --
         if (
@@ -395,23 +447,12 @@ class DutchAccumulationEngine:
             self._current_cal_prob = cal_prob
             self._prediction_spend = 0.0
 
-        # -- E: Kill switch (only on matched inventory, delayed to 60% of bar) --
-        if (
-            self._inventory.matched > 0
-            and time_pct >= self._config.kill_switch_after
-        ):
-            avg_pc = self._inventory.avg_pair_cost
-            if avg_pc > self._config.max_pair_cost:
-                if not self._stopped:
-                    self._decision_log.append(
-                        f"t={time_pct:.2f}: KILL avg_pair_cost={avg_pc:.4f}"
-                    )
-                    self._emit("kill", time_pct=time_pct, avg_pair_cost=avg_pc)
-                    self._stopped = True
-                return []
-
-        # -- F: Budget remaining --
-        budget_remaining = self._config.bar_budget - self._inventory.total_cost
+        # -- F: Budget remaining (includes inflight orders not yet filled) --
+        budget_remaining = (
+            self._config.bar_budget
+            - self._inventory.total_cost
+            - self._committed_spend
+        )
         if budget_remaining < self._config.min_order_usd:
             return []
 
@@ -427,17 +468,19 @@ class DutchAccumulationEngine:
         if self._order_count >= self._effective_max:
             return []
 
-        # -- R1: Budget envelope pacing --
-        t_safe = max(time_pct, 0.01)  # floor to avoid 0^x = 0
-        edge = max(cheap_up, cheap_dn, 0.01)
+        # -- R1: Budget envelope pacing (V6: urgency from pair opportunity) --
+        t_safe = max(time_pct, 0.01)
+        pair_opportunity = max(
+            1.0 - (book_up.best_ask + book_dn.best_ask), 0.01,
+        )
         urgency = max(
             self._config.pace_urgency_lo,
             min(
-                edge / (2 * self._config.cheap_threshold),
+                pair_opportunity / (2 * self._config.cheap_threshold),
                 self._config.pace_urgency_hi,
             ),
         )
-        pace_t = min(1.0, t_safe ** urgency)  # V4: back-loaded (convex)
+        pace_t = min(1.0, t_safe ** urgency)
         allowed_spend = self._config.bar_budget * pace_t
         self._last_allowed_spend = allowed_spend
         if self._inventory.total_cost >= allowed_spend:
@@ -447,224 +490,94 @@ class DutchAccumulationEngine:
             )
             return []
 
-        # -- G: Time remaining --
-        remaining_s = (1.0 - time_pct) * self._config.bar_seconds
+        # ============================================================
+        # Phase A: Pair opportunity detection
+        # ============================================================
+        pair_cost = book_up.best_ask + book_dn.best_ask
+        is_dutch_opportunity = pair_cost < self._config.max_marginal_pair_cost
 
-        # -- H: PnL-aware balance state (computed once, used per-side) --
-        pnl_up = self._inventory.pnl_if_up
-        pnl_dn = self._inventory.pnl_if_dn
-        worst = min(pnl_up, pnl_dn)
-        if worst >= 0:
-            needs_balance = False
-            need_side: str | None = None
+        # Cheap scores (for edge-scaled sizing and display)
+        cheap_up = cal_prob - book_up.best_ask
+        cheap_dn = (1.0 - cal_prob) - book_dn.best_ask
+
+        # ============================================================
+        # Phase B: Risk budget
+        # ============================================================
+        risk_allowed = self._risk_budget(time_pct)
+        self._last_time_pct = time_pct
+
+        # Need Dutch opportunity to trade at all
+        if not is_dutch_opportunity:
+            return self._v6_sell_pass(time_pct, book_up, book_dn, [])
+
+        # Lighter side first — completes pairs, frees risk room
+        if self._inventory.net_shares_up <= self._inventory.net_shares_dn:
+            buy_sides = ["UP", "DN"]
         else:
-            needs_balance = True
-            need_side = "DN" if pnl_up > pnl_dn else "UP"
+            buy_sides = ["DN", "UP"]
 
-        # -- J: Time factor ramps cheap_threshold from 100% at t=0 to 50% at t=0.85 --
-        time_factor = max(0.5, 1.0 - 0.588 * min(time_pct / 0.85, 1.0))
-        adjusted_threshold = self._config.cheap_threshold * time_factor
+        # Determine heavy side for edge decay
+        if self._inventory.net_shares_up > self._inventory.net_shares_dn:
+            heavy_side: str | None = "UP"
+        elif self._inventory.net_shares_dn > self._inventory.net_shares_up:
+            heavy_side = "DN"
+        else:
+            heavy_side = None  # equal = no heavy side
 
+        # ============================================================
+        # Per-side order construction
+        # ============================================================
+        remaining_s = (1.0 - time_pct) * self._config.bar_seconds
         orders: list[DutchOrder] = []
 
-        # Alternate starting side to avoid UP bias with break
-        sides = ("DN", "UP") if self._order_count % 2 else ("UP", "DN")
-        for side in sides:
-            if side == "UP":
-                bid = book_up.best_bid
-                ask = book_up.best_ask
-                my_cheap = cheap_up
-                other_cheap = cheap_dn
-            else:
-                bid = book_dn.best_bid
-                ask = book_dn.best_ask
-                my_cheap = cheap_dn
-                other_cheap = cheap_up
+        for side in buy_sides:
+            book = book_up if side == "UP" else book_dn
+            ask = book.best_ask
+            bid = book.best_bid
 
-            # -- K1: Tier decision (V4: price-first bilateral) --
-            can_buy = False
-            reason = ""
-            is_balance = False
-
-            # -- Share match monitor (highest priority, after warm-up) --
-            # Don't force rebalance until enough budget spent to judge
-            if self._inventory.total_cost >= self._config.bar_budget * self._config.rebalance_warmup:
-                max_sh = max(self._inventory.net_shares_up, self._inventory.net_shares_dn)
-                min_sh = min(self._inventory.net_shares_up, self._inventory.net_shares_dn)
-                share_match = min_sh / max_sh if max_sh > 0 else 1.0
-                light_side = (
-                    "UP" if self._inventory.net_shares_up < self._inventory.net_shares_dn
-                    else "DN"
-                )
-                if (
-                    share_match < self._config.min_share_match
-                    and side == light_side
-                    and ask < self._config.max_hedge_ask
-                ):
-                    can_buy = True
-                    is_balance = False  # paced via R2, not burst
-                    reason = f"match_rebalance sm={share_match:.0%}"
-
-            # -- Time-windowed tier logic (only if share match didn't fire) --
-            warmup_passed = (
-                self._inventory.total_cost
-                >= self._config.bar_budget * self._config.rebalance_warmup
+            # -- Limit price: always maker --
+            limit_price = min(
+                bid + self._config.spread_offset, ask - 0.01,
             )
-            if not can_buy:
-                if remaining_s <= self._config.min_time_remaining:
-                    # Last 30s: emergency balance only
-                    if (
-                        needs_balance and need_side == side
-                        and remaining_s > 10
-                        and ask < self._config.max_hedge_ask
-                    ):
-                        can_buy = True
-                        is_balance = True
-                        reason = f"emergency worst_pnl={worst:.2f}"
-                elif remaining_s <= self._config.emergency_balance_time:
-                    # 30-120s: cheap + edge + urgent balance (no hedge)
-                    if ask < self._config.cheap_ask_max:
-                        can_buy = True
-                        reason = f"cheap ask={ask:.3f}"
-                    elif my_cheap > adjusted_threshold:
-                        can_buy = True
-                        reason = f"edge={my_cheap:.3f}"
-                    elif (
-                        warmup_passed
-                        and needs_balance and need_side == side
-                        and ask < self._config.max_hedge_ask
-                    ):
-                        can_buy = True
-                        is_balance = True
-                        reason = f"urgent_balance worst_pnl={worst:.2f}"
-                else:
-                    # Normal window: 4 tiers (cheap, edge, hedge, balance)
-                    # Tier 1: Cheap — ask below fair, buy regardless of model
-                    if ask < self._config.cheap_ask_max:
-                        can_buy = True
-                        reason = f"cheap ask={ask:.3f}"
-                    # Tier 2: Model edge — model says underpriced
-                    elif my_cheap > adjusted_threshold:
-                        can_buy = True
-                        reason = f"edge={my_cheap:.3f}"
-                    # Tier 3: Hedge — after warm-up, other side has value
-                    elif (
-                        warmup_passed
-                        and other_cheap > self._config.cheap_threshold
-                        and ask < self._config.max_hedge_ask
-                    ):
-                        can_buy = True
-                        reason = f"hedge ask={ask:.3f}"
-                    # Tier 4: Balance — after warm-up, worst-case PnL negative
-                    elif (
-                        warmup_passed
-                        and needs_balance and need_side == side
-                        and ask < self._config.max_hedge_ask
-                    ):
-                        can_buy = True
-                        is_balance = True
-                        reason = f"balance worst_pnl={worst:.2f}"
-
-            if not can_buy:
-                continue
-
-            # -- R2: Slot-based minimum spacing (only emergency exempt) --
-            if "emergency" not in reason:
-                last_t = (
-                    self._last_order_time_pct_up if side == "UP"
-                    else self._last_order_time_pct_dn
-                )
-                remaining_slots = self._effective_max - self._order_count
-                if remaining_slots > 0 and last_t >= 0:
-                    min_gap = (1.0 - time_pct) / remaining_slots
-                    if (time_pct - last_t) < min_gap:
-                        self._emit(
-                            "gate_spacing", time_pct=time_pct, side=side,
-                            last_t=last_t, min_gap=min_gap,
-                        )
-                        continue
-
-            # -- R3: Per-side budget cap (only emergency exempt) --
-            if "emergency" not in reason:
-                side_cost = (
-                    self._inventory.cost_up if side == "UP"
-                    else self._inventory.cost_dn
-                )
-                max_side_budget = (
-                    self._config.bar_budget * self._config.max_side_fraction
-                )
-                if side_cost >= max_side_budget:
-                    self._emit(
-                        "gate_side_cap", time_pct=time_pct, side=side,
-                        side_cost=side_cost, max_side_budget=max_side_budget,
-                    )
-                    continue
-
-            # -- K2: Limit price computation (maker post_only) --
-            is_aggressive = ("match_rebalance" in reason or "hedge" in reason
-                             or "balance" in reason or "urgent" in reason)
-            if is_aggressive:
-                # Rebalance/hedge: best possible maker price (just below ask)
-                limit_price = ask - 0.01
-            else:
-                # Cheap/edge: true maker — at bid or in spread gap
-                if ask - bid > 2 * self._config.spread_offset:
-                    limit_price = bid + self._config.spread_offset
-                else:
-                    limit_price = bid
-            # post_only: NEVER at or above ask (production rejects)
-            if limit_price >= ask:
-                limit_price = ask - 0.01
             if limit_price <= 0:
                 continue
 
-            # -- R6: Price improvement gate (balance/hedge/rebalance exempt) --
-            if is_balance or "hedge" in reason or "match_rebalance" in reason:
-                pass  # skip VWAP — these tiers buy at inherently worse prices
-            elif side == "UP" and self._inventory.net_shares_up > 0:
-                avg_fill = self._inventory.net_cost_up / self._inventory.net_shares_up
-                if limit_price > avg_fill * (1 + self._config.vwap_tolerance):
+            # -- R2: Slot spacing (no exemptions) --
+            last_t = (
+                self._last_order_time_pct_up if side == "UP"
+                else self._last_order_time_pct_dn
+            )
+            remaining_slots = self._effective_max - self._order_count
+            if remaining_slots > 0 and last_t >= 0:
+                min_gap = (1.0 - time_pct) / remaining_slots
+                if (time_pct - last_t) < min_gap:
                     self._emit(
-                        "gate_vwap", time_pct=time_pct, side=side,
-                        limit=limit_price, avg_fill=avg_fill,
-                    )
-                    continue
-            elif side == "DN" and self._inventory.net_shares_dn > 0:
-                avg_fill = self._inventory.net_cost_dn / self._inventory.net_shares_dn
-                if limit_price > avg_fill * (1 + self._config.vwap_tolerance):
-                    self._emit(
-                        "gate_vwap", time_pct=time_pct, side=side,
-                        limit=limit_price, avg_fill=avg_fill,
+                        "gate_spacing", time_pct=time_pct, side=side,
+                        last_t=last_t, min_gap=min_gap,
                     )
                     continue
 
-            # -- K3: Smart sizing (V4) --
-            if "hedge" in reason:
-                # Hedge: flat half-size order (limit exposure on expensive side)
-                dollar_size = self._config.order_size * 0.5
-                dollar_size = min(dollar_size, budget_remaining)
-            elif "match_rebalance" in reason or (needs_balance and need_side == side):
-                # Balance/rebalance: buy shares to reduce imbalance
-                if side == "UP":
-                    shares_needed = self._inventory.total_cost - self._inventory.net_shares_up
-                else:
-                    shares_needed = self._inventory.total_cost - self._inventory.net_shares_dn
-                shares_needed = max(0, shares_needed)
-                dollar_size = min(
-                    shares_needed * limit_price,
-                    budget_remaining,
-                    self._config.order_size * 2,
+            # -- R3: Side budget cap (no exemptions) --
+            side_cost = (
+                self._inventory.cost_up if side == "UP"
+                else self._inventory.cost_dn
+            )
+            max_side_budget = (
+                self._config.bar_budget * self._config.max_side_fraction
+            )
+            if side_cost >= max_side_budget:
+                self._emit(
+                    "gate_side_cap", time_pct=time_pct, side=side,
+                    side_cost=side_cost, max_side_budget=max_side_budget,
                 )
-            else:
-                # Edge-scaled: narrowed range (V4: 0.8x to 1.2x)
-                edge_for_scale = max(my_cheap, 0)
-                edge_scale = min(
-                    edge_for_scale / (self._config.cheap_threshold * 2),
-                    self._config.edge_scale_hi,
-                )
-                edge_scale = max(self._config.edge_scale_lo, edge_scale)
-                dollar_size = self._config.order_size * edge_scale
-                dollar_size = min(dollar_size, budget_remaining)
+                continue
+
+            # -- Sizing: share-based (expensive side sets pace) --
+            max_ask = max(book_up.best_ask, book_dn.best_ask, 0.01)
+            base_shares = self._config.order_size / max_ask
+            dollar_size = base_shares * limit_price
+
+            dollar_size = min(dollar_size, budget_remaining)
 
             # Clamp to per-prediction remaining (R4)
             prediction_remaining = (
@@ -677,7 +590,108 @@ class DutchAccumulationEngine:
 
             shares = dollar_size / limit_price
 
-            # -- K4: Order creation + bookkeeping --
+            # -- Edge decay guard (heavy side only) --
+            if (
+                side == heavy_side
+                and time_pct >= self._config.edge_decay_start
+            ):
+                cheap_this = cheap_up if side == "UP" else cheap_dn
+                decay_range = (
+                    self._config.edge_decay_end
+                    - self._config.edge_decay_start
+                )
+                decay = (
+                    min(1.0, (time_pct - self._config.edge_decay_start) / decay_range)
+                    if decay_range > 0
+                    else 1.0
+                )
+                effective_edge = cheap_this * (1.0 - decay)
+                if effective_edge <= 0:
+                    self._emit(
+                        "gate_edge_decay", time_pct=time_pct, side=side,
+                        raw_edge=round(cheap_this, 3),
+                        decay=round(decay, 2),
+                    )
+                    continue
+
+            # -- Phase D: Per-order pair cost guard --
+            other_shares = (
+                self._inventory.net_shares_dn if side == "UP"
+                else self._inventory.net_shares_up
+            )
+            if other_shares > 0:
+                sim_pc = self._inventory.simulated_avg_pair_cost(
+                    side, shares, limit_price,
+                )
+                if sim_pc > self._config.max_marginal_pair_cost:
+                    self._emit(
+                        "gate_pair_cost", time_pct=time_pct, side=side,
+                        sim_pair_cost=round(sim_pc, 4),
+                    )
+                    continue
+
+            # -- Risk budget gate --
+            total_after = (
+                self._inventory.total_cost
+                + self._committed_spend
+                + dollar_size
+            )
+            up_after = self._inventory.net_shares_up + (
+                shares if side == "UP" else 0
+            )
+            dn_after = self._inventory.net_shares_dn + (
+                shares if side == "DN" else 0
+            )
+            new_worst = max(total_after - up_after, total_after - dn_after, 0)
+
+            if new_worst > risk_allowed:
+                # Over budget — allow ONLY if buy REDUCES worst-case
+                current_worst = max(
+                    -self._inventory.pnl_if_up,
+                    -self._inventory.pnl_if_dn,
+                    0,
+                )
+                if new_worst >= current_worst:
+                    self._emit(
+                        "gate_risk", time_pct=time_pct, side=side,
+                        worst=round(new_worst, 2),
+                        allowed=round(risk_allowed, 2),
+                    )
+                    continue
+                # new_worst < current_worst → buy helps, allow it
+
+            # -- R6: VWAP gate (no exemptions) --
+            if side == "UP" and self._inventory.net_shares_up > 0:
+                avg_fill = (
+                    self._inventory.net_cost_up
+                    / self._inventory.net_shares_up
+                )
+                if limit_price > avg_fill * (1 + self._config.vwap_tolerance):
+                    self._emit(
+                        "gate_vwap", time_pct=time_pct, side=side,
+                        limit=limit_price, avg_fill=avg_fill,
+                    )
+                    continue
+            elif side == "DN" and self._inventory.net_shares_dn > 0:
+                avg_fill = (
+                    self._inventory.net_cost_dn
+                    / self._inventory.net_shares_dn
+                )
+                if limit_price > avg_fill * (1 + self._config.vwap_tolerance):
+                    self._emit(
+                        "gate_vwap", time_pct=time_pct, side=side,
+                        limit=limit_price, avg_fill=avg_fill,
+                    )
+                    continue
+
+            # -- Order creation --
+            risk_pct = (
+                new_worst / self._config.bar_budget * 100
+                if self._config.bar_budget > 0
+                else 0
+            )
+            reason = f"dutch pc={pair_cost:.3f} risk={risk_pct:.0f}%"
+
             order = DutchOrder(
                 side=side,
                 limit_price=round(limit_price, 4),
@@ -691,8 +705,8 @@ class DutchAccumulationEngine:
             budget_remaining -= dollar_size
             self._order_count += 1
             self._prediction_spend += dollar_size
+            self._committed_spend += dollar_size
 
-            # Update per-side last order time (R2)
             if side == "UP":
                 self._last_order_time_pct_up = time_pct
             else:
@@ -706,82 +720,119 @@ class DutchAccumulationEngine:
                 "order", time_pct=time_pct, side=side, reason=reason,
                 limit=limit_price, dollars=dollar_size,
             )
+            # NO break — both sides can buy per tick
 
-            # One side per tick — let prices update before buying other side.
-            # trader_a median gap between first UP and first DN is 72 seconds.
-            break
+        # ============================================================
+        # Phase F: Profit-only sell
+        # ============================================================
+        return self._v6_sell_pass(time_pct, book_up, book_dn, orders)
 
-        # -- V5: SELL PASS — dump losing side to recycle capital --
+    def _v6_sell_pass(
+        self,
+        time_pct: float,
+        book_up,
+        book_dn,
+        orders: list[DutchOrder],
+    ) -> list[DutchOrder]:
+        """V6 sell pass: only sell at profit, only sell the heavier side.
+
+        When sell_profit_only is False, all sells are disabled (V6 has no
+        model-edge sell logic — profit-only is the only sell mode).
+        """
+        if not self._config.sell_profit_only:
+            return orders
+
         buy_side = orders[0].side if orders else None
         warmup_for_sell = (
             self._inventory.total_cost
             >= self._config.bar_budget * self._config.rebalance_warmup
         )
-        # Sell cooldown: prevent rapid-fire sells from reading stale inventory
-        sell_cooldown = 0.005  # ~1.5s on 5m, ~4.5s on 15m, ~18s on 1h
-        sell_on_cooldown = (time_pct - self._last_sell_time_pct) < sell_cooldown
-        if warmup_for_sell and not sell_on_cooldown:
-            for side in sides:
-                # Don't sell the same side we just bought
-                if side == buy_side:
-                    continue
+        sell_cooldown = 0.005
+        sell_on_cooldown = (
+            (time_pct - self._last_sell_time_pct) < sell_cooldown
+        )
 
-                if side == "UP":
-                    net_shares = self._inventory.net_shares_up
-                    pending = self._pending_sell_shares_up
-                    my_cheap_sell = cheap_up
-                    sell_ask = book_up.best_ask
-                else:
-                    net_shares = self._inventory.net_shares_dn
-                    pending = self._pending_sell_shares_dn
-                    my_cheap_sell = cheap_dn
-                    sell_ask = book_dn.best_ask
+        if not warmup_for_sell or sell_on_cooldown:
+            return orders
 
-                # Available = net minus shares already committed to pending sells
-                available = net_shares - pending
+        for side in ["UP", "DN"]:
+            if side == buy_side:
+                continue
 
-                # Must have enough AVAILABLE shares to sell
-                if available < self._config.sell_min_shares:
-                    continue
+            net_shares = (
+                self._inventory.net_shares_up if side == "UP"
+                else self._inventory.net_shares_dn
+            )
+            other_shares = (
+                self._inventory.net_shares_dn if side == "UP"
+                else self._inventory.net_shares_up
+            )
+            pending = (
+                self._pending_sell_shares_up if side == "UP"
+                else self._pending_sell_shares_dn
+            )
+            book = book_up if side == "UP" else book_dn
 
-                # Model must strongly disagree (losing side)
-                if my_cheap_sell > -self._config.sell_loss_threshold:
-                    continue
+            available = net_shares - pending
+            if available < self._config.sell_min_shares:
+                continue
 
-                # Sell up to sell_max_fraction of net shares, capped by available
-                max_sellable = max(0, net_shares * self._config.sell_max_fraction - pending)
-                sell_shares = min(self._config.order_size / sell_ask, max_sellable) if sell_ask > 0 else 0
+            # NEVER sell the lighter side
+            if net_shares <= other_shares:
+                continue
 
-                if sell_shares * sell_ask < self._config.min_order_usd:
-                    continue
+            # NEVER sell at a loss
+            if net_shares <= 0:
+                continue
+            avg_cost = (
+                self._inventory.net_cost_up / self._inventory.net_shares_up
+                if side == "UP"
+                else self._inventory.net_cost_dn / self._inventory.net_shares_dn
+            )
+            if avg_cost <= 0 or book.best_bid <= avg_cost:
+                continue
 
-                sell_order = DutchOrder(
-                    side=side,
-                    limit_price=round(sell_ask, 4),
-                    shares=round(sell_shares, 4),
-                    dollars=round(sell_shares * sell_ask, 2),
-                    time_pct=round(time_pct, 4),
-                    placed_at=datetime.now(UTC),
-                    reason=f"sell_losing edge={my_cheap_sell:.3f}",
-                    action="SELL",
-                )
-                orders.append(sell_order)
-                self._decision_log.append(
-                    f"t={time_pct:.2f}: SELL {side} edge={my_cheap_sell:.3f} "
-                    f"limit={sell_ask:.4f} ${sell_shares * sell_ask:.2f}"
-                )
-                self._emit(
-                    "order", time_pct=time_pct, side=side,
-                    reason=f"sell_losing edge={my_cheap_sell:.3f}",
-                    limit=sell_ask, dollars=sell_shares * sell_ask,
-                )
-                self._last_sell_time_pct = time_pct
-                # Reserve shares so next tick can't oversell
-                if side == "UP":
-                    self._pending_sell_shares_up += sell_shares
-                else:
-                    self._pending_sell_shares_dn += sell_shares
-                break  # one sell per tick
+            # Sell enough to improve parity (half the imbalance)
+            imbalance = net_shares - other_shares
+            max_sellable = max(
+                0,
+                net_shares * self._config.sell_max_fraction - pending,
+            )
+            sell_shares = min(imbalance / 2, max_sellable)
+            if sell_shares * book.best_bid < self._config.min_order_usd:
+                continue
+
+            sell_order = DutchOrder(
+                side=side,
+                limit_price=round(book.best_bid, 4),
+                shares=round(sell_shares, 4),
+                dollars=round(sell_shares * book.best_bid, 2),
+                time_pct=round(time_pct, 4),
+                placed_at=datetime.now(UTC),
+                reason=(
+                    f"sell_profit bid={book.best_bid:.3f}"
+                    f">avg={avg_cost:.3f}"
+                ),
+                action="SELL",
+            )
+            orders.append(sell_order)
+            self._decision_log.append(
+                f"t={time_pct:.2f}: SELL {side} "
+                f"bid={book.best_bid:.3f}>avg={avg_cost:.3f} "
+                f"${sell_shares * book.best_bid:.2f}"
+            )
+            self._emit(
+                "order", time_pct=time_pct, side=side,
+                reason=sell_order.reason,
+                limit=book.best_bid,
+                dollars=sell_shares * book.best_bid,
+            )
+            self._last_sell_time_pct = time_pct
+            if side == "UP":
+                self._pending_sell_shares_up += sell_shares
+            else:
+                self._pending_sell_shares_dn += sell_shares
+            break  # one sell per tick
 
         return orders
 
@@ -794,6 +845,12 @@ class DutchAccumulationEngine:
         """Update inventory when a limit order fills."""
         cost = filled_shares * fill_price
         action = getattr(order, "action", "BUY")
+
+        # Release committed spend (order is no longer inflight)
+        if action == "BUY":
+            self._committed_spend = max(
+                0, self._committed_spend - order.dollars,
+            )
 
         if action == "SELL":
             # V5: Sell — track revenue and sold shares
@@ -832,13 +889,19 @@ class DutchAccumulationEngine:
             total_cost=round(self._inventory.total_cost, 4),
         )
 
-    def on_sell_cancelled(self, order: DutchOrder) -> None:
-        """Release pending sell reservation when order is cancelled/expired."""
-        if getattr(order, "action", "BUY") == "SELL":
+    def on_order_cancelled(self, order: DutchOrder) -> None:
+        """Release reservations when order is cancelled/expired."""
+        action = getattr(order, "action", "BUY")
+        if action == "SELL":
             if order.side == "UP":
                 self._pending_sell_shares_up = max(0, self._pending_sell_shares_up - order.shares)
             else:
                 self._pending_sell_shares_dn = max(0, self._pending_sell_shares_dn - order.shares)
+        else:
+            # Release committed buy spend
+            self._committed_spend = max(
+                0, self._committed_spend - order.dollars,
+            )
 
     def resolve(self, outcome: str) -> DutchBarSummary:
         """Compute PnL at bar end and return summary."""
@@ -922,18 +985,25 @@ class DutchAccumulationEngine:
         self._condition_id = ""
         self._window_start = ""
         self._window_end = ""
-        self._stopped = False
 
         # Pacing state (R1/R2/R4)
         self._last_order_time_pct_up = -1.0
         self._last_order_time_pct_dn = -1.0
         self._current_cal_prob = None
         self._prediction_spend = 0.0
+        self._committed_spend = 0.0
         self._last_allowed_spend = 0.0
         self._last_sell_time_pct = -1.0
         self._pending_sell_shares_up = 0.0
         self._pending_sell_shares_dn = 0.0
         self._last_gate_emitted.clear()
+
+        # V6 state
+        self._last_ask_up = 0.0
+        self._last_ask_dn = 0.0
+
+        # V6.1 state
+        self._last_time_pct = 0.0
 
     def snapshot(self) -> dict:
         """Current state for live display."""
@@ -955,7 +1025,9 @@ class DutchAccumulationEngine:
             "pnl_if_up": round(inv.pnl_if_up, 4),
             "pnl_if_dn": round(inv.pnl_if_dn, 4),
             "worst_case_pnl": round(inv.worst_case_pnl, 4),
-            "stopped": self._stopped,
+            "risk_budget": round(self._risk_budget(self._last_time_pct), 2),
+            "worst_case_loss": round(max(-inv.worst_case_pnl, 0), 2),
+            "pair_cost_live": round(self._last_ask_up + self._last_ask_dn, 4),
             "orders_count": len(self._orders),
             "last_decisions": self._decision_log[-5:],
             "allowed_spend": round(self._last_allowed_spend, 2),
@@ -982,4 +1054,3 @@ class DutchAccumulationEngine:
                 / max(inv.net_shares_up, inv.net_shares_dn) * 100, 1,
             ) if max(inv.net_shares_up, inv.net_shares_dn) > 0 else 0,
         }
-

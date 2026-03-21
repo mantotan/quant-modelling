@@ -36,7 +36,7 @@ Read `autoresearch/dutch/phase.json`.
    - **RESET {hash}**: Restore knobs from that commit.
    - **FOCUS {timeframe}**: Note for future (v1 uses shared config for all TFs).
    - **SPLIT_CONFIG**: Create per-TF knobs (future).
-   - **DISABLE_SELLS**: Set sell_min_shares=99999 in knobs.
+   - **DISABLE_SELLS**: Set `"sell_profit_only": false` in knobs (disables all sells in V6).
    - **ESCALATE {criteria}**: Adjust KEEP thresholds as specified.
 
 5. Read `autoresearch/dutch/monitor_report.md` and `alerts.json` — note any anomalies.
@@ -112,7 +112,7 @@ Priority chain — first match wins:
 
 1. **Auditor directive** (RESET/FOCUS/SPLIT_CONFIG/DISABLE_SELLS) → execute it
 2. **Strategist priority queue** → follow top unexecuted item
-3. **Monitor-flagged issue** → if monitor says "one-sided accumulation," try `max_side_fraction`; if "pair cost stuck," try `cheap_ask_max` or `max_hedge_ask`
+3. **Monitor-flagged issue** → if monitor says "one-sided accumulation," try `risk_ceil` or `edge_decay_start`; if "pair cost stuck," try `max_marginal_pair_cost` or `cheap_threshold`
 4. **Autonomous mode:**
    a. Group results.tsv by `param_changed` column into categories
    b. Compute KEEP rate per category
@@ -121,16 +121,17 @@ Priority chain — first match wins:
    e. If 5+ consecutive DISCARDs → random large perturbation
    f. Try reversing a previous DISCARD if context changed
 
-**Parameter categories:**
+**Parameter categories (V6.1):**
 
 | Category | Parameters |
 |----------|-----------|
-| Pricing | cheap_threshold, cheap_ask_max, max_pair_cost, max_hedge_ask |
+| Pair cost | cheap_threshold, max_marginal_pair_cost |
 | Pacing | pace_urgency_lo/hi, max_per_prediction, bar_budget, order_size |
-| Balance | max_side_fraction, min_share_match, rebalance_warmup |
-| Kill switch | kill_switch_after |
+| Risk budget | risk_floor, risk_ceil, risk_t_start, risk_t_end, risk_exponent |
+| Edge decay | edge_decay_start, edge_decay_end |
+| Balance | max_side_fraction |
 | Edge | edge_scale_lo/hi, vwap_tolerance |
-| Sell | sell_loss_threshold, sell_max_fraction, sell_min_shares |
+| Sell | sell_profit_only, sell_max_fraction, sell_min_shares, rebalance_warmup |
 | Fill sim | fill_ticks, sweep_threshold, chase_threshold, max_chase, spread_offset, cancel_distance |
 
 **Read-only params** (NEVER change): `strategy`, `version`, `min_order_usd`. `bar_seconds` is not in knobs.json.
