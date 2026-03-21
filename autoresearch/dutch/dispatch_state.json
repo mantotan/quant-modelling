@@ -1,12 +1,12 @@
 {
-  "total_iterations": 0,
+  "total_iterations": 1,
   "last_strategist_at": 0,
   "last_auditor_at": 0,
   "last_monitor_at": null,
-  "last_role": null,
-  "last_updated": null,
-  "experiment_started_at": null,
-  "experiment_start_bar_ids": {"5m": 0, "15m": 0, "1h": 0},
+  "last_role": "researcher",
+  "last_updated": "2026-03-21T11:10:56Z",
+  "experiment_started_at": "2026-03-21T11:10:56Z",
+  "experiment_start_bar_ids": {"5m": 1774090800, "15m": 1774089900, "1h": 0},
   "min_eval_bars": 8,
   "incubation_complete": false
 }

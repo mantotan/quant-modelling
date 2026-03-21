@@ -1,0 +1,3 @@
+2026-03-21T11:10:56Z iter=0 status=BASELINE param=- -
+  eval: pair_cost=0.7689 profit=$-20.28 matched=0.2136 fill=0.9898 bars=37
+  hypothesis: "Baseline recorded. matched_ratio=0.21 is critically low — one-sided accumulation dominates. Tighten max_side_fraction 0.65->0.55 to force earlier rebalancing."

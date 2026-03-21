@@ -11,7 +11,7 @@
   "spread_offset": 0.01,
   "pace_urgency_lo": 0.5,
   "pace_urgency_hi": 2.0,
-  "max_side_fraction": 0.65,
+  "max_side_fraction": 0.55,
   "max_per_prediction": 100.0,
   "vwap_tolerance": 0.10,
   "kill_switch_after": 0.60,
