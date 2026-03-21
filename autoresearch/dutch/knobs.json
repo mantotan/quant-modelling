@@ -20,7 +20,7 @@
   "sell_min_shares": 10.0,
   "max_marginal_pair_cost": 1.03,
   "sell_profit_only": true,
-  "risk_floor": 0.05,
+  "risk_floor": 0.01,
   "risk_ceil": 0.15,
   "risk_t_start": 0.10,
   "risk_t_end": 0.80,

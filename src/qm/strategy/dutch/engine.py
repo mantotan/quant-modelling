@@ -483,10 +483,11 @@ class DutchAccumulationEngine:
         pace_t = min(1.0, t_safe ** urgency)
         allowed_spend = self._config.bar_budget * pace_t
         self._last_allowed_spend = allowed_spend
-        if self._inventory.total_cost >= allowed_spend:
+        spent = self._inventory.total_cost + self._committed_spend
+        if spent >= allowed_spend:
             self._emit(
                 "gate_envelope", time_pct=time_pct,
-                total_cost=self._inventory.total_cost, allowed=allowed_spend,
+                total_cost=spent, allowed=allowed_spend,
             )
             return []
 
@@ -585,6 +586,25 @@ class DutchAccumulationEngine:
             )
             dollar_size = min(dollar_size, prediction_remaining)
 
+            # -- Risk budget clamp --
+            # Max ds that keeps worst-case <= risk_allowed for the OTHER outcome.
+            # Same formula for both sides — light side naturally gets bigger cap.
+            base_cost = (
+                self._inventory.total_cost + self._committed_spend
+            )
+            other_side_shares = (
+                self._inventory.net_shares_dn if side == "UP"
+                else self._inventory.net_shares_up
+            )
+            risk_max_ds = risk_allowed - base_cost + other_side_shares
+            if risk_max_ds < dollar_size:
+                dollar_size = max(0.0, risk_max_ds)
+                self._emit(
+                    "gate_risk_cap", time_pct=time_pct, side=side,
+                    capped_to=round(dollar_size, 2),
+                    allowed=round(risk_allowed, 2),
+                )
+
             if dollar_size < self._config.min_order_usd:
                 continue
 
@@ -630,36 +650,6 @@ class DutchAccumulationEngine:
                     )
                     continue
 
-            # -- Risk budget gate --
-            total_after = (
-                self._inventory.total_cost
-                + self._committed_spend
-                + dollar_size
-            )
-            up_after = self._inventory.net_shares_up + (
-                shares if side == "UP" else 0
-            )
-            dn_after = self._inventory.net_shares_dn + (
-                shares if side == "DN" else 0
-            )
-            new_worst = max(total_after - up_after, total_after - dn_after, 0)
-
-            if new_worst > risk_allowed:
-                # Over budget — allow ONLY if buy REDUCES worst-case
-                current_worst = max(
-                    -self._inventory.pnl_if_up,
-                    -self._inventory.pnl_if_dn,
-                    0,
-                )
-                if new_worst >= current_worst:
-                    self._emit(
-                        "gate_risk", time_pct=time_pct, side=side,
-                        worst=round(new_worst, 2),
-                        allowed=round(risk_allowed, 2),
-                    )
-                    continue
-                # new_worst < current_worst → buy helps, allow it
-
             # -- R6: VWAP gate (no exemptions) --
             if side == "UP" and self._inventory.net_shares_up > 0:
                 avg_fill = (
@@ -685,8 +675,17 @@ class DutchAccumulationEngine:
                     continue
 
             # -- Order creation --
+            worst_after = max(
+                base_cost + dollar_size
+                - self._inventory.net_shares_up
+                - (shares if side == "UP" else 0),
+                base_cost + dollar_size
+                - self._inventory.net_shares_dn
+                - (shares if side == "DN" else 0),
+                0,
+            )
             risk_pct = (
-                new_worst / self._config.bar_budget * 100
+                worst_after / self._config.bar_budget * 100
                 if self._config.bar_budget > 0
                 else 0
             )

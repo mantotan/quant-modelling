@@ -809,6 +809,90 @@ class TestDutchV6PnlParity:
         assert len(sell_up) == 0  # can't sell same side we bought
 
 
+class TestDutchV61RiskBudget:
+    """Tests for V6.1 risk-budget-aware sizing (cap, not block)."""
+
+    def _make_engine(self, **kwargs):
+        config = DutchConfig(**kwargs)
+        return DutchAccumulationEngine(config)
+
+    def test_risk_budget_caps_heavy_side(self):
+        """Heavy side order is REDUCED to fit risk room, not blocked."""
+        engine = self._make_engine(
+            risk_floor=0.10, risk_ceil=0.15,  # 10% = $20 at t=0.50
+            risk_t_start=0.0, risk_t_end=1.0,
+            max_marginal_pair_cost=1.03,
+            order_size=10.0,
+        )
+        # UP heavy: 50 shares @ $0.40 = $20, DN: 20 shares @ $0.50 = $10
+        # base_cost = $30, risk_allowed = $20 (10% of $200 at t=0)
+        # Buying UP: max_ds = 20 - 30 + 20(DN) = $10
+        # Buying DN: max_ds = 20 - 30 + 50(UP) = $40
+        engine._inventory.shares_up = 50
+        engine._inventory.cost_up = 20
+        engine._inventory.shares_dn = 20
+        engine._inventory.cost_dn = 10
+        book_up = make_book(0.38, 0.40)
+        book_dn = make_book(0.48, 0.50)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        # Should have orders (not blocked)
+        assert len(orders) >= 1
+        # UP (heavy side) should be capped
+        up_orders = [o for o in orders if o.side == "UP" and o.action == "BUY"]
+        if up_orders:
+            assert up_orders[0].dollars <= 10.5  # ~$10 risk room
+
+    def test_risk_budget_light_side_gets_bigger_cap(self):
+        """Light side gets more room than heavy side from same risk budget."""
+        engine = self._make_engine(
+            risk_floor=0.10, risk_ceil=0.15,
+            risk_t_start=0.0, risk_t_end=1.0,
+            max_marginal_pair_cost=1.03,
+            order_size=50.0,  # large so we hit the cap
+        )
+        engine._inventory.shares_up = 50
+        engine._inventory.cost_up = 20
+        engine._inventory.shares_dn = 20
+        engine._inventory.cost_dn = 10
+        book_up = make_book(0.38, 0.40)
+        book_dn = make_book(0.48, 0.50)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        up_orders = [o for o in orders if o.side == "UP" and o.action == "BUY"]
+        dn_orders = [o for o in orders if o.side == "DN" and o.action == "BUY"]
+        if up_orders and dn_orders:
+            assert dn_orders[0].dollars > up_orders[0].dollars
+
+    def test_risk_budget_first_order_capped_to_floor(self):
+        """Empty inventory at t=0.10 — first order capped to risk_floor * budget."""
+        engine = self._make_engine(
+            risk_floor=0.01, risk_ceil=0.15,
+            risk_t_start=0.10, risk_t_end=0.80,
+            max_marginal_pair_cost=1.03,
+            order_size=10.0,
+        )
+        book_up = make_book(0.38, 0.40)
+        book_dn = make_book(0.48, 0.50)
+        orders = engine.on_tick(0.10, 0.50, book_up, book_dn)
+        # risk_allowed = 200 * 0.01 = $2. Orders should exist but be small.
+        assert len(orders) >= 1
+        for o in orders:
+            assert o.dollars <= 2.5  # capped near $2
+
+    def test_risk_curve_grows_with_time(self):
+        """Verify quadratic risk curve at known points."""
+        engine = self._make_engine(
+            risk_floor=0.01, risk_ceil=0.15,
+            risk_t_start=0.10, risk_t_end=0.80,
+            risk_exponent=2.0,
+        )
+        # t=0.10 → 1% = $2
+        assert engine._risk_budget(0.10) == pytest.approx(2.0, abs=0.1)
+        # t=0.80 → 15% = $30
+        assert engine._risk_budget(0.80) == pytest.approx(30.0, abs=0.1)
+        # t=0.50 → ~5.6% = ~$11.2
+        assert 10.0 < engine._risk_budget(0.50) < 13.0
+
+
 class TestDutchBarSummary:
     def test_compute_pnl_up_wins(self):
         summary = DutchBarSummary()
