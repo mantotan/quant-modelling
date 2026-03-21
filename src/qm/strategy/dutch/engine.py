@@ -271,6 +271,13 @@ class DutchAccumulationEngine:
         self._current_cal_prob: float | None = None
         self._prediction_spend: float = 0.0
 
+        # V5: Sell cooldown to prevent rapid-fire sells reading stale inventory
+        self._last_sell_time_pct: float = -1.0
+
+        # V5: Track shares committed to pending sell orders (not yet filled)
+        self._pending_sell_shares_up: float = 0.0
+        self._pending_sell_shares_dn: float = 0.0
+
         # Envelope tracking for snapshot display (R1)
         self._last_allowed_spend: float = 0.0
 
@@ -699,7 +706,10 @@ class DutchAccumulationEngine:
             self._inventory.total_cost
             >= self._config.bar_budget * self._config.rebalance_warmup
         )
-        if warmup_for_sell:
+        # Sell cooldown: prevent rapid-fire sells from reading stale inventory
+        sell_cooldown = 0.005  # ~1.5s on 5m, ~4.5s on 15m, ~18s on 1h
+        sell_on_cooldown = (time_pct - self._last_sell_time_pct) < sell_cooldown
+        if warmup_for_sell and not sell_on_cooldown:
             for side in sides:
                 # Don't sell the same side we just bought
                 if side == buy_side:
@@ -707,23 +717,28 @@ class DutchAccumulationEngine:
 
                 if side == "UP":
                     net_shares = self._inventory.net_shares_up
+                    pending = self._pending_sell_shares_up
                     my_cheap_sell = cheap_up
                     bid = book_up.best_bid
                 else:
                     net_shares = self._inventory.net_shares_dn
+                    pending = self._pending_sell_shares_dn
                     my_cheap_sell = cheap_dn
                     bid = book_dn.best_bid
 
-                # Must have enough shares to sell
-                if net_shares < self._config.sell_min_shares:
+                # Available = net minus shares already committed to pending sells
+                available = net_shares - pending
+
+                # Must have enough AVAILABLE shares to sell
+                if available < self._config.sell_min_shares:
                     continue
 
                 # Model must strongly disagree (losing side)
                 if my_cheap_sell > -self._config.sell_loss_threshold:
                     continue
 
-                # Sell up to sell_max_fraction of net shares
-                max_sellable = net_shares * self._config.sell_max_fraction
+                # Sell up to sell_max_fraction of net shares, capped by available
+                max_sellable = max(0, net_shares * self._config.sell_max_fraction - pending)
                 sell_shares = min(self._config.order_size / bid, max_sellable) if bid > 0 else 0
 
                 if sell_shares * bid < self._config.min_order_usd:
@@ -749,6 +764,12 @@ class DutchAccumulationEngine:
                     reason=f"sell_losing edge={my_cheap_sell:.3f}",
                     limit=bid, dollars=sell_shares * bid,
                 )
+                self._last_sell_time_pct = time_pct
+                # Reserve shares so next tick can't oversell
+                if side == "UP":
+                    self._pending_sell_shares_up += sell_shares
+                else:
+                    self._pending_sell_shares_dn += sell_shares
                 break  # one sell per tick
 
         return orders
@@ -768,9 +789,12 @@ class DutchAccumulationEngine:
             if order.side == "UP":
                 self._inventory.sell_revenue_up += cost
                 self._inventory.sold_shares_up += filled_shares
+                # Release full reservation (partial fills remove order entirely)
+                self._pending_sell_shares_up = max(0, self._pending_sell_shares_up - order.shares)
             else:
                 self._inventory.sell_revenue_dn += cost
                 self._inventory.sold_shares_dn += filled_shares
+                self._pending_sell_shares_dn = max(0, self._pending_sell_shares_dn - order.shares)
         else:
             # Buy — existing logic
             if order.side == "UP":
@@ -796,6 +820,14 @@ class DutchAccumulationEngine:
             cost=round(cost, 4),
             total_cost=round(self._inventory.total_cost, 4),
         )
+
+    def on_sell_cancelled(self, order: DutchOrder) -> None:
+        """Release pending sell reservation when order is cancelled/expired."""
+        if getattr(order, "action", "BUY") == "SELL":
+            if order.side == "UP":
+                self._pending_sell_shares_up = max(0, self._pending_sell_shares_up - order.shares)
+            else:
+                self._pending_sell_shares_dn = max(0, self._pending_sell_shares_dn - order.shares)
 
     def resolve(self, outcome: str) -> DutchBarSummary:
         """Compute PnL at bar end and return summary."""
@@ -887,6 +919,9 @@ class DutchAccumulationEngine:
         self._current_cal_prob = None
         self._prediction_spend = 0.0
         self._last_allowed_spend = 0.0
+        self._last_sell_time_pct = -1.0
+        self._pending_sell_shares_up = 0.0
+        self._pending_sell_shares_dn = 0.0
         self._last_gate_emitted.clear()
 
     def snapshot(self) -> dict:

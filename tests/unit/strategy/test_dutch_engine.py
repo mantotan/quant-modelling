@@ -1054,6 +1054,121 @@ class TestDutchV5Sells:
         assert len(orders) >= 1
         assert "cheap" in orders[0].reason
 
+    def test_sell_cooldown_prevents_rapid_sells(self):
+        """Two on_tick calls within cooldown window should produce only 1 sell."""
+        engine = self._make_engine(
+            sell_loss_threshold=0.05, sell_min_shares=5.0,
+            rebalance_warmup=0.0, max_hedge_ask=0.80,
+        )
+        engine._inventory.shares_up = 100.0
+        engine._inventory.cost_up = 30.0
+
+        book_up = make_book(0.85, 0.90)
+        book_dn = make_book(0.08, 0.10)
+
+        # First tick at t=0.50 → should sell
+        orders1 = engine.on_tick(0.50, 0.20, book_up, book_dn)
+        sells1 = [o for o in orders1 if o.action == "SELL"]
+        assert len(sells1) == 1
+
+        # Second tick at t=0.502 (within 0.005 cooldown) → no sell
+        orders2 = engine.on_tick(0.502, 0.20, book_up, book_dn)
+        sells2 = [o for o in orders2 if o.action == "SELL"]
+        assert len(sells2) == 0
+
+        # Third tick at t=0.510 (past cooldown) → should sell again
+        orders3 = engine.on_tick(0.510, 0.20, book_up, book_dn)
+        sells3 = [o for o in orders3 if o.action == "SELL"]
+        assert len(sells3) == 1
+
+    def test_sell_pending_prevents_oversell(self):
+        """Total pending + sold shares can't exceed sell_max_fraction of net shares."""
+        engine = self._make_engine(
+            sell_loss_threshold=0.05, sell_min_shares=5.0,
+            sell_max_fraction=0.50, order_size=500.0,  # large to hit max_sellable cap
+            rebalance_warmup=0.0, max_hedge_ask=0.80,
+        )
+        engine._inventory.shares_up = 100.0
+        engine._inventory.cost_up = 30.0
+
+        book_up = make_book(0.85, 0.90)
+        book_dn = make_book(0.08, 0.10)
+
+        # First tick: sell fires, reserves up to 50% = 50 shares
+        orders1 = engine.on_tick(0.50, 0.20, book_up, book_dn)
+        sells1 = [o for o in orders1 if o.action == "SELL"]
+        assert len(sells1) == 1
+        reserved = engine._pending_sell_shares_up
+        assert reserved > 0
+        # With order_size=500/0.85=588 >> 50, sell should be capped at 50
+        assert abs(reserved - 50.0) < 1.0
+
+        # Second tick (past cooldown): max_sellable = 100*0.5 - 50 ≈ 0 → blocked
+        orders2 = engine.on_tick(0.510, 0.20, book_up, book_dn)
+        sells2 = [o for o in orders2 if o.action == "SELL"]
+        assert len(sells2) == 0  # blocked by pending reservation
+
+    def test_sell_pending_released_on_fill(self):
+        """After fill, pending reservation is released and next sell can fire."""
+        engine = self._make_engine(
+            sell_loss_threshold=0.05, sell_min_shares=5.0,
+            sell_max_fraction=0.50, rebalance_warmup=0.0, max_hedge_ask=0.80,
+        )
+        engine._inventory.shares_up = 100.0
+        engine._inventory.cost_up = 30.0
+
+        book_up = make_book(0.85, 0.90)
+        book_dn = make_book(0.08, 0.10)
+
+        # Place sell
+        orders1 = engine.on_tick(0.50, 0.20, book_up, book_dn)
+        sell = [o for o in orders1 if o.action == "SELL"][0]
+        assert engine._pending_sell_shares_up > 0
+
+        # Simulate fill — releases reservation
+        engine.on_fill(sell, 0.85, sell.shares)
+        assert engine._pending_sell_shares_up == 0.0
+
+    def test_sell_pending_released_on_partial_fill(self):
+        """Partial fill releases FULL order.shares reservation."""
+        engine = self._make_engine(
+            sell_loss_threshold=0.05, sell_min_shares=5.0,
+            sell_max_fraction=0.50, rebalance_warmup=0.0, max_hedge_ask=0.80,
+        )
+        engine._inventory.shares_up = 100.0
+        engine._inventory.cost_up = 30.0
+
+        book_up = make_book(0.85, 0.90)
+        book_dn = make_book(0.08, 0.10)
+
+        orders1 = engine.on_tick(0.50, 0.20, book_up, book_dn)
+        sell = [o for o in orders1 if o.action == "SELL"][0]
+        reserved = engine._pending_sell_shares_up
+
+        # Partial fill: only half filled, but full reservation released
+        engine.on_fill(sell, 0.85, sell.shares * 0.5)
+        assert engine._pending_sell_shares_up == 0.0  # full reservation released
+
+    def test_sell_pending_released_on_cancel(self):
+        """Cancelled sell releases pending reservation."""
+        engine = self._make_engine(
+            sell_loss_threshold=0.05, sell_min_shares=5.0,
+            sell_max_fraction=0.50, rebalance_warmup=0.0, max_hedge_ask=0.80,
+        )
+        engine._inventory.shares_up = 100.0
+        engine._inventory.cost_up = 30.0
+
+        book_up = make_book(0.85, 0.90)
+        book_dn = make_book(0.08, 0.10)
+
+        orders1 = engine.on_tick(0.50, 0.20, book_up, book_dn)
+        sell = [o for o in orders1 if o.action == "SELL"][0]
+        assert engine._pending_sell_shares_up > 0
+
+        # Cancel releases reservation
+        engine.on_sell_cancelled(sell)
+        assert engine._pending_sell_shares_up == 0.0
+
 
 class TestDutchBarSummary:
     def test_compute_pnl_up_wins(self):

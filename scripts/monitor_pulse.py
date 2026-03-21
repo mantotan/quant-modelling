@@ -664,19 +664,51 @@ def print_dutch_panel(
 
 # -- State persistence ------------------------------------------------
 
-DUTCH_STATE_FILE = Path("data/dutch_paper/state.json")
+DUTCH_KNOBS_FILE = Path("autoresearch/dutch/knobs.json")
 
 
-def _save_dutch_state(session: dict, pending: list) -> None:
-    """Save dutch session state for crash recovery."""
+def load_dutch_config(
+    args: argparse.Namespace, tf: Timeframe,
+) -> tuple[DutchConfig, dict]:
+    """Load DutchConfig from knobs.json (if exists), CLI args as fallback.
+
+    Returns (config, sim_kwargs) where sim_kwargs are for LimitOrderSimulator.
+    """
+    kwargs: dict = {
+        "bar_budget": args.dutch_budget,
+        "order_size": args.dutch_order_size,
+        "max_side_fraction": args.dutch_max_side_frac,
+        "max_per_prediction": args.dutch_max_per_prediction,
+        "vwap_tolerance": args.dutch_vwap_tol,
+        "max_hedge_ask": args.dutch_max_hedge_ask,
+        "bar_seconds": BAR_SECONDS[tf],
+    }
+    sim_kwargs: dict = {}
+
+    if DUTCH_KNOBS_FILE.exists():
+        with open(DUTCH_KNOBS_FILE) as f:
+            knobs = json.load(f)
+        for key, val in knobs.items():
+            if key.startswith("_") or key == "fill_simulator":
+                continue
+            if key in DutchConfig.__dataclass_fields__ and key != "bar_seconds":
+                kwargs[key] = val
+        sim_kwargs = knobs.get("fill_simulator", {})
+        logger.info("Dutch config loaded from %s", DUTCH_KNOBS_FILE)
+
+    return DutchConfig(**kwargs), sim_kwargs
+
+
+def _save_dutch_state(state_file: Path, session: dict, pending: list) -> None:
+    """Save dutch session state for crash recovery (per-TF)."""
     try:
         state = {
             "session": {k: v for k, v in session.items() if not k.startswith("_")},
             "pending_count": len(pending),
             "saved_at": datetime.now(UTC).isoformat(),
         }
-        DUTCH_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(DUTCH_STATE_FILE, "w") as f:
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(state_file, "w") as f:
             json.dump(state, f, indent=2)
     except Exception as e:
         logger.warning("Failed to save dutch state: %s", e)
@@ -745,25 +777,20 @@ async def main_loop(args: argparse.Namespace) -> None:
     dutch_bar_condition_id: str = ""
 
     if dutch_mode:
-        dutch_config = DutchConfig(
-            bar_budget=args.dutch_budget,
-            order_size=args.dutch_order_size,
-            max_side_fraction=args.dutch_max_side_frac,
-            max_per_prediction=args.dutch_max_per_prediction,
-            vwap_tolerance=args.dutch_vwap_tol,
-            max_hedge_ask=args.dutch_max_hedge_ask,
-            bar_seconds=BAR_SECONDS[tf],
-        )
+        dutch_config, sim_kwargs = load_dutch_config(args, tf)
         dutch_engine = DutchAccumulationEngine(dutch_config)
-        dutch_sim = LimitOrderSimulator(fill_ticks=3)
+        dutch_sim = LimitOrderSimulator(**sim_kwargs) if sim_kwargs else LimitOrderSimulator()
+        logger.info("Dutch config: budget=$%.0f, order=$%.0f, sell_threshold=%.2f",
+                     dutch_config.bar_budget, dutch_config.order_size,
+                     dutch_config.sell_loss_threshold)
         dutch_logger = DutchSummaryLogger(
             base_dir=Path("data/dutch_paper"),
             asset="BTC",
             timeframe=tf_label,
         )
         dutch_engine.set_event_callback(dutch_logger.log_event)
-        # Load persisted session state
-        dutch_state_file = Path("data/dutch_paper/state.json")
+        # Load persisted session state (per-TF to avoid cross-TF overwrites)
+        dutch_state_file = Path(f"data/dutch_paper/state_{tf_label}.json")
         if dutch_state_file.exists():
             try:
                 with open(dutch_state_file) as f:
@@ -881,8 +908,11 @@ async def main_loop(args: argparse.Namespace) -> None:
         if bar_id != current_bar_id:
             # Dutch: finalize previous bar
             if dutch_mode and dutch_engine and current_bar_id != 0:
-                # Cancel unfilled orders
-                dutch_sim.cancel_all()
+                # Cancel unfilled orders and release pending sell reservations
+                cancelled = dutch_sim.cancel_all()
+                for order in cancelled:
+                    if getattr(order, "action", "BUY") == "SELL":
+                        dutch_engine.on_sell_cancelled(order)
                 # Create summary (outcome pending — will be filled by resolution)
                 summary = dutch_engine.resolve("")
                 summary.fill_stats = {
@@ -1096,12 +1126,12 @@ async def main_loop(args: argparse.Namespace) -> None:
         # -- State persistence (every 5 min) -----------------------
         if dutch_mode and now_disp - last_state_save >= STATE_SAVE_INTERVAL:
             last_state_save = now_disp
-            _save_dutch_state(dutch_session, dutch_pending_resolutions)
+            _save_dutch_state(dutch_state_file, dutch_session, dutch_pending_resolutions)
 
     # -- Shutdown -------------------------------------------------
     logger.info("Shutting down...")
     if dutch_mode:
-        _save_dutch_state(dutch_session, dutch_pending_resolutions)
+        _save_dutch_state(dutch_state_file, dutch_session, dutch_pending_resolutions)
     if dutch_logger:
         dutch_logger.close()
     for feed in ws_feeds.values():
