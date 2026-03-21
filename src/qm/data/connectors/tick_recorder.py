@@ -1,10 +1,12 @@
-"""Polymarket CLOB tick recorder — captures orderbook ticks to Parquet.
+"""Polymarket CLOB tick recorder — captures orderbook ticks + spot prices to Parquet.
 
 Records real-time bid/ask/depth for UP and DOWN tokens across multiple
-assets and timeframes. Designed for dutch accumulation backtesting.
+assets and timeframes, plus the underlying crypto spot price from
+TradingView WSS. Designed for dutch accumulation backtesting.
 
 Architecture:
   TickRecorder (orchestrator)
+    ├── 1x SpotPriceFeed (TradingView WSS, all 4 assets in one connection)
     ├── 3x MarketScanner (one per TF, discovers markets for all assets)
     ├── 12x StreamSlot (one per asset×TF, each runs a PolymarketWSFeed)
     └── 1x TickWriter (consumes tick queue, flushes to Parquet chunks)
@@ -21,12 +23,17 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import math
+import random
+import string
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import aiohttp
 import polars as pl
 
 from qm.core.types import Asset, Timeframe
@@ -38,6 +45,15 @@ logger = logging.getLogger(__name__)
 
 TF_MAP = {"5m": Timeframe.M5, "15m": Timeframe.M15, "1h": Timeframe.H1}
 TF_LABELS = {Timeframe.M5: "5m", Timeframe.M15: "15m", Timeframe.H1: "1h"}
+
+# TradingView WSS for spot prices
+TV_WSS_URL = "wss://data.tradingview.com/socket.io/websocket"
+TV_SYMBOLS = {
+    Asset.BTC: "BINANCE:BTCUSDT",
+    Asset.ETH: "BINANCE:ETHUSDT",
+    Asset.SOL: "BINANCE:SOLUSDT",
+    Asset.XRP: "BINANCE:XRPUSDT",
+}
 
 TICK_SCHEMA = {
     "ts": pl.Datetime("us", "UTC"),
@@ -57,12 +73,35 @@ TICK_SCHEMA = {
     "depth_ask_dn": pl.Float64,
     "is_heartbeat": pl.Boolean,
     "is_stale": pl.Boolean,
+    "spot_price": pl.Float64,
 }
+
+
+# -- TradingView WSS helpers ------------------------------------------
+
+def _tv_encode(msg: str) -> str:
+    return f"~m~{len(msg)}~m~{msg}"
+
+
+def _tv_decode(raw: str) -> list[str]:
+    msgs: list[str] = []
+    i = 0
+    while i < len(raw):
+        if raw[i : i + 3] == "~m~":
+            i += 3
+            j = raw.index("~m~", i)
+            length = int(raw[i:j])
+            i = j + 3
+            msgs.append(raw[i : i + length])
+            i += length
+        else:
+            break
+    return msgs
 
 
 @dataclass(frozen=True, slots=True)
 class TickSnapshot:
-    """One orderbook snapshot for both UP and DOWN tokens."""
+    """One orderbook snapshot for both UP and DOWN tokens + spot price."""
 
     ts: datetime
     asset: str
@@ -81,6 +120,7 @@ class TickSnapshot:
     depth_ask_dn: float
     is_heartbeat: bool
     is_stale: bool
+    spot_price: float
 
     def to_dict(self) -> dict:
         return {
@@ -101,8 +141,96 @@ class TickSnapshot:
             "depth_ask_dn": self.depth_ask_dn,
             "is_heartbeat": self.is_heartbeat,
             "is_stale": self.is_stale,
+            "spot_price": self.spot_price,
         }
 
+
+# -- Spot price feed ---------------------------------------------------
+
+class SpotPriceFeed:
+    """Streams spot prices for multiple assets via TradingView WSS.
+
+    Subscribes to all assets in one WSS connection. Stores latest
+    price per asset. Returns NaN if price not yet received.
+    """
+
+    def __init__(self, assets: set[Asset]) -> None:
+        self._assets = assets
+        self.prices: dict[Asset, float] = {}
+        self._symbol_to_asset: dict[str, Asset] = {
+            TV_SYMBOLS[a]: a for a in assets if a in TV_SYMBOLS
+        }
+
+    def get(self, asset: Asset) -> float:
+        """Get latest spot price. Returns NaN if not yet received."""
+        return self.prices.get(asset, float("nan"))
+
+    async def run(self, running_flag: list[bool]) -> None:
+        """Stream spot prices, auto-reconnect on disconnect."""
+        symbols = [TV_SYMBOLS[a] for a in self._assets if a in TV_SYMBOLS]
+        if not symbols:
+            logger.warning("SpotPriceFeed: no symbols to subscribe")
+            return
+
+        while running_flag[0]:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    ws = await session.ws_connect(
+                        TV_WSS_URL,
+                        headers={"Origin": "https://www.tradingview.com"},
+                        heartbeat=30.0,
+                    )
+                    qs = "qs_" + "".join(random.choices(string.ascii_lowercase, k=12))
+
+                    await ws.send_str(_tv_encode(json.dumps(
+                        {"m": "set_auth_token", "p": ["unauthorized_user_token"]},
+                    )))
+                    await ws.send_str(_tv_encode(json.dumps(
+                        {"m": "quote_create_session", "p": [qs]},
+                    )))
+                    await ws.send_str(_tv_encode(json.dumps(
+                        {"m": "quote_set_fields", "p": [qs, "lp"]},
+                    )))
+                    await ws.send_str(_tv_encode(json.dumps(
+                        {"m": "quote_add_symbols", "p": [qs, *symbols]},
+                    )))
+
+                    logger.info("SpotPriceFeed connected: %d symbols", len(symbols))
+
+                    async for msg in ws:
+                        if not running_flag[0]:
+                            break
+                        if msg.type != aiohttp.WSMsgType.TEXT:
+                            continue
+                        for m in _tv_decode(msg.data):
+                            if m.startswith("~h~"):
+                                await ws.send_str(_tv_encode(m))
+                                continue
+                            try:
+                                d = json.loads(m)
+                            except json.JSONDecodeError:
+                                continue
+                            if d.get("m") != "qsd":
+                                continue
+                            p = d.get("p", [None, {}])
+                            if len(p) < 2 or not isinstance(p[1], dict):
+                                continue
+                            sym_name = p[1].get("n", "")
+                            v = p[1].get("v", {})
+                            lp = v.get("lp")
+                            if lp is not None and sym_name in self._symbol_to_asset:
+                                asset = self._symbol_to_asset[sym_name]
+                                self.prices[asset] = float(lp)
+
+                    await ws.close()
+            except asyncio.CancelledError:
+                return
+            except Exception:
+                logger.warning("SpotPriceFeed disconnected, reconnecting in 5s...")
+                await asyncio.sleep(5.0)
+
+
+# -- Stream slot -------------------------------------------------------
 
 class StreamSlot:
     """Manages one WSS connection for a single asset×timeframe market.
@@ -116,12 +244,14 @@ class StreamSlot:
         asset: Asset,
         timeframe: Timeframe,
         tick_queue: asyncio.Queue,
+        spot_feed: SpotPriceFeed,
         connector_factory=None,
         heartbeat_s: float = 30.0,
     ) -> None:
         self.asset = asset
         self.timeframe = timeframe
         self.tick_queue = tick_queue
+        self._spot_feed = spot_feed
         self._connector_factory = connector_factory or create_connector
         self._heartbeat_s = heartbeat_s
         self.feed: PolymarketWSFeed | None = None
@@ -211,7 +341,7 @@ class StreamSlot:
         await asyncio.sleep(1.0)  # wait for initial book snapshot
 
     def _snapshot(self, is_heartbeat: bool) -> TickSnapshot | None:
-        """Read current book state and create a TickSnapshot.
+        """Read current book state + spot price and create a TickSnapshot.
 
         Marks ticks as stale when WSS is disconnected — the book data
         is from before the disconnect and should not be trusted by the
@@ -248,8 +378,11 @@ class StreamSlot:
             depth_ask_dn=book_dn.asks.get(book_dn.best_ask, 0.0),
             is_heartbeat=is_heartbeat,
             is_stale=is_stale,
+            spot_price=self._spot_feed.get(self.asset),
         )
 
+
+# -- Tick writer -------------------------------------------------------
 
 class TickWriter:
     """Consumes TickSnapshots from a queue and writes to Parquet chunks.
@@ -331,8 +464,10 @@ class TickWriter:
             logger.warning("Flush failed: %s (buffer retained, %d ticks)", e, len(self._buffer))
 
 
+# -- Orchestrator ------------------------------------------------------
+
 class TickRecorder:
-    """Orchestrator: manages 12 stream slots + 1 writer."""
+    """Orchestrator: manages spot feed + 12 stream slots + 1 writer."""
 
     def __init__(
         self,
@@ -346,6 +481,9 @@ class TickRecorder:
         self._running_flag: list[bool] = [True]
         self._tick_queue: asyncio.Queue = asyncio.Queue()
         self._connector_factory = create_connector
+
+        # Spot price feed (one TradingView WSS for all assets)
+        self._spot_feed = SpotPriceFeed(assets)
 
         # One scanner per timeframe (each scans all assets)
         self._scanners: dict[Timeframe, MarketScanner] = {}
@@ -365,6 +503,7 @@ class TickRecorder:
                     asset=asset,
                     timeframe=tf,
                     tick_queue=self._tick_queue,
+                    spot_feed=self._spot_feed,
                     connector_factory=self._connector_factory,
                     heartbeat_s=heartbeat_s,
                 ))
@@ -381,7 +520,14 @@ class TickRecorder:
         )
 
     async def run(self) -> None:
-        """Start all streams and writer, run until stopped."""
+        """Start spot feed, all streams, and writer, run until stopped."""
+        # Start spot price feed first, wait for initial prices
+        asyncio.create_task(self._spot_feed.run(self._running_flag))
+        await asyncio.sleep(2.0)
+
+        spot_ready = sum(1 for p in self._spot_feed.prices.values() if not math.isnan(p))
+        logger.info("SpotPriceFeed: %d/%d prices ready", spot_ready, len(self._spot_feed._assets))
+
         # Start writer
         asyncio.create_task(self._writer.run(self._tick_queue, self._running_flag))
 
@@ -401,10 +547,15 @@ class TickRecorder:
                 if s.feed and s.feed._connected.is_set()
             )
             total_ticks = sum(s._tick_count for s in self._slots)
+            spot_count = sum(
+                1 for p in self._spot_feed.prices.values() if not math.isnan(p)
+            )
             logger.info(
-                "Recorder: %d/%d active, %d total ticks, %d flushes, %d buffered",
+                "Recorder: %d/%d active, %d total ticks, %d flushes, "
+                "%d buffered, spot=%d/%d",
                 active, len(self._slots), total_ticks,
                 self._writer._flush_count, len(self._writer._buffer),
+                spot_count, len(self._spot_feed._assets),
             )
 
     def stop(self) -> None:
