@@ -8,3 +8,4 @@
 2026-03-21T19:10:32Z iter=1 role=monitor outcome=3/3 online no_new_criticals pair_cost_stuck_warning_active 5m_apc=0.983 15m_apc=1.005
 2026-03-21T19:20:48Z iter=1 EXIT reason=incubating elapsed=15991s alerts=0
 2026-03-21T20:00:53Z iter=1 EXIT reason=incubating elapsed=18396s alerts=0
+2026-03-21T22:37:43Z iter=1 role=researcher outcome=BTC_5m BASELINE pair_cost=0.9676 profit=$-5.63 max_dd=482.5% bars=164 next=sell_loss_start:0.70->0.50
