@@ -600,10 +600,21 @@ class DutchAccumulationEngine:
                     )
                     continue
 
-            # -- K2: Limit price computation --
-            limit_price = bid + self._config.spread_offset
+            # -- K2: Limit price computation (maker post_only) --
+            is_aggressive = ("match_rebalance" in reason or "hedge" in reason
+                             or "balance" in reason or "urgent" in reason)
+            if is_aggressive:
+                # Rebalance/hedge: best possible maker price (just below ask)
+                limit_price = ask - 0.01
+            else:
+                # Cheap/edge: true maker — at bid or in spread gap
+                if ask - bid > 2 * self._config.spread_offset:
+                    limit_price = bid + self._config.spread_offset
+                else:
+                    limit_price = bid
+            # post_only: NEVER at or above ask (production rejects)
             if limit_price >= ask:
-                limit_price = ask
+                limit_price = ask - 0.01
             if limit_price <= 0:
                 continue
 
@@ -719,12 +730,12 @@ class DutchAccumulationEngine:
                     net_shares = self._inventory.net_shares_up
                     pending = self._pending_sell_shares_up
                     my_cheap_sell = cheap_up
-                    bid = book_up.best_bid
+                    sell_ask = book_up.best_ask
                 else:
                     net_shares = self._inventory.net_shares_dn
                     pending = self._pending_sell_shares_dn
                     my_cheap_sell = cheap_dn
-                    bid = book_dn.best_bid
+                    sell_ask = book_dn.best_ask
 
                 # Available = net minus shares already committed to pending sells
                 available = net_shares - pending
@@ -739,16 +750,16 @@ class DutchAccumulationEngine:
 
                 # Sell up to sell_max_fraction of net shares, capped by available
                 max_sellable = max(0, net_shares * self._config.sell_max_fraction - pending)
-                sell_shares = min(self._config.order_size / bid, max_sellable) if bid > 0 else 0
+                sell_shares = min(self._config.order_size / sell_ask, max_sellable) if sell_ask > 0 else 0
 
-                if sell_shares * bid < self._config.min_order_usd:
+                if sell_shares * sell_ask < self._config.min_order_usd:
                     continue
 
                 sell_order = DutchOrder(
                     side=side,
-                    limit_price=round(bid, 4),
+                    limit_price=round(sell_ask, 4),
                     shares=round(sell_shares, 4),
-                    dollars=round(sell_shares * bid, 2),
+                    dollars=round(sell_shares * sell_ask, 2),
                     time_pct=round(time_pct, 4),
                     placed_at=datetime.now(UTC),
                     reason=f"sell_losing edge={my_cheap_sell:.3f}",
@@ -757,12 +768,12 @@ class DutchAccumulationEngine:
                 orders.append(sell_order)
                 self._decision_log.append(
                     f"t={time_pct:.2f}: SELL {side} edge={my_cheap_sell:.3f} "
-                    f"limit={bid:.4f} ${sell_shares * bid:.2f}"
+                    f"limit={sell_ask:.4f} ${sell_shares * sell_ask:.2f}"
                 )
                 self._emit(
                     "order", time_pct=time_pct, side=side,
                     reason=f"sell_losing edge={my_cheap_sell:.3f}",
-                    limit=bid, dollars=sell_shares * bid,
+                    limit=sell_ask, dollars=sell_shares * sell_ask,
                 )
                 self._last_sell_time_pct = time_pct
                 # Reserve shares so next tick can't oversell

@@ -1,2 +1,1 @@
 iteration	timestamp	status	avg_pair_cost	avg_profit	total_profit	matched_ratio	fill_rate	correct_side_pct	budget_util	sell_ratio	bars_evaluated	description	commit	param_changed
-0	2026-03-21T11:10:16Z	BASELINE	0.7689	-20.2811	-750.4023	0.2136	0.9898	0.4054	0.4180	-	37	baseline v5 defaults	-	-

@@ -11,7 +11,7 @@
   "spread_offset": 0.01,
   "pace_urgency_lo": 0.5,
   "pace_urgency_hi": 2.0,
-  "max_side_fraction": 0.65,
+  "max_side_fraction": 0.55,
   "max_per_prediction": 100.0,
   "vwap_tolerance": 0.10,
   "kill_switch_after": 0.60,
@@ -25,11 +25,12 @@
   "sell_max_fraction": 0.50,
   "sell_min_shares": 10.0,
   "fill_simulator": {
-    "fill_ticks": 3,
+    "fill_ticks": 10,
     "chase_threshold": 0.03,
     "max_chase": 2,
     "spread_offset": 0.01,
-    "cancel_distance": 0.05
+    "cancel_distance": 0.05,
+    "sweep_threshold": 0.01
   },
   "_readonly": ["strategy", "version", "min_order_usd"],
   "_notes": "bar_seconds is TF-specific (300/900/3600), not tunable here"

@@ -1,10 +1,11 @@
-"""Limit order fill simulator V2 for dutch accumulation paper trading.
+"""Limit order fill simulator V3 for dutch accumulation paper trading.
 
-Simulates realistic maker-only limit order fills:
-  - Consecutive-tick fill model (N ticks at/below limit = fill)
-  - Order chasing: cancel + re-place when market moves away
-  - Cancel orders that drift too far (>5c)
-  - Depth-aware partial fills
+Simulates realistic maker-only (post_only=True) limit order fills:
+  - Consecutive-tick fill model (N ticks at/below limit = fill, default 10 ~5s)
+  - Sweep detection: instant fill when price passes through by >= 1c
+  - Order chasing: cancel + re-place when market moves away (never above ask)
+  - Cancel orders that drift too far (>=5c)
+  - Depth-aware partial fills (buy checks asks, sell checks bids)
   - State machine: PENDING → CROSSING → FILLED | CANCELLED | EXPIRED
 """
 
@@ -51,7 +52,8 @@ class SimulatorStats:
     would_fill: int = 0
     expired: int = 0
     chased: int = 0
-    cancelled: int = 0
+    chase_cancelled: int = 0  # V3: old orders replaced by chase
+    cancelled: int = 0        # distance-based cancels only
     total_fill_ticks: int = 0
 
     @property
@@ -62,26 +64,29 @@ class SimulatorStats:
 class LimitOrderSimulator:
     """Simulates limit order fills with consecutive-tick model and chasing.
 
-    Fill model: order fills after N consecutive ticks where ask <= limit.
-    If ask bounces above limit, counter resets to 0.
+    Fill model: order fills after N consecutive ticks where ask <= limit (buy)
+    or bid >= limit (sell). If price bounces, counter resets to 0.
+    Sweep: if price passes through limit by >= sweep_threshold, fill on tick 1.
 
     Chase model: if market moves >chase_threshold from our limit, cancel
-    and re-place at new bid + offset. Max chase_count per order.
+    and re-place at new bid + offset (never at/above ask). Max chase_count.
     """
 
     def __init__(
         self,
-        fill_ticks: int = 3,
+        fill_ticks: int = 10,
         chase_threshold: float = 0.03,
         max_chase: int = 2,
         spread_offset: float = 0.01,
         cancel_distance: float = 0.05,
+        sweep_threshold: float = 0.01,
     ) -> None:
         self._fill_ticks = fill_ticks
         self._chase_threshold = chase_threshold
         self._max_chase = max_chase
         self._spread_offset = spread_offset
         self._cancel_distance = cancel_distance
+        self._sweep_threshold = sweep_threshold
         self._pending: list[_PendingOrder] = []
         self._stats = SimulatorStats()
 
@@ -105,7 +110,7 @@ class LimitOrderSimulator:
         for po in self._pending:
             if po.state not in ("PENDING", "CROSSING"):
                 continue
-            # V5: skip chase for sell orders (they sit at bid)
+            # V5: skip chase for sell orders (they sit on ask side)
             if getattr(po.order, "action", "BUY") == "SELL":
                 continue
             book = book_up if po.order.side == "UP" else book_dn
@@ -116,11 +121,14 @@ class LimitOrderSimulator:
             distance = new_limit - po.order.limit_price
 
             if distance > self._chase_threshold and po.chase_count < self._max_chase:
-                # Moderate distance — chase (cancel and re-place)
-                # Chase: re-place at new price
+                # Chase: cancel old + re-place at new price
                 new_ask = book.best_ask
+                # V3: never chase TO the ask (maker principle)
                 if new_limit >= new_ask:
-                    new_limit = new_ask
+                    new_limit = new_ask - 0.01
+                # Don't chase to a worse-or-equal price
+                if new_limit <= po.order.limit_price:
+                    continue
                 po.order = DutchOrder(
                     side=po.order.side,
                     limit_price=round(new_limit, 4),
@@ -134,8 +142,9 @@ class LimitOrderSimulator:
                 po.state = "PENDING"
                 po.consecutive_ticks_at_limit = 0
                 self._stats.chased += 1
-            elif distance > self._cancel_distance:
-                # Too far and no chases left — cancel
+                self._stats.chase_cancelled += 1
+            elif distance >= self._cancel_distance:
+                # V3: >= (was >) — cancel at exact boundary too
                 po.state = "CANCELLED"
                 po.consecutive_ticks_at_limit = 0
                 self._stats.cancelled += 1
@@ -157,14 +166,22 @@ class LimitOrderSimulator:
             is_sell = getattr(po.order, "action", "BUY") == "SELL"
 
             if is_sell:
-                # V5: Sell fills when bid >= limit
+                # Sell fills when bid >= limit (buyer reaches our ask price)
                 bid = book.best_bid
                 if bid >= limit:
                     po.consecutive_ticks_at_limit += 1
-                    if po.consecutive_ticks_at_limit >= self._fill_ticks:
-                        fill = self._execute_fill(po, time_pct, book)
-                        fills.append(fill)
-                        po.state = "FILLED"
+                    # V3: sweep detection — bid passed through our sell limit
+                    sweep = (bid - limit) >= self._sweep_threshold
+                    if sweep or po.consecutive_ticks_at_limit >= self._fill_ticks:
+                        # V3: check bid-side depth before filling
+                        available = self._available_at_or_above(book, limit)
+                        if available <= 0:
+                            po.consecutive_ticks_at_limit = 0
+                            remaining.append(po)
+                        else:
+                            fill = self._execute_fill(po, time_pct, available)
+                            fills.append(fill)
+                            po.state = "FILLED"
                     else:
                         remaining.append(po)
                 else:
@@ -174,14 +191,22 @@ class LimitOrderSimulator:
                     po.state = "PENDING"
                     remaining.append(po)
             else:
-                # Buy fills when ask <= limit
+                # Buy fills when ask <= limit (seller reaches our bid price)
                 ask = book.best_ask
                 if ask <= limit:
                     po.consecutive_ticks_at_limit += 1
-                    if po.consecutive_ticks_at_limit >= self._fill_ticks:
-                        fill = self._execute_fill(po, time_pct, book)
-                        fills.append(fill)
-                        po.state = "FILLED"
+                    # V3: sweep detection — ask dropped through our buy limit
+                    sweep = (limit - ask) >= self._sweep_threshold
+                    if sweep or po.consecutive_ticks_at_limit >= self._fill_ticks:
+                        # V3: check ask-side depth before filling
+                        available = self._available_at_or_below(book, limit)
+                        if available <= 0:
+                            po.consecutive_ticks_at_limit = 0
+                            remaining.append(po)
+                        else:
+                            fill = self._execute_fill(po, time_pct, available)
+                            fills.append(fill)
+                            po.state = "FILLED"
                     else:
                         remaining.append(po)
                 else:
@@ -195,16 +220,12 @@ class LimitOrderSimulator:
         return fills
 
     def _execute_fill(
-        self, po: _PendingOrder, time_pct: float, book,
+        self, po: _PendingOrder, time_pct: float, available: float,
     ) -> DutchFill:
-        """Execute a fill with depth checking."""
-        available = self._available_at_or_below(book, po.order.limit_price)
+        """Execute a fill. Caller guarantees available > 0."""
         requested = po.order.shares
 
-        if available <= 0:
-            filled_shares = requested
-            partial = False
-        elif available < requested:
+        if available < requested:
             filled_shares = available
             partial = True
             self._stats.partial += 1
@@ -229,6 +250,13 @@ class LimitOrderSimulator:
         """Sum shares available at all ask levels <= limit_price."""
         return sum(
             size for price, size in book.asks.items() if price <= limit_price
+        )
+
+    @staticmethod
+    def _available_at_or_above(book, limit_price: float) -> float:
+        """Sum shares available at all bid levels >= limit_price."""
+        return sum(
+            size for price, size in book.bids.items() if price >= limit_price
         )
 
     def cancel_all(self) -> list[DutchOrder]:

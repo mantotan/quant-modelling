@@ -245,3 +245,126 @@ class TestSimulatorStats:
         assert len(fills) == 1
         assert fills[0].order.side == "UP"
         assert len(sim.pending_orders) == 1  # DN still pending
+
+
+class TestV3Realism:
+    """V3 fixes: sweep detection, zero-depth rejection, sell-side depth, chase stats."""
+
+    def test_default_fill_ticks_is_10(self):
+        sim = LimitOrderSimulator()
+        assert sim._fill_ticks == 10
+
+    def test_sweep_fills_on_tick_1(self):
+        """Ask drops 1c+ below limit → sweep fill on first qualifying tick."""
+        sim = LimitOrderSimulator(fill_ticks=10, sweep_threshold=0.01)
+        sim.place(make_order(side="UP", limit_price=0.49))
+        # Ask at 0.47 — 2c below limit (sweep)
+        book_up = make_book(0.45, 0.47)
+        book_dn = make_book(0.44, 0.48)
+        fills = sim.on_tick(0.50, book_up, book_dn)
+        assert len(fills) == 1
+        assert fills[0].fill_ticks == 1  # swept on first tick
+
+    def test_no_sweep_when_ask_at_limit(self):
+        """Ask exactly at limit is NOT a sweep — needs fill_ticks consecutive."""
+        sim = LimitOrderSimulator(fill_ticks=10, sweep_threshold=0.01)
+        sim.place(make_order(side="UP", limit_price=0.49))
+        book_up = make_book(0.47, 0.49)  # ask = limit, 0c gap
+        book_dn = make_book(0.44, 0.48)
+        fills = sim.on_tick(0.50, book_up, book_dn)
+        assert fills == []  # needs 10 ticks, only 1 so far
+
+    def test_zero_depth_no_fill(self):
+        """When no depth at limit price, order stays pending."""
+        sim = LimitOrderSimulator(fill_ticks=1, sweep_threshold=0.01)
+        sim.place(make_order(side="UP", limit_price=0.49))
+        # Book has ask at 0.49 but with 0 depth
+        book_up = TokenBook(token_id="test")
+        book_up.bids = {0.47: 100.0}
+        book_up.asks = {0.50: 100.0}  # depth at 0.50, NOT at 0.49
+        book_up._update_bbo()
+        # best_ask is 0.50 > 0.49, so ask > limit → no fill condition met
+        # But let's test with ask AT limit but no depth at that price
+        book_up2 = TokenBook(token_id="test")
+        book_up2.bids = {0.47: 100.0}
+        book_up2.asks = {0.49: 0.0}  # zero size at limit
+        book_up2._update_bbo()
+        book_dn = make_book(0.44, 0.48)
+        # Sweep: ask drops 2c below
+        book_sweep = TokenBook(token_id="test")
+        book_sweep.bids = {0.45: 100.0}
+        book_sweep.asks = {}  # NO asks at all
+        book_sweep.best_ask = 0.47  # synthetic — less than limit
+        book_dn = make_book(0.44, 0.48)
+        fills = sim.on_tick(0.50, book_sweep, book_dn)
+        # Sweep triggered but available_at_or_below = 0 (empty asks) → no fill
+        assert fills == []
+        assert len(sim.pending_orders) == 1  # still pending
+
+    def test_sell_depth_uses_bids(self):
+        """Sell fills check bid-side depth, not ask-side."""
+        sim = LimitOrderSimulator(fill_ticks=1, sweep_threshold=0.01)
+        sell_order = DutchOrder(
+            side="UP", limit_price=0.50, shares=20.0,
+            dollars=10.0, time_pct=0.50,
+            placed_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+            reason="test_sell", action="SELL",
+        )
+        sim.place(sell_order)
+        # bid=0.52 >= limit=0.50 → sweep (2c above), but bids have depth
+        book_up = TokenBook(token_id="test")
+        book_up.bids = {0.52: 50.0}  # 50 shares at bid
+        book_up.asks = {0.55: 100.0}
+        book_up._update_bbo()
+        book_dn = make_book(0.44, 0.48)
+        fills = sim.on_tick(0.50, book_up, book_dn)
+        assert len(fills) == 1
+        assert fills[0].filled_shares == 20.0  # filled from bid-side depth
+
+    def test_chase_cancelled_stat(self):
+        """Chase increments both chased and chase_cancelled."""
+        sim = LimitOrderSimulator(
+            fill_ticks=10, chase_threshold=0.03, max_chase=2, spread_offset=0.01,
+        )
+        sim.place(make_order(side="UP", limit_price=0.40))
+        book_dn = make_book(0.44, 0.48)
+        # bid=0.44 → new_limit=0.45, distance=0.05 > 0.03 → chase
+        sim.on_tick(0.50, make_book(0.44, 0.48), book_dn)
+        assert sim.stats.chased == 1
+        assert sim.stats.chase_cancelled == 1
+
+    def test_cancel_at_exact_boundary(self):
+        """Distance == cancel_distance → cancels (was > only)."""
+        sim = LimitOrderSimulator(
+            fill_ticks=10, chase_threshold=0.03, max_chase=0,
+            spread_offset=0.01, cancel_distance=0.05,
+        )
+        sim.place(make_order(side="UP", limit_price=0.40))
+        book_dn = make_book(0.44, 0.48)
+        # new_limit=0.46, distance=0.06 >= 0.05 → cancel (was > so 0.05 wouldn't cancel)
+        sim.on_tick(0.50, make_book(0.45, 0.50), book_dn)
+        assert sim.stats.cancelled == 1
+
+    def test_chase_stays_below_ask(self):
+        """Chased price never reaches ask."""
+        sim = LimitOrderSimulator(
+            fill_ticks=10, chase_threshold=0.03, max_chase=2, spread_offset=0.01,
+        )
+        sim.place(make_order(side="UP", limit_price=0.40))
+        book_dn = make_book(0.44, 0.48)
+        # bid=0.48, ask=0.49 → new_limit=0.49 >= ask → clamped to 0.48
+        sim.on_tick(0.50, make_book(0.48, 0.49), book_dn)
+        assert sim.stats.chased == 1
+        assert sim.pending_orders[0].limit_price < 0.49  # below ask
+
+    def test_chase_no_downward(self):
+        """Chase is skipped if new_limit <= current limit."""
+        sim = LimitOrderSimulator(
+            fill_ticks=10, chase_threshold=0.03, max_chase=2, spread_offset=0.01,
+        )
+        sim.place(make_order(side="UP", limit_price=0.49))
+        book_dn = make_book(0.44, 0.48)
+        # bid=0.47, ask=0.49 → new_limit=0.48, but clamp to ask-0.01=0.48
+        # 0.48 < 0.49 (current limit) → skip chase
+        sim.on_tick(0.50, make_book(0.47, 0.49), book_dn)
+        assert sim.stats.chased == 0  # no chase — would be downward
