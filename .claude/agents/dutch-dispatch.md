@@ -31,7 +31,7 @@ Priority order (first match wins):
 2. **Unexecuted auditor directive** in audit.md → **RESEARCHER**
 3. `iters_since_auditor >= 24` AND `total_iterations > 12` → **AUDITOR**
 4. `iters_since_strategist >= 12` AND `total_iterations > 0` → **STRATEGIST**
-5. **Incubation complete** OR (**replay_available** AND `last_role == "researcher"`) → **RESEARCHER** (evaluate + start new experiment)
+5. **Incubation complete** OR **replay_available** → **RESEARCHER** (evaluate + start new experiment)
 6. `total_iterations == 0` (no experiments yet) → **RESEARCHER** (baseline run)
 7. **Periodic health check** (`last_monitor_at` is null or > 1 hour ago) → **MONITOR**
 8. **Default** → **EXIT immediately**
@@ -58,7 +58,7 @@ The researcher always operates on `current_pair`. After each researcher invocati
 
 **Backtest fast path:** If `phase.json` `sub_phase == "replay_available"`:
 - Skip time-based incubation entirely — backtest runs in seconds.
-- After researcher completes (`last_role == "researcher"`), immediately treat incubation as complete.
+- RESEARCHER is always eligible (rule 5 matches unconditionally).
 - This enables back-to-back researcher iterations with pair rotation.
 - Strategist cadence: every 12 iterations (1 full rotation). Auditor: every 24 iterations.
 
