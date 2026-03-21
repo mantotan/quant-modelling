@@ -2,9 +2,9 @@
   "current_pair": "BTC_15m",
   "pair_rotation": ["BTC_5m","BTC_15m","BTC_1h","ETH_5m","ETH_15m","ETH_1h","SOL_5m","SOL_15m","SOL_1h","XRP_5m","XRP_15m","XRP_1h"],
   "pair_index": 1,
-  "last_updated": "2026-03-22T05:41:12Z",
-  "last_role": "researcher",
-  "last_monitor_at": null,
+  "last_updated": "2026-03-22T06:15:00Z",
+  "last_role": "monitor",
+  "last_monitor_at": "2026-03-22T06:15:00Z",
   "last_strategist_at": 0,
   "last_auditor_at": 0,
   "total_iterations": 2
