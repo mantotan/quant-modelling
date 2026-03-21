@@ -4,3 +4,4 @@
 2026-03-21T14:54:17Z iter=1 role=researcher outcome=BASELINE pair_cost=0.4195 profit=$-31.35 bars=91 param=-
 2026-03-21T15:01:54Z iter=1 EXIT reason=incubating elapsed=447s alerts=0
 2026-03-21T15:28:22Z iter=1 EXIT reason=incubating elapsed=2045s alerts=0
+2026-03-21T16:03:44Z iter=1 role=monitor outcome=3_CRITICAL_resolved,1_WARNING_pair_cost_stuck_15m,3/3_processes_healthy

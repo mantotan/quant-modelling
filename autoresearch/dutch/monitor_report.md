@@ -1,46 +1,42 @@
 # Dutch Monitor Report
-Updated: 2026-03-21T19:02:00Z
+Updated: 2026-03-21T16:03:44Z
 
 ## Process Health
 | Process | Status | Restarts | Uptime |
 |---------|--------|----------|--------|
-| dutch-5m | online | 3 | ~4m |
-| dutch-15m | online | 3 | ~4m |
-| dutch-1h | online | 3 | ~4m |
+| dutch-5m | online | 8 | 34m |
+| dutch-15m | online | 8 | 34m |
+| dutch-1h | online | 8 | 34m |
 
-Note: All 3 processes restarted at ~18:58 UTC for V3 fill simulator upgrade. Restart count=3 is from upgrade cycles, not crashes.
+Note: 8 restarts are historical from the ~15:30 UTC crash (exit_code=1). All processes have been stable for 34m with no new crashes. The sell race fix from commit 4ac2d2c is confirmed active.
 
 ## Anomaly Checklist
 | # | Check | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | Process health | PASS | All 3 online |
-| 2 | Sell race | CRITICAL | 15m: 6/10 recent bars, 5m: 1/10 recent bars have sell_losing with time_pct gap < 0.005 |
-| 3 | Negative net shares | CRITICAL | 15m: 2 bars (bar 1774084500 dn=-7.10, bar 1774088100 dn=-23.35). 5m: PASS now |
-| 4 | One-sided accumulation | WARNING | 5m: 9 consecutive bars matched_ratio < 20%, 15m: 5 consecutive |
-| 5 | Budget exhaustion | PASS | Not observed |
-| 6 | Pair cost stuck | PASS | No 5+ consecutive bars > 0.98 |
-| 7 | Zero fills | PASS | Fill rates ~99% across TFs |
-| 8 | Kill switch spam | PASS | 0% of bars |
+| 1 | Process health | PASS | All 3 online, 34m uptime, no active crash activity. |
+| 2 | Sell race | PASS | 0 sell_losing events in last 100 events across all TFs. Prior CRITICAL alert predated sell-race fix. |
+| 3 | Negative net shares | PASS (recent) | Historical negatives: 5m 8 bars (bar_id<=1774085700), 15m 2 bars (bar_id<=1774088100). All recent bars clean. Root cause was sell race, fixed. |
+| 4 | One-sided accumulation | PASS | 5m matched_ratio=57.4%, 15m matched_ratio=75.4%. Both well above 20% threshold. |
+| 5 | Budget exhaustion | PASS | No gate_budget events in recent events; active gates are gate_risk_cap (normal). |
+| 6 | Pair cost stuck | WARN | 15m avg_pair_cost=1.005, 8/10 consecutive bars >0.98. Consistently above breakeven. |
+| 7 | Zero fills | PASS | 5m: 0 zero-fill bars in last 10. 15m: 1 zero-fill bar (bar_id=1774104300, 5 expired). Not 3+ consecutive. |
+| 8 | Kill switch spam | PASS | 0 kill switch events in recent 100 events per TF. |
 
 ## Per-Timeframe Metrics (last 10 resolved bars)
-| TF | Bars | Avg Pair Cost | Avg Profit | Fill Rate | Matched Ratio | Sell Count |
-|----|------|---------------|------------|-----------|---------------|------------|
-| 5m | 10 | -0.593 | $-66.48 | 99.5% | 6.5% | 257 |
-| 15m | 10 | 0.803 | $-26.63 | 98.6% | 15.3% | 264 |
-| 1h | 0 | N/A | N/A | N/A | N/A | 0 |
+| TF | Total Bars | Avg Pair Cost | Avg Profit | Fill Rate | Matched Ratio | Sell Count |
+|----|-----------|---------------|------------|-----------|---------------|------------|
+| 5m | 73 | 0.983 | $-3.37 | 84.7% | 57.4% | 6/10 |
+| 15m | 29 | 1.005 | $-5.07 | 85.5% | 75.4% | 8/10 |
+| 1h | N/A | N/A | N/A | N/A | N/A | N/A |
 
-## Critical Findings
-
-### 1. Negative pair costs on 5m (avg = -0.59)
-The system spends far more on sells than it recovers. Sell_losing logic dumps shares at massive losses. Combined with 6.5% matched ratio, nearly all inventory is unmatched and sold at loss.
-
-### 2. Sell race persists after V3 restart
-V3 fill simulator did NOT fix sell race. 15m shows 6/10 bars with rapid-fire sell_losing events at near-identical time_pct. This causes negative shares (selling beyond held inventory).
-
-### 3. One-sided accumulation dominant
-Both 5m (9 consec) and 15m (5 consec) show persistent one-sided loading with minimal matching. Root cause of poor pair costs and losses.
+Note: 1h has no resolved bars yet (process started mid-bar 1774108800).
 
 ## Alerts
-- **CRITICAL: sell_race** (detected 2026-03-21T11:24:07Z) -- STILL ACTIVE, reduced but not fixed
-- **CRITICAL: negative_shares** (detected 2026-03-21T11:24:07Z) -- STILL ACTIVE on 15m, fixed on 5m
-- **WARNING: one_sided_accumulation** -- 5m: 9 consec bars, 15m: 5 consec bars
+
+### Previous CRITICAL Alerts (all resolved)
+- **process_down** (detected 15:29): RESOLVED. All 3 processes online, stable 34m uptime.
+- **sell_race** (detected 15:29): RESOLVED. Zero sell_losing events in recent 100 events per TF. Sell race fix confirmed active.
+- **negative_shares** (detected 15:29): RESOLVED in recent bars. Historical negatives from pre-fix session only (bar_ids before ~1774086000). Current inventory accounting clean.
+
+### Active WARNING
+- **pair_cost_stuck (15m)**: avg_pair_cost=1.005 across last 10 bars, 8/10 consecutive bars above 0.98 threshold. Consistently above breakeven — pair cost above 1.00 guarantees net losses. Consider tightening max_side_fraction on 15m.
