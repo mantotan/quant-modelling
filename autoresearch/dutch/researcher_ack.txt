@@ -1,4 +1,9 @@
-iter=4 pair=BTC_1h timestamp=2026-03-22T06:26:57Z status=BASELINE
-Mode: BACKTEST (replay_available)
-Result: BASELINE recorded — avg_pair_cost=0.9382 profit=$-54.68 max_dd=27.3% bars=16
-Next hypothesis: risk_ceil 0.15->0.10 — reduce per-prediction risk cap to address max_dd near 30% threshold.
+iter=5 pair=BTC_1h timestamp=2026-03-22T06:39:33Z
+status=DISCARD param=risk_ceil old=0.15 new=0.10
+result: pair_cost 0.9382->0.9588 (WORSE), max_dd 27.3->29.8% (WORSE)
+reason: lower risk_ceil reduced per-prediction budget, fewer fills, matched_ratio 0.674->0.647,
+  pair formation degraded. risk_ceil on BLACKLIST for BTC_1h — do not re-attempt below 0.15.
+
+next hypothesis: pace_urgency_hi 2.0->2.5
+  1h bars have 3600s; raising urgency at bar-end window drives more aggressive second-side fill
+  for open pairs before expiry. Should improve matched_ratio without touching risk budget.
