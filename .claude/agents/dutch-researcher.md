@@ -121,17 +121,17 @@ Priority chain — first match wins:
    e. If 5+ consecutive DISCARDs → random large perturbation
    f. Try reversing a previous DISCARD if context changed
 
-**Parameter categories (V6.1):**
+**Parameter categories (V7):**
 
 | Category | Parameters |
 |----------|-----------|
 | Pair cost | cheap_threshold, max_marginal_pair_cost |
 | Pacing | pace_urgency_lo/hi, max_per_prediction, bar_budget, order_size |
 | Risk budget | risk_floor, risk_ceil, risk_t_start, risk_t_end, risk_exponent |
-| Edge decay | edge_decay_start, edge_decay_end |
+| Conviction | conviction_market_start, conviction_market_full |
+| Unmatched cap | min_unmatched_shares, unmatched_ratio |
 | Balance | max_side_fraction |
-| Edge | edge_scale_lo/hi, vwap_tolerance |
-| Sell | sell_profit_only, sell_max_fraction, sell_min_shares, rebalance_warmup |
+| Sell | sell_loss_start, sell_dump_start, sell_max_fraction, sell_min_shares, rebalance_warmup |
 | Fill sim | fill_ticks, sweep_threshold, chase_threshold, max_chase, spread_offset, cancel_distance |
 
 **Read-only params** (NEVER change): `strategy`, `version`, `min_order_usd`. `bar_seconds` is not in knobs.json.

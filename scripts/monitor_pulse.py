@@ -622,6 +622,11 @@ def print_dutch_panel(
         print(f"  If UP: ${payout_up:.2f} - ${tc:.2f} = ${payout_up - tc:+.2f}")
         print(f"  If DN: ${payout_dn:.2f} - ${tc:.2f} = ${payout_dn - tc:+.2f}")
 
+        conv_up = engine_snap.get("conviction_up", 0.5)
+        conv_dn = engine_snap.get("conviction_dn", 0.5)
+        eff_pc = engine_snap.get("effective_max_pc", 1.03)
+        print(f"\n  CONVICTION  UP={conv_up:.2f}  DN={conv_dn:.2f}  max_pc={eff_pc:.3f}")
+
     # Pair cost
     pair_cost_live = engine_snap.get("pair_cost_live", 0)
     if pair_cost_live > 0:
@@ -780,7 +785,7 @@ async def main_loop(args: argparse.Namespace) -> None:
         dutch_config, sim_kwargs = load_dutch_config(args, tf)
         dutch_engine = DutchAccumulationEngine(dutch_config)
         dutch_sim = LimitOrderSimulator(**sim_kwargs) if sim_kwargs else LimitOrderSimulator()
-        logger.info("Dutch V6.1 config: budget=$%.0f, order=$%.0f, pair_cost<%.2f, risk=%.0f%%->%.0f%%",
+        logger.info("Dutch V7 config: budget=$%.0f, order=$%.0f, pair_cost<%.2f, risk=%.0f%%->%.0f%%",
                      dutch_config.bar_budget, dutch_config.order_size,
                      dutch_config.max_marginal_pair_cost,
                      dutch_config.risk_floor * 100, dutch_config.risk_ceil * 100)

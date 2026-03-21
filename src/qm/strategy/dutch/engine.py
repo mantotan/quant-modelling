@@ -1,11 +1,12 @@
-"""Dutch accumulation engine V6.1 — time-progressive risk budget.
+"""Dutch accumulation engine V7 — model-aware conviction engine.
 
 Core state machine that tracks one bar's lifecycle:
   - Holds bilateral inventory (shares_up, shares_dn, cost_up, cost_dn)
   - Time-progressive risk budget: worst-case loss capped by quadratic curve
-  - Per-order pair cost guard (simulated avg_pair_cost < threshold)
-  - Edge decay: wind down heavy-side buying late in bar
-  - Profit-only sells: bid > avg_cost AND heavy side only
+  - Conviction blending: model + market price, time-weighted
+  - Adaptive pair cost ceiling: tightens when profitable pairs exist
+  - Unmatched cap: buy-side discipline on heavy side
+  - Time-aware sell phases: profit-only → conviction-gated loss → dump
   - Book health checks (spread, depth)
 
 The engine is pure logic — no I/O, no async. It receives TokenBook
@@ -30,9 +31,8 @@ logger = logging.getLogger(__name__)
 class DutchConfig:
     """Configuration for dutch accumulation strategy.
 
-    V6.1: Time-progressive risk budget — worst-case loss grows quadratically
-    from risk_floor to risk_ceil over the bar. Edge decay winds down heavy
-    side buying late in bar.
+    V7: Conviction engine — blends model prediction with market price,
+    adaptive pair cost ceiling, unmatched cap, time-aware sell phases.
     """
 
     bar_budget: float = 200.0
@@ -58,14 +58,10 @@ class DutchConfig:
     # Price improvement: wider for bilateral accumulation
     vwap_tolerance: float = 0.10
 
-    # Edge scaling bounds for non-trailing orders
-    edge_scale_lo: float = 0.8
-    edge_scale_hi: float = 1.2
-
     # Warm-up: don't sell until this fraction of bar_budget is spent
     rebalance_warmup: float = 0.10
 
-    # Sell limits (used by V6 profit-only sell)
+    # Sell limits
     sell_max_fraction: float = 0.50    # sell at most 50% of net shares
     sell_min_shares: float = 10.0      # minimum net shares to consider selling
 
@@ -74,9 +70,6 @@ class DutchConfig:
     # but actual fill prices (at bid+offset) are lower than ask.
     max_marginal_pair_cost: float = 1.03
 
-    # V6: Profit-only sells — only sell when bid > avg_cost for that side
-    sell_profit_only: bool = True
-
     # V6.1: Time-progressive risk budget
     risk_floor: float = 0.05        # 5% of budget at bar start ($10 on $200)
     risk_ceil: float = 0.15         # 15% max at t_end
@@ -84,11 +77,27 @@ class DutchConfig:
     risk_t_end: float = 0.80        # risk maxes out here
     risk_exponent: float = 2.0      # quadratic curve
 
-    # V6.1: Edge decay — wind down heavy side buying late in bar
-    edge_decay_start: float = 0.70  # start decaying heavy side edge
-    edge_decay_end: float = 0.85    # fully zeroed by here
+    # V7: Conviction blending (sell-side only)
+    conviction_market_start: float = 0.30   # market weight=0 before this
+    conviction_market_full: float = 1.00    # market weight=1.0 at bar end
 
-    # --- Deprecated V5/V6 fields (kept for backward compat, ignored by V6.1 on_tick) ---
+    # V7: Profit protection
+    profit_protect_min_pairs: int = 5       # min matched pairs before tightening
+
+    # V7: Unmatched cap (buy-side discipline)
+    min_unmatched_shares: float = 20.0      # allow this many before cap
+    unmatched_ratio: float = 0.50           # max unmatched = max(min, matched × ratio)
+
+    # V7: Sell phases
+    sell_loss_start: float = 0.70           # allow conviction-gated loss sells
+    sell_dump_start: float = 0.90           # sell at any price
+
+    # --- Deprecated fields (kept for backward compat, ignored by V7 on_tick) ---
+    edge_decay_start: float = 0.70
+    edge_decay_end: float = 0.85
+    edge_scale_lo: float = 0.8
+    edge_scale_hi: float = 1.2
+    sell_profit_only: bool = True
     max_pair_cost: float = 1.05
     kill_switch_after: float = 0.60
     max_hedge_ask: float = 0.80
@@ -272,17 +281,17 @@ class DutchBarSummary:
 
 
 class DutchAccumulationEngine:
-    """V6.1 engine: time-progressive risk budget for Dutch accumulation.
+    """V7 engine: model-aware conviction engine for Dutch accumulation.
 
-    Worst-case loss is capped by a quadratic curve that grows from risk_floor
-    to risk_ceil over the bar. Edge decay winds down heavy-side buying late
-    in bar. Per-order pair cost guard blocks expensive buys.
+    Conviction blending (model + market price), adaptive pair cost ceiling,
+    unmatched cap for buy-side discipline, time-aware sell phases
+    (profit-only → conviction-gated loss → dump).
 
     Decision flow:
       Phase A: Pair opportunity detection (ask_up + ask_dn < threshold?)
       Phase B: Risk budget + lighter-side-first ordering
-      Per-side: Sizing, edge decay, pair cost guard, risk budget gate
-      Phase F: Profit-only sell (bid > avg_cost AND heavy side only)
+      Per-side: Sizing, unmatched cap, pair cost guard, risk budget gate
+      Phase F: Three-phase sell (conviction-influenced)
     """
 
     def __init__(self, config: DutchConfig) -> None:
@@ -328,6 +337,10 @@ class DutchAccumulationEngine:
 
         # V6.1: Track last time_pct for snapshot risk budget
         self._last_time_pct: float = 0.0
+
+        # V7: Conviction tracking for snapshot
+        self._conviction_up: float = 0.5
+        self._conviction_dn: float = 0.5
 
         # Effective max orders (derived once, reused)
         self._effective_max: int = (
@@ -390,6 +403,42 @@ class DutchAccumulationEngine:
         risk_pct = cfg.risk_floor + (cfg.risk_ceil - cfg.risk_floor) * (t_clamped ** cfg.risk_exponent)
         return cfg.bar_budget * risk_pct
 
+    def _conviction(self, side: str, cal_prob: float, ask_price: float, time_pct: float) -> float:
+        """How confident are we that `side` wins? 0=certain loss, 1=certain win.
+
+        Blends model prediction with market price. Market weight grows with time:
+        early bar = trust model, late bar = trust market.
+        """
+        model_p = cal_prob if side == "UP" else (1.0 - cal_prob)
+        market_p = 1.0 - ask_price
+
+        cfg = self._config
+        if cfg.conviction_market_full <= cfg.conviction_market_start:
+            mw = 1.0
+        else:
+            mw = (time_pct - cfg.conviction_market_start) / (
+                cfg.conviction_market_full - cfg.conviction_market_start
+            )
+        market_weight = max(0.0, min(1.0, mw))
+
+        return max(0.0, min(1.0,
+            (1.0 - market_weight) * model_p + market_weight * market_p
+        ))
+
+    def _effective_max_pair_cost(self) -> float:
+        """Adaptive pair cost ceiling: tightens when profitable pairs exist."""
+        matched = self._inventory.matched
+        if matched < self._config.profit_protect_min_pairs:
+            return self._config.max_marginal_pair_cost
+
+        pc = self._inventory.avg_pair_cost
+        if pc >= 1.0:
+            return self._config.max_marginal_pair_cost
+
+        profit = 1.0 - pc
+        margin = max(0.02, 0.05 - profit)
+        return min(pc + margin, self._config.max_marginal_pair_cost)
+
     def on_tick(
         self,
         time_pct: float,
@@ -397,7 +446,7 @@ class DutchAccumulationEngine:
         book_up,
         book_dn,
     ) -> list[DutchOrder]:
-        """V6.1 decision logic. Called on every book update.
+        """V7 decision logic. Called on every book update.
 
         Returns 0-3 DutchOrder objects (up to 2 buys + 1 sell).
         book_up/book_dn are TokenBook | None.
@@ -407,8 +456,8 @@ class DutchAccumulationEngine:
           R5 (max orders), R1 (envelope pacing).
 
         Decision phases: A (pair opportunity), B (risk budget),
-          Per-side (sizing, edge decay, pair cost, risk gate),
-          F (profit-only sell).
+          Per-side (sizing, unmatched cap, pair cost, risk gate),
+          F (three-phase sell).
         """
 
         # -- B: Track model stats (incremental flip counting) --
@@ -497,7 +546,7 @@ class DutchAccumulationEngine:
         pair_cost = book_up.best_ask + book_dn.best_ask
         is_dutch_opportunity = pair_cost < self._config.max_marginal_pair_cost
 
-        # Cheap scores (for edge-scaled sizing and display)
+        # Cheap scores (for display)
         cheap_up = cal_prob - book_up.best_ask
         cheap_dn = (1.0 - cal_prob) - book_dn.best_ask
 
@@ -509,7 +558,7 @@ class DutchAccumulationEngine:
 
         # Need Dutch opportunity to trade at all
         if not is_dutch_opportunity:
-            return self._v6_sell_pass(time_pct, book_up, book_dn, [])
+            return self._sell_pass(time_pct, cal_prob, book_up, book_dn, [])
 
         # Lighter side first — completes pairs, frees risk room
         if self._inventory.net_shares_up <= self._inventory.net_shares_dn:
@@ -517,13 +566,17 @@ class DutchAccumulationEngine:
         else:
             buy_sides = ["DN", "UP"]
 
-        # Determine heavy side for edge decay
+        # Determine heavy side for unmatched cap
         if self._inventory.net_shares_up > self._inventory.net_shares_dn:
             heavy_side: str | None = "UP"
         elif self._inventory.net_shares_dn > self._inventory.net_shares_up:
             heavy_side = "DN"
         else:
             heavy_side = None  # equal = no heavy side
+
+        # Compute conviction for snapshot display
+        self._conviction_up = self._conviction("UP", cal_prob, book_up.best_ask, time_pct)
+        self._conviction_dn = self._conviction("DN", cal_prob, book_dn.best_ask, time_pct)
 
         # ============================================================
         # Per-side order construction
@@ -610,27 +663,24 @@ class DutchAccumulationEngine:
 
             shares = dollar_size / limit_price
 
-            # -- Edge decay guard (heavy side only) --
-            if (
-                side == heavy_side
-                and time_pct >= self._config.edge_decay_start
-            ):
-                cheap_this = cheap_up if side == "UP" else cheap_dn
-                decay_range = (
-                    self._config.edge_decay_end
-                    - self._config.edge_decay_start
+            # -- Unmatched cap (heavy side only) --
+            if heavy_side is not None and side == heavy_side:
+                unmatched_this = max(0, (
+                    self._inventory.net_shares_up if side == "UP"
+                    else self._inventory.net_shares_dn
+                ) - (
+                    self._inventory.net_shares_dn if side == "UP"
+                    else self._inventory.net_shares_up
+                ))
+                max_unmatched = max(
+                    self._config.min_unmatched_shares,
+                    self._inventory.matched * self._config.unmatched_ratio,
                 )
-                decay = (
-                    min(1.0, (time_pct - self._config.edge_decay_start) / decay_range)
-                    if decay_range > 0
-                    else 1.0
-                )
-                effective_edge = cheap_this * (1.0 - decay)
-                if effective_edge <= 0:
+                if unmatched_this >= max_unmatched:
                     self._emit(
-                        "gate_edge_decay", time_pct=time_pct, side=side,
-                        raw_edge=round(cheap_this, 3),
-                        decay=round(decay, 2),
+                        "gate_unmatched_cap", time_pct=time_pct, side=side,
+                        unmatched=round(unmatched_this, 1),
+                        cap=round(max_unmatched, 1),
                     )
                     continue
 
@@ -643,7 +693,7 @@ class DutchAccumulationEngine:
                 sim_pc = self._inventory.simulated_avg_pair_cost(
                     side, shares, limit_price,
                 )
-                if sim_pc > self._config.max_marginal_pair_cost:
+                if sim_pc > self._effective_max_pair_cost():
                     self._emit(
                         "gate_pair_cost", time_pct=time_pct, side=side,
                         sim_pair_cost=round(sim_pc, 4),
@@ -722,25 +772,24 @@ class DutchAccumulationEngine:
             # NO break — both sides can buy per tick
 
         # ============================================================
-        # Phase F: Profit-only sell
+        # Phase F: Three-phase sell
         # ============================================================
-        return self._v6_sell_pass(time_pct, book_up, book_dn, orders)
+        return self._sell_pass(time_pct, cal_prob, book_up, book_dn, orders)
 
-    def _v6_sell_pass(
+    def _sell_pass(
         self,
         time_pct: float,
+        cal_prob: float,
         book_up,
         book_dn,
         orders: list[DutchOrder],
     ) -> list[DutchOrder]:
-        """V6 sell pass: only sell at profit, only sell the heavier side.
+        """V7 sell pass: three phases with conviction-influenced sizing.
 
-        When sell_profit_only is False, all sells are disabled (V6 has no
-        model-edge sell logic — profit-only is the only sell mode).
+        Phase 1 (t < sell_loss_start): profit-only (bid > avg_cost)
+        Phase 2 (sell_loss_start <= t < sell_dump_start): loss sells when conviction < 0.50
+        Phase 3 (t >= sell_dump_start): sell at any price > $0.01
         """
-        if not self._config.sell_profit_only:
-            return orders
-
         buy_side = orders[0].side if orders else None
         warmup_for_sell = (
             self._inventory.total_cost
@@ -776,11 +825,10 @@ class DutchAccumulationEngine:
             if available < self._config.sell_min_shares:
                 continue
 
-            # NEVER sell the lighter side
+            # Never sell the lighter side
             if net_shares <= other_shares:
                 continue
 
-            # NEVER sell at a loss
             if net_shares <= 0:
                 continue
             avg_cost = (
@@ -788,19 +836,43 @@ class DutchAccumulationEngine:
                 if side == "UP"
                 else self._inventory.net_cost_dn / self._inventory.net_shares_dn
             )
-            if avg_cost <= 0 or book.best_bid <= avg_cost:
-                continue
 
-            # Sell enough to improve parity (half the imbalance)
+            # Conviction for this side
+            conviction = self._conviction(side, cal_prob, book.best_ask, time_pct)
+
+            # Phase 1: profit-only (t < sell_loss_start)
+            if time_pct < self._config.sell_loss_start:
+                if avg_cost <= 0 or book.best_bid <= avg_cost:
+                    continue
+
+            # Phase 2: conviction-gated loss sell
+            elif time_pct < self._config.sell_dump_start:
+                if conviction >= 0.50:
+                    continue  # model+market still think this side might win
+                if book.best_bid < 0.02:
+                    continue
+
+            # Phase 3: dump at any price
+            else:
+                if book.best_bid < 0.01:
+                    continue
+
+            # Conviction-influenced sell amount
             imbalance = net_shares - other_shares
+            sell_fraction = (1.0 - conviction) * 0.75
+            if time_pct >= self._config.sell_dump_start:
+                sell_fraction = max(0.25, sell_fraction)
+            sell_fraction = min(sell_fraction, 0.50)  # cap at 50%
+
             max_sellable = max(
                 0,
                 net_shares * self._config.sell_max_fraction - pending,
             )
-            sell_shares = min(imbalance / 2, max_sellable)
+            sell_shares = min(imbalance * sell_fraction, max_sellable)
             if sell_shares * book.best_bid < self._config.min_order_usd:
                 continue
 
+            is_profit = book.best_bid > avg_cost
             sell_order = DutchOrder(
                 side=side,
                 limit_price=round(book.best_bid, 4),
@@ -809,15 +881,15 @@ class DutchAccumulationEngine:
                 time_pct=round(time_pct, 4),
                 placed_at=datetime.now(UTC),
                 reason=(
-                    f"sell_profit bid={book.best_bid:.3f}"
-                    f">avg={avg_cost:.3f}"
+                    f"sell_{'profit' if is_profit else 'cut'} "
+                    f"conv={conviction:.2f}"
                 ),
                 action="SELL",
             )
             orders.append(sell_order)
             self._decision_log.append(
                 f"t={time_pct:.2f}: SELL {side} "
-                f"bid={book.best_bid:.3f}>avg={avg_cost:.3f} "
+                f"{'profit' if is_profit else 'cut'} conv={conviction:.2f} "
                 f"${sell_shares * book.best_bid:.2f}"
             )
             self._emit(
@@ -1004,6 +1076,10 @@ class DutchAccumulationEngine:
         # V6.1 state
         self._last_time_pct = 0.0
 
+        # V7 state
+        self._conviction_up = 0.5
+        self._conviction_dn = 0.5
+
     def snapshot(self) -> dict:
         """Current state for live display."""
         inv = self._inventory
@@ -1026,6 +1102,9 @@ class DutchAccumulationEngine:
             "worst_case_pnl": round(inv.worst_case_pnl, 4),
             "risk_budget": round(self._risk_budget(self._last_time_pct), 2),
             "worst_case_loss": round(max(-inv.worst_case_pnl, 0), 2),
+            "conviction_up": round(self._conviction_up, 3),
+            "conviction_dn": round(self._conviction_dn, 3),
+            "effective_max_pc": round(self._effective_max_pair_cost(), 4),
             "pair_cost_live": round(self._last_ask_up + self._last_ask_dn, 4),
             "orders_count": len(self._orders),
             "last_decisions": self._decision_log[-5:],

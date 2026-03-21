@@ -22,17 +22,17 @@ Single dispatch loop (`/loop 20m dutch-dispatch`) with 4 roles:
 - **Strategist**: Every ~5 iterations, analyze KEEP rates, write priority queue
 - **Auditor**: Every ~20 iterations, deep analysis, issue directives
 
-## Tunable Parameters (V6.1)
+## Tunable Parameters (V7)
 
 See `knobs.json` for all parameters. Key categories:
 - Pair cost (cheap_threshold, max_marginal_pair_cost)
 - Pacing (pace_urgency_lo/hi, max_per_prediction, bar_budget, order_size)
 - Risk budget (risk_floor, risk_ceil, risk_t_start, risk_t_end, risk_exponent)
-- Edge decay (edge_decay_start, edge_decay_end)
+- Conviction (conviction_market_start, conviction_market_full)
+- Unmatched cap (min_unmatched_shares, unmatched_ratio)
 - Balance (max_side_fraction)
-- Edge (edge_scale_lo/hi, vwap_tolerance)
-- Sell (sell_profit_only, sell_max_fraction, sell_min_shares, rebalance_warmup)
-- Fill simulator (fill_ticks, sweep_threshold, chase_threshold, max_chase, cancel_distance)
+- Sell (sell_loss_start, sell_dump_start, sell_max_fraction, sell_min_shares, rebalance_warmup)
+- Fill simulator (fill_ticks, sweep_threshold, chase_threshold, max_chase, spread_offset, cancel_distance)
 
 ## Fill Simulator V3 (2026-03-21)
 

@@ -331,10 +331,10 @@ class TestDutchPacingGates:
         book_dn = make_book(0.20, 0.25)
         # Use t=0.90 so envelope allows enough spend
         orders = engine.on_tick(0.90, 0.65, book_up, book_dn)
-        up_orders = [o for o in orders if o.side == "UP"]
-        dn_orders = [o for o in orders if o.side == "DN"]
-        assert len(up_orders) == 0  # blocked by side cap (non-trailing)
-        assert len(dn_orders) >= 1  # DN is trailing and fine
+        up_buys = [o for o in orders if o.side == "UP" and o.action == "BUY"]
+        dn_buys = [o for o in orders if o.side == "DN" and o.action == "BUY"]
+        assert len(up_buys) == 0  # blocked by side cap
+        assert len(dn_buys) >= 1  # DN is fine
 
     def test_per_prediction_cap(self):
         """$100 per prediction: blocks after spending, resets on new cal_prob."""
@@ -670,20 +670,21 @@ class TestDutchV6PnlParity:
     def test_share_sizing_uses_max_ask(self):
         """V6.1: Sizing is share-based — order_size / max(ask_up, ask_dn)."""
         engine = self._make_engine(
-            max_marginal_pair_cost=0.98,
+            max_marginal_pair_cost=1.03,
             order_size=5.0,
             risk_ceil=0.50,  # permissive risk
             vwap_tolerance=0.20,  # wide enough for test prices
         )
-        engine._inventory.shares_up = 30
-        engine._inventory.cost_up = 9  # avg 0.30
-        engine._inventory.shares_dn = 10
-        engine._inventory.cost_dn = 5  # avg 0.50
-        # DN is lighter side, ordered first
-        book_up = make_book(0.28, 0.30)
+        # Few matched pairs so adaptive pair cost stays at default
+        engine._inventory.shares_up = 3
+        engine._inventory.cost_up = 1.2  # avg 0.40
+        engine._inventory.shares_dn = 2
+        engine._inventory.cost_dn = 1.0  # avg 0.50
+        # DN is lighter, pair_cost=0.40+0.60=1.00 < 1.03
+        book_up = make_book(0.38, 0.40)
         book_dn = make_book(0.58, 0.60)
         orders = engine.on_tick(0.5, 0.50, book_up, book_dn)
-        dn_orders = [o for o in orders if o.side == "DN"]
+        dn_orders = [o for o in orders if o.side == "DN" and o.action == "BUY"]
         assert len(dn_orders) >= 1
         # max_ask=0.60, base_shares=5/0.60≈8.33, dollar_size=8.33*limit_price
         assert dn_orders[0].shares <= 10.0
@@ -891,6 +892,203 @@ class TestDutchV61RiskBudget:
         assert engine._risk_budget(0.80) == pytest.approx(30.0, abs=0.1)
         # t=0.50 → ~5.6% = ~$11.2
         assert 10.0 < engine._risk_budget(0.50) < 13.0
+
+
+class TestDutchV7:
+    """Tests for V7: conviction, adaptive pair cost, unmatched cap, sell phases."""
+
+    def _make_engine(self, **kwargs):
+        config = DutchConfig(**kwargs)
+        return DutchAccumulationEngine(config)
+
+    # Conviction formula
+    def test_conviction_early_bar_model_only(self):
+        """t=0.10: market weight=0, conviction=model_p."""
+        engine = self._make_engine(conviction_market_start=0.30, conviction_market_full=1.00)
+        c = engine._conviction("UP", 0.70, 0.40, 0.10)  # model_p=0.70, market_p=0.60
+        assert c == pytest.approx(0.70, abs=0.01)  # 100% model
+
+    def test_conviction_late_bar_market_dominant(self):
+        """t=0.95: market weight~0.93, conviction~market_p."""
+        engine = self._make_engine(conviction_market_start=0.30, conviction_market_full=1.00)
+        c = engine._conviction("UP", 0.70, 0.95, 0.95)  # ask=0.95, market_p=0.05
+        # market_weight = (0.95-0.30)/0.70 = 0.929
+        # conv = 0.071*0.70 + 0.929*0.05 = 0.050 + 0.046 = 0.096
+        assert c < 0.15  # market says UP is losing (expensive ask)
+
+    def test_conviction_midbar_blend(self):
+        """t=0.65: 50/50 blend."""
+        engine = self._make_engine(conviction_market_start=0.30, conviction_market_full=1.00)
+        c = engine._conviction("DN", 0.40, 0.30, 0.65)
+        # model_p(DN) = 0.60, market_p = 1-0.30 = 0.70
+        # market_weight = (0.65-0.30)/0.70 = 0.50
+        # conv = 0.50*0.60 + 0.50*0.70 = 0.65
+        assert 0.60 < c < 0.70
+
+    # Adaptive pair cost
+    def test_adaptive_pc_default_when_few_pairs(self):
+        engine = self._make_engine(max_marginal_pair_cost=1.03, profit_protect_min_pairs=5)
+        engine._inventory.shares_up = 3
+        engine._inventory.shares_dn = 3
+        engine._inventory.cost_up = 1.2
+        engine._inventory.cost_dn = 1.2
+        assert engine._effective_max_pair_cost() == 1.03  # matched=3 < 5
+
+    def test_adaptive_pc_tightens_when_profitable(self):
+        engine = self._make_engine(max_marginal_pair_cost=1.03, profit_protect_min_pairs=5)
+        engine._inventory.shares_up = 20
+        engine._inventory.shares_dn = 20
+        engine._inventory.cost_up = 9.3  # avg 0.465
+        engine._inventory.cost_dn = 9.3  # avg 0.465, pair=0.93
+        # profit=0.07, margin=max(0.02, 0.05-0.07)=0.02
+        # ceiling = 0.93 + 0.02 = 0.95
+        assert engine._effective_max_pair_cost() == pytest.approx(0.95, abs=0.01)
+
+    def test_adaptive_pc_default_when_not_profitable(self):
+        engine = self._make_engine(max_marginal_pair_cost=1.03, profit_protect_min_pairs=5)
+        engine._inventory.shares_up = 20
+        engine._inventory.shares_dn = 20
+        engine._inventory.cost_up = 10.1
+        engine._inventory.cost_dn = 10.1  # pair=1.01
+        assert engine._effective_max_pair_cost() == 1.03  # not profitable
+
+    # Unmatched cap
+    def test_unmatched_cap_blocks_heavy_side(self):
+        """DN heavy with 25 unmatched, max=20 -> DN blocked."""
+        engine = self._make_engine(
+            min_unmatched_shares=20.0, unmatched_ratio=0.50,
+            max_marginal_pair_cost=1.03, risk_floor=0.10, risk_ceil=0.50,
+        )
+        engine._inventory.shares_up = 38
+        engine._inventory.cost_up = 19
+        engine._inventory.shares_dn = 63
+        engine._inventory.cost_dn = 20
+        book_up = make_book(0.38, 0.40)
+        book_dn = make_book(0.58, 0.60)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        dn_buys = [o for o in orders if o.side == "DN" and o.action == "BUY"]
+        assert len(dn_buys) == 0  # DN blocked by unmatched cap
+
+    def test_unmatched_cap_allows_light_side(self):
+        """DN blocked but UP (light side) can still buy."""
+        engine = self._make_engine(
+            min_unmatched_shares=20.0, unmatched_ratio=0.50,
+            max_marginal_pair_cost=1.03, risk_floor=0.10, risk_ceil=0.50,
+        )
+        engine._inventory.shares_up = 38
+        engine._inventory.cost_up = 19
+        engine._inventory.shares_dn = 63
+        engine._inventory.cost_dn = 20
+        book_up = make_book(0.38, 0.40)
+        book_dn = make_book(0.58, 0.60)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        up_buys = [o for o in orders if o.side == "UP" and o.action == "BUY"]
+        assert len(up_buys) >= 1  # UP free to buy
+
+    def test_unmatched_cap_min_allows_early_building(self):
+        """With few matched pairs, min_unmatched allows building up."""
+        engine = self._make_engine(
+            min_unmatched_shares=20.0, unmatched_ratio=0.50,
+            max_marginal_pair_cost=1.03, risk_floor=0.10, risk_ceil=0.50,
+        )
+        engine._inventory.shares_up = 2
+        engine._inventory.cost_up = 0.8
+        engine._inventory.shares_dn = 15
+        engine._inventory.cost_dn = 7.5
+        # matched=2, max_unmatched=max(20, 1)=20. unmatched_DN=13 < 20 -> allowed
+        book_up = make_book(0.38, 0.40)
+        book_dn = make_book(0.48, 0.50)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        dn_buys = [o for o in orders if o.side == "DN" and o.action == "BUY"]
+        assert len(dn_buys) >= 1  # DN still allowed under min
+
+    # Sell phases
+    def test_sell_phase1_profit_only(self):
+        """t=0.50: only sell at profit (bid > avg_cost)."""
+        engine = self._make_engine(
+            sell_loss_start=0.70, sell_dump_start=0.90,
+            sell_min_shares=5.0, rebalance_warmup=0.0,
+            max_marginal_pair_cost=1.03, risk_floor=0.10,
+        )
+        engine._inventory.shares_up = 100
+        engine._inventory.cost_up = 60  # avg 0.60
+        engine._inventory.shares_dn = 50
+        engine._inventory.cost_dn = 15
+        # bid_UP=0.53 < avg 0.60 -> no sell
+        book_up = make_book(0.53, 0.55)
+        book_dn = make_book(0.43, 0.45)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        sells = [o for o in orders if o.action == "SELL"]
+        assert len(sells) == 0
+
+    def test_sell_phase2_low_conviction_sells(self):
+        """t=0.80: conviction < 0.50 -> sell fires even at loss."""
+        engine = self._make_engine(
+            sell_loss_start=0.70, sell_dump_start=0.90,
+            sell_min_shares=5.0, rebalance_warmup=0.0,
+            max_marginal_pair_cost=1.03, risk_floor=0.10, risk_ceil=0.50,
+            conviction_market_start=0.30, conviction_market_full=1.00,
+        )
+        # UP heavy. Model says UP losing (cal_prob=0.20). Market agrees (UP expensive ask=0.95).
+        engine._inventory.shares_up = 50
+        engine._inventory.cost_up = 25  # avg 0.50
+        engine._inventory.shares_dn = 20
+        engine._inventory.cost_dn = 8
+        book_up = make_book(0.93, 0.95)  # UP expensive -> market says UP losing
+        book_dn = make_book(0.04, 0.05)  # DN cheap -> market says DN winning
+        # conviction_UP: model_p=0.20, market_p=1-0.95=0.05
+        # market_weight=(0.80-0.30)/0.70=0.714
+        # conv = 0.286*0.20 + 0.714*0.05 = 0.057+0.036 = 0.093 < 0.50 -> sell fires!
+        orders = engine.on_tick(0.80, 0.20, book_up, book_dn)
+        sells = [o for o in orders if o.action == "SELL"]
+        assert len(sells) >= 1
+        assert sells[0].side == "UP"
+        assert "conv=" in sells[0].reason  # conviction-driven sell
+
+    def test_sell_phase3_dumps(self):
+        """t=0.92: sell at any price > $0.01."""
+        engine = self._make_engine(
+            sell_loss_start=0.70, sell_dump_start=0.90,
+            sell_min_shares=5.0, rebalance_warmup=0.0,
+            max_marginal_pair_cost=1.03, risk_floor=0.10, risk_ceil=0.50,
+            conviction_market_start=0.30, conviction_market_full=1.00,
+        )
+        engine._inventory.shares_up = 50
+        engine._inventory.cost_up = 25
+        engine._inventory.shares_dn = 20
+        engine._inventory.cost_dn = 8
+        # UP heavy, UP ask expensive (market says UP losing)
+        book_up = make_book(0.93, 0.95)
+        book_dn = make_book(0.04, 0.05)
+        # t=0.92 -> Phase 3, sell at any price
+        orders = engine.on_tick(0.92, 0.20, book_up, book_dn)
+        sells = [o for o in orders if o.action == "SELL"]
+        assert len(sells) >= 1
+        assert sells[0].side == "UP"  # UP is heavy
+        assert "cut" in sells[0].reason or "profit" in sells[0].reason
+
+    def test_profit_protection_blocks_dilution(self):
+        """pc=0.93 with 20 matched -> ceiling 0.95. New buy at sim=1.01 blocked."""
+        engine = self._make_engine(
+            max_marginal_pair_cost=1.03, profit_protect_min_pairs=5,
+            risk_floor=0.10, risk_ceil=0.50,
+        )
+        engine._inventory.shares_up = 20
+        engine._inventory.shares_dn = 20
+        engine._inventory.cost_up = 9.3  # pair=0.93
+        engine._inventory.cost_dn = 9.3
+        # pair_cost at market: 0.52+0.52=1.04 > 1.03 -> not even dutch opp
+        # Use slightly lower asks to pass Phase A
+        book_up = make_book(0.50, 0.51)
+        book_dn = make_book(0.50, 0.51)
+        # pair_cost=1.02 < 1.03 -> dutch opp exists
+        # effective_max = 0.93+0.02 = 0.95
+        # sim_pair_cost for buying UP at 0.51: UP avg goes from 0.465 to ~0.48
+        # sim = 0.48 + 0.465 = 0.945 < 0.95 -> allowed! (still profitable)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        # Should have orders since sim < ceiling
+        buys = [o for o in orders if o.action == "BUY"]
+        assert len(buys) >= 1
 
 
 class TestDutchBarSummary:

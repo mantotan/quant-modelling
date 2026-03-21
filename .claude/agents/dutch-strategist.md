@@ -18,14 +18,14 @@ All state files in `autoresearch/dutch/` — never read Sentinel's `autoresearch
 - sell_ratio 0.10-0.40 (capital recycling, V6: profit-only sells)
 - budget_util 0.50-0.90 (uses most of budget)
 
-**Parameter categories (V6.1):**
+**Parameter categories (V7):**
 - Pair cost: cheap_threshold, max_marginal_pair_cost
 - Pacing: pace_urgency_lo/hi, max_per_prediction, bar_budget, order_size
 - Risk budget: risk_floor, risk_ceil, risk_t_start, risk_t_end, risk_exponent
-- Edge decay: edge_decay_start, edge_decay_end
+- Conviction: conviction_market_start, conviction_market_full
+- Unmatched cap: min_unmatched_shares, unmatched_ratio
 - Balance: max_side_fraction
-- Edge: edge_scale_lo/hi, vwap_tolerance
-- Sell: sell_profit_only, sell_max_fraction, sell_min_shares, rebalance_warmup
+- Sell: sell_loss_start, sell_dump_start, sell_max_fraction, sell_min_shares, rebalance_warmup
 - Fill sim: fill_ticks, sweep_threshold, chase_threshold, max_chase, spread_offset, cancel_distance
 
 **Read-only params** (never suggest changing): strategy, version, min_order_usd
