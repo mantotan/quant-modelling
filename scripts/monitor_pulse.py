@@ -128,8 +128,12 @@ def parse_args() -> argparse.Namespace:
         help="Max spend per model prediction cycle (default: 100)",
     )
     p.add_argument(
-        "--dutch-vwap-tol", type=float, default=0.02,
-        help="Price improvement tolerance vs avg fill (default: 0.02)",
+        "--dutch-vwap-tol", type=float, default=0.10,
+        help="Price improvement tolerance vs avg fill (default: 0.10)",
+    )
+    p.add_argument(
+        "--dutch-max-hedge-ask", type=float, default=0.80,
+        help="Max ask price for hedge buys (default: 0.80)",
     )
     return p.parse_args()
 
@@ -747,6 +751,7 @@ async def main_loop(args: argparse.Namespace) -> None:
             max_side_fraction=args.dutch_max_side_frac,
             max_per_prediction=args.dutch_max_per_prediction,
             vwap_tolerance=args.dutch_vwap_tol,
+            max_hedge_ask=args.dutch_max_hedge_ask,
             bar_seconds=BAR_SECONDS[tf],
         )
         dutch_engine = DutchAccumulationEngine(dutch_config)

@@ -29,21 +29,24 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DutchConfig:
-    """Configuration for dutch accumulation strategy."""
+    """Configuration for dutch accumulation strategy.
+
+    V4: Bilateral grid accumulation (matching trader_a strategy).
+    Two-phase: build bilateral base early, model-tilt late.
+    """
 
     bar_budget: float = 200.0
     order_size: float = 5.0
     max_orders: int = 0  # 0 = auto-derive from bar_budget / min_order_usd
     cheap_threshold: float = 0.10
-    contra_threshold: float = 0.11
-    max_pair_cost: float = 0.97
+    max_pair_cost: float = 1.05  # V4: relaxed from 0.97, allow convergence
     min_order_usd: float = 1.0
     min_time_remaining: float = 30.0
     emergency_balance_time: float = 120.0
     spread_offset: float = 0.01
     bar_seconds: float = 900.0
 
-    # Pacing: budget envelope urgency bounds
+    # Pacing: budget envelope urgency bounds (V3)
     pace_urgency_lo: float = 0.5
     pace_urgency_hi: float = 2.0
 
@@ -53,8 +56,24 @@ class DutchConfig:
     # Per-prediction spend cap
     max_per_prediction: float = 100.0
 
-    # Price improvement: skip if limit > avg_fill * (1 + tol)
-    vwap_tolerance: float = 0.02
+    # Price improvement: wider for bilateral accumulation (V4: 0.10 from 0.02)
+    vwap_tolerance: float = 0.10
+
+    # V4: Kill switch delay — don't check before this fraction of bar elapsed
+    kill_switch_after: float = 0.60
+
+    # V4: Hedge tier — buy expensive side up to this ask price
+    max_hedge_ask: float = 0.80
+
+    # V4: Share match monitor — force rebalance below this ratio
+    min_share_match: float = 0.50
+
+    # V4: Narrowed edge scaling (was implicit 0.5-2.0)
+    edge_scale_lo: float = 0.8
+    edge_scale_hi: float = 1.2
+
+    # V4: Cheap tier ask threshold (buy any side below this, no model gate)
+    cheap_ask_max: float = 0.50
 
 
 @dataclass(frozen=True, slots=True)
@@ -331,8 +350,11 @@ class DutchAccumulationEngine:
             self._current_cal_prob = cal_prob
             self._prediction_spend = 0.0
 
-        # -- E: Kill switch (only on actual matched inventory) --
-        if self._inventory.matched > 0:
+        # -- E: Kill switch (only on matched inventory, delayed to 60% of bar) --
+        if (
+            self._inventory.matched > 0
+            and time_pct >= self._config.kill_switch_after
+        ):
             avg_pc = self._inventory.avg_pair_cost
             if avg_pc > self._config.max_pair_cost:
                 if not self._stopped:
@@ -370,7 +392,7 @@ class DutchAccumulationEngine:
                 self._config.pace_urgency_hi,
             ),
         )
-        pace_t = min(1.0, t_safe ** (1.0 / urgency))
+        pace_t = min(1.0, t_safe ** urgency)  # V4: back-loaded (convex)
         allowed_spend = self._config.bar_budget * pace_t
         self._last_allowed_spend = allowed_spend
         if self._inventory.total_cost >= allowed_spend:
@@ -412,52 +434,88 @@ class DutchAccumulationEngine:
                 my_cheap = cheap_dn
                 other_cheap = cheap_up
 
-            # Contra-signal: positive when OTHER side is overpriced
-            contra_signal = -other_cheap
-
-            # -- K1: Tier decision --
+            # -- K1: Tier decision (V4: price-first bilateral) --
             can_buy = False
             reason = ""
             is_balance = False
 
-            if remaining_s <= self._config.min_time_remaining:
-                # Last 30s: emergency balance only
-                if needs_balance and need_side == side and remaining_s > 10:
-                    if my_cheap > -0.02:
+            # -- Share match monitor (highest priority) --
+            # If shares are heavily imbalanced, force-buy the light side
+            if self._inventory.shares_up > 0 or self._inventory.shares_dn > 0:
+                max_sh = max(self._inventory.shares_up, self._inventory.shares_dn)
+                min_sh = min(self._inventory.shares_up, self._inventory.shares_dn)
+                share_match = min_sh / max_sh if max_sh > 0 else 1.0
+                light_side = (
+                    "UP" if self._inventory.shares_up < self._inventory.shares_dn
+                    else "DN"
+                )
+                if (
+                    share_match < self._config.min_share_match
+                    and side == light_side
+                    and ask < self._config.max_hedge_ask
+                ):
+                    can_buy = True
+                    is_balance = False  # paced via R2, not burst
+                    reason = f"match_rebalance sm={share_match:.0%}"
+
+            # -- Time-windowed tier logic (only if share match didn't fire) --
+            if not can_buy:
+                if remaining_s <= self._config.min_time_remaining:
+                    # Last 30s: emergency balance only
+                    if (
+                        needs_balance and need_side == side
+                        and remaining_s > 10
+                        and ask < self._config.max_hedge_ask
+                    ):
                         can_buy = True
                         is_balance = True
                         reason = f"emergency worst_pnl={worst:.2f}"
-            elif remaining_s <= self._config.emergency_balance_time:
-                # 30-120s: urgent balance + normal buys
-                if my_cheap > adjusted_threshold:
-                    can_buy = True
-                    reason = f"cheap={my_cheap:.3f}"
-                elif needs_balance and need_side == side and my_cheap > 0:
-                    can_buy = True
-                    is_balance = True
-                    reason = f"urgent_balance worst_pnl={worst:.2f}"
-            else:
-                # Normal window: all 3 tiers
-                if my_cheap > adjusted_threshold:
-                    can_buy = True
-                    reason = f"cheap={my_cheap:.3f}"
-                elif (
-                    contra_signal > self._config.contra_threshold
-                    and my_cheap > 0
-                    and remaining_s > 180
-                ):
-                    can_buy = True
-                    reason = f"contra={contra_signal:.3f}"
-                elif needs_balance and need_side == side and my_cheap > 0:
-                    can_buy = True
-                    is_balance = True
-                    reason = f"balance worst_pnl={worst:.2f}"
+                elif remaining_s <= self._config.emergency_balance_time:
+                    # 30-120s: cheap + edge + urgent balance (no hedge)
+                    if ask < self._config.cheap_ask_max:
+                        can_buy = True
+                        reason = f"cheap ask={ask:.3f}"
+                    elif my_cheap > adjusted_threshold:
+                        can_buy = True
+                        reason = f"edge={my_cheap:.3f}"
+                    elif (
+                        needs_balance and need_side == side
+                        and ask < self._config.max_hedge_ask
+                    ):
+                        can_buy = True
+                        is_balance = True
+                        reason = f"urgent_balance worst_pnl={worst:.2f}"
+                else:
+                    # Normal window: 4 tiers (cheap, edge, hedge, balance)
+                    # Tier 1: Cheap — ask below fair, buy regardless of model
+                    if ask < self._config.cheap_ask_max:
+                        can_buy = True
+                        reason = f"cheap ask={ask:.3f}"
+                    # Tier 2: Model edge — model says underpriced
+                    elif my_cheap > adjusted_threshold:
+                        can_buy = True
+                        reason = f"edge={my_cheap:.3f}"
+                    # Tier 3: Hedge — other side has value, buy this side
+                    elif (
+                        other_cheap > self._config.cheap_threshold
+                        and ask < self._config.max_hedge_ask
+                    ):
+                        can_buy = True
+                        reason = f"hedge ask={ask:.3f}"
+                    # Tier 4: Balance — worst-case PnL negative
+                    elif (
+                        needs_balance and need_side == side
+                        and ask < self._config.max_hedge_ask
+                    ):
+                        can_buy = True
+                        is_balance = True
+                        reason = f"balance worst_pnl={worst:.2f}"
 
             if not can_buy:
                 continue
 
-            # -- R2: Slot-based minimum spacing (balance/emergency exempt) --
-            if not is_balance:
+            # -- R2: Slot-based minimum spacing (only emergency exempt) --
+            if "emergency" not in reason:
                 last_t = (
                     self._last_order_time_pct_up if side == "UP"
                     else self._last_order_time_pct_dn
@@ -472,8 +530,8 @@ class DutchAccumulationEngine:
                         )
                         continue
 
-            # -- R3: Per-side budget cap (balance/emergency exempt) --
-            if not is_balance:
+            # -- R3: Per-side budget cap (only emergency exempt) --
+            if "emergency" not in reason:
                 side_cost = (
                     self._inventory.cost_up if side == "UP"
                     else self._inventory.cost_dn
@@ -495,8 +553,10 @@ class DutchAccumulationEngine:
             if limit_price <= 0:
                 continue
 
-            # -- R6: Price improvement gate (skip if worse than avg fill) --
-            if side == "UP" and self._inventory.shares_up > 0:
+            # -- R6: Price improvement gate (balance/hedge/rebalance exempt) --
+            if is_balance or "hedge" in reason or "match_rebalance" in reason:
+                pass  # skip VWAP — these tiers buy at inherently worse prices
+            elif side == "UP" and self._inventory.shares_up > 0:
                 avg_fill = self._inventory.cost_up / self._inventory.shares_up
                 if limit_price > avg_fill * (1 + self._config.vwap_tolerance):
                     self._emit(
@@ -513,9 +573,13 @@ class DutchAccumulationEngine:
                     )
                     continue
 
-            # -- K3: Smart sizing --
-            if needs_balance and need_side == side:
-                # Balance: buy enough shares to make worst_case_pnl = 0
+            # -- K3: Smart sizing (V4) --
+            if "hedge" in reason:
+                # Hedge: flat half-size order (limit exposure on expensive side)
+                dollar_size = self._config.order_size * 0.5
+                dollar_size = min(dollar_size, budget_remaining)
+            elif "match_rebalance" in reason or (needs_balance and need_side == side):
+                # Balance/rebalance: buy shares to reduce imbalance
                 if side == "UP":
                     shares_needed = self._inventory.total_cost - self._inventory.shares_up
                 else:
@@ -527,10 +591,13 @@ class DutchAccumulationEngine:
                     self._config.order_size * 2,
                 )
             else:
-                # Edge-scaled: bigger edge → bigger order (0.5x to 2x base)
-                edge_for_scale = max(my_cheap, contra_signal if "contra" in reason else 0)
-                edge_scale = min(edge_for_scale / (self._config.cheap_threshold * 2), 2.0)
-                edge_scale = max(0.5, edge_scale)
+                # Edge-scaled: narrowed range (V4: 0.8x to 1.2x)
+                edge_for_scale = max(my_cheap, 0)
+                edge_scale = min(
+                    edge_for_scale / (self._config.cheap_threshold * 2),
+                    self._config.edge_scale_hi,
+                )
+                edge_scale = max(self._config.edge_scale_lo, edge_scale)
                 dollar_size = self._config.order_size * edge_scale
                 dollar_size = min(dollar_size, budget_remaining)
 
@@ -736,5 +803,9 @@ class DutchAccumulationEngine:
                 round(inv.cost_dn / inv.shares_dn, 4)
                 if inv.shares_dn > 0 else 0
             ),
+            "share_match_pct": round(
+                min(inv.shares_up, inv.shares_dn)
+                / max(inv.shares_up, inv.shares_dn) * 100, 1,
+            ) if max(inv.shares_up, inv.shares_dn) > 0 else 0,
         }
 

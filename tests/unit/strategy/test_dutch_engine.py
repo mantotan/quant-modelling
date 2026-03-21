@@ -94,72 +94,58 @@ class TestDutchEngine:
         book_dn = make_book(0.44, 0.48, depth=100)
         assert engine.on_tick(0.5, 0.55, book_up, book_dn) == []
 
-    def test_buys_up_when_cheap(self):
-        # Model P(UP)=0.65, ask_UP=0.52 → cheap=0.13 > threshold 0.10
+    def test_buys_up_when_model_edge(self):
+        """V4: Tier 2 (edge) fires when model says underpriced and ask > 0.50."""
         engine = self._make_engine(cheap_threshold=0.10)
+        # ask_UP=0.52 > 0.50, so Tier 1 doesn't fire
+        # my_cheap = 0.65 - 0.52 = 0.13 > threshold → Tier 2 fires
         book_up = make_book(0.48, 0.52)
         book_dn = make_book(0.44, 0.48)
         orders = engine.on_tick(0.5, 0.65, book_up, book_dn)
         up_orders = [o for o in orders if o.side == "UP"]
         assert len(up_orders) >= 1
-        assert "cheap" in up_orders[0].reason
+        assert "edge" in up_orders[0].reason
 
-    def test_no_buy_when_edge_below_threshold(self):
-        # Model P(UP)=0.55, ask_UP=0.52 → cheap=0.03 < threshold 0.10
+    def test_no_buy_when_both_asks_above_50c_no_edge(self):
+        """V4: No buy when both asks > 0.50 and no model edge and no hedge trigger."""
         engine = self._make_engine(cheap_threshold=0.10)
-        book_up = make_book(0.48, 0.52)
-        book_dn = make_book(0.44, 0.48)
-        orders = engine.on_tick(0.5, 0.55, book_up, book_dn)
+        # Both asks > 0.50, no model edge, no other_cheap for hedge
+        book_up = make_book(0.53, 0.57)
+        book_dn = make_book(0.53, 0.57)
+        orders = engine.on_tick(0.5, 0.50, book_up, book_dn)
         assert orders == []
 
-    def test_contra_signal_buys_cheap_side(self):
-        """When DN is overpriced, contra-signal buys UP (if UP is cheap)."""
-        engine = self._make_engine(
-            cheap_threshold=0.10, contra_threshold=0.11,
-        )
-        # Model P(UP)=0.55, ask_UP=0.42 → cheap_up = +0.13 (Tier 1 direct)
-        # cheap_dn = 0.45 - 0.58 = -0.13 (DN overpriced)
-        # contra for UP = -(-0.13) = +0.13 > 0.11 (also triggers)
-        # No inventory yet → kill switch won't fire
-        book_up = make_book(0.40, 0.42)
-        book_dn = make_book(0.50, 0.58)
-        orders = engine.on_tick(0.3, 0.55, book_up, book_dn)
+    def test_cheap_tier_buys_both_sides(self):
+        """V4 Tier 1: when both asks < 0.50, buys both sides."""
+        engine = self._make_engine(cheap_threshold=0.10)
+        book_up = make_book(0.40, 0.42)  # ask < 0.50
+        book_dn = make_book(0.40, 0.42)  # ask < 0.50
+        orders = engine.on_tick(0.3, 0.50, book_up, book_dn)
+        up_orders = [o for o in orders if o.side == "UP"]
+        dn_orders = [o for o in orders if o.side == "DN"]
+        assert len(up_orders) >= 1
+        assert len(dn_orders) >= 1
+
+    def test_hedge_tier_replaces_contra(self):
+        """V4: Hedge tier fires where old contra used to, without model gate."""
+        engine = self._make_engine(cheap_threshold=0.10, max_hedge_ask=0.80)
+        # ask_UP = 0.58, model P(UP)=0.40 → cheap_UP = 0.40-0.58 = -0.18 (negative)
+        # cheap_DN = 0.60 - 0.35 = +0.25 > threshold 0.10 → hedge fires for UP
+        book_up = make_book(0.50, 0.58)
+        book_dn = make_book(0.30, 0.35)
+        orders = engine.on_tick(0.3, 0.40, book_up, book_dn)
         up_orders = [o for o in orders if o.side == "UP"]
         assert len(up_orders) >= 1
 
-    def test_contra_requires_my_cheap_positive(self):
-        """Contra must not fire when both sides are overpriced (total ask > 1.0)."""
-        engine = self._make_engine(
-            cheap_threshold=0.10, contra_threshold=0.11,
-        )
-        # Model P(UP)=0.50, ask_UP=0.65, ask_DN=0.55 → total 1.20
-        # cheap_up = -0.15, cheap_dn = -0.05
-        # contra for UP = -(-0.05) = +0.05 < 0.11 (no contra for UP)
-        # contra for DN = -(-0.15) = +0.15 > 0.11 BUT cheap_dn = -0.05 < 0
-        # → Guard prevents contra buy: my_cheap must be > 0
+    def test_no_hedge_when_both_overpriced(self):
+        """V4: No hedge when both sides above 0.50 and neither has edge."""
+        engine = self._make_engine(cheap_threshold=0.10, max_hedge_ask=0.80)
+        # Both asks > 0.50, model neutral → no edge on either side
         book_up = make_book(0.60, 0.65)
-        book_dn = make_book(0.50, 0.55)
+        book_dn = make_book(0.55, 0.60)
         orders = engine.on_tick(0.3, 0.50, book_up, book_dn)
+        # Neither side should trigger (no cheap, no edge, no hedge)
         assert orders == []
-
-    def test_contra_requires_enough_time(self):
-        """Contra-signal only fires when remaining_s > 180."""
-        engine = self._make_engine(
-            cheap_threshold=0.10, contra_threshold=0.11,
-        )
-        # Good contra setup but late in bar (t=0.85, only 135s left on 15m)
-        book_up = make_book(0.40, 0.45)  # cheap_up = model - 0.45
-        book_dn = make_book(0.70, 0.75)  # cheap_dn = very negative → contra for UP
-        # At t=0.85: remaining = 0.15 * 900 = 135s < 180
-        # cheap_up = 0.55 - 0.45 = 0.10, exactly at threshold with time_factor
-        # But time_factor at 0.85 = 0.5, so adjusted_threshold = 0.05
-        # cheap_up = 0.10 > 0.05 → this would actually trigger Tier 1
-        # Use a case where Tier 1 doesn't trigger but contra would
-        book_up2 = make_book(0.40, 0.50)  # cheap_up = 0.55 - 0.50 = 0.05 < threshold
-        orders = engine.on_tick(0.85, 0.55, book_up2, book_dn)
-        # Even though contra_signal = 0.30, remaining < 180s → no contra
-        contra_orders = [o for o in orders if "contra" in o.reason]
-        assert len(contra_orders) == 0
 
     def test_pnl_aware_no_balance_when_both_profitable(self):
         """Don't urgently balance when both outcomes are profitable."""
@@ -193,16 +179,17 @@ class TestDutchEngine:
         assert len(dn_orders) >= 1
 
     def test_kill_switch_on_bad_avg_pair_cost(self):
-        """Stop when avg pair cost exceeds threshold after building inventory."""
-        engine = self._make_engine(max_pair_cost=0.97)
-        # Manually set inventory with bad avg pair cost
+        """Stop when avg pair cost exceeds threshold after 60% of bar."""
+        engine = self._make_engine(max_pair_cost=1.05, kill_switch_after=0.60)
+        # Pair cost = 1.06 > 1.05
         engine._inventory.shares_up = 20
         engine._inventory.shares_dn = 20
-        engine._inventory.cost_up = 10   # avg 0.50
-        engine._inventory.cost_dn = 10   # avg 0.50 → pair cost = 1.00 > 0.97
+        engine._inventory.cost_up = 10.6
+        engine._inventory.cost_dn = 10.6
         book_up = make_book(0.48, 0.52)
         book_dn = make_book(0.48, 0.52)
-        orders = engine.on_tick(0.5, 0.65, book_up, book_dn)
+        # At t=0.70 (after kill_switch_after=0.60) → should kill
+        orders = engine.on_tick(0.70, 0.65, book_up, book_dn)
         assert orders == []
         assert engine._stopped
 
@@ -409,30 +396,32 @@ class TestDutchPacingGates:
         up_orders = [o for o in orders2 if o.side == "UP"]
         assert len(up_orders) == 0
 
-    def test_slot_spacing_exempts_balance(self):
-        """Balance orders bypass spacing gate."""
+    def test_slot_spacing_exempts_emergency(self):
+        """Emergency orders (last 30s) bypass spacing gate."""
         engine = self._make_engine(
             cheap_threshold=0.10, order_size=5.0, bar_budget=200.0,
+            max_hedge_ask=0.80, min_share_match=0.0,  # disable share match
         )
-        # Build UP inventory → need DN for balance
+        # Build UP inventory → need DN for emergency balance
         engine._inventory.shares_up = 40
         engine._inventory.cost_up = 20
-        # Place an order to set last_order_time
-        engine._last_order_time_pct_dn = 0.89
+        # Set last_order_time very close to now
+        engine._last_order_time_pct_dn = 0.969
 
-        # DN is fairly priced (cheap_dn = 0.50 - 0.48 = 0.02 > 0)
         book_up = make_book(0.48, 0.52)
         book_dn = make_book(0.44, 0.48)
-        # Late bar (urgent window), very close to previous order
-        orders = engine.on_tick(0.895, 0.50, book_up, book_dn)
+        # t=0.97 → remaining = 0.03 * 900 = 27s < 30s → emergency window
+        orders = engine.on_tick(0.97, 0.50, book_up, book_dn)
         dn_orders = [o for o in orders if o.side == "DN"]
-        # Balance should fire despite spacing
+        # Emergency should fire despite close spacing
         assert len(dn_orders) >= 1
+        assert "emergency" in dn_orders[0].reason
 
     def test_side_cap_blocks_heavy_side(self):
         """65% budget on UP → next UP order blocked, DN still allowed."""
         engine = self._make_engine(
             cheap_threshold=0.10, max_side_fraction=0.65, bar_budget=200.0,
+            min_share_match=0.0,  # disable share match to test side cap alone
         )
         # UP already at 65% of budget = $130
         engine._inventory.shares_up = 260
@@ -440,7 +429,8 @@ class TestDutchPacingGates:
 
         book_up = make_book(0.20, 0.25)  # UP is very cheap
         book_dn = make_book(0.20, 0.25)  # DN is also cheap
-        orders = engine.on_tick(0.50, 0.65, book_up, book_dn)
+        # Use t=0.90 so envelope allows enough spend ($130 < envelope at 90%)
+        orders = engine.on_tick(0.90, 0.65, book_up, book_dn)
         up_orders = [o for o in orders if o.side == "UP"]
         dn_orders = [o for o in orders if o.side == "DN"]
         assert len(up_orders) == 0  # blocked by side cap
@@ -580,6 +570,283 @@ class TestDutchPacingGates:
             bar_budget=200.0, min_order_usd=1.0, max_orders=50,
         )
         assert engine2._effective_max == 50
+
+
+class TestDutchV4BilateralGrid:
+    """Tests for V4: bilateral grid accumulation (matching trader_a)."""
+
+    def _make_engine(self, **kwargs) -> DutchAccumulationEngine:
+        config = DutchConfig(**kwargs)
+        return DutchAccumulationEngine(config)
+
+    def _fill_order(self, engine, order):
+        engine.on_fill(order, order.limit_price, order.shares)
+
+    def test_cheap_tier_buys_below_50c(self):
+        """Tier 1: ask < 0.50 buys regardless of model edge."""
+        engine = self._make_engine(cheap_threshold=0.10)
+        # Model says P(UP)=0.30, but ask_UP=0.35 < 0.50 → buy anyway
+        # my_cheap = 0.30 - 0.35 = -0.05 (negative edge!)
+        book_up = make_book(0.30, 0.35)
+        book_dn = make_book(0.60, 0.65)
+        orders = engine.on_tick(0.50, 0.30, book_up, book_dn)
+        up_orders = [o for o in orders if o.side == "UP"]
+        assert len(up_orders) >= 1
+        assert "cheap" in up_orders[0].reason
+
+    def test_hedge_buys_expensive_side(self):
+        """Tier 3: hedge fires when other side has edge and ask < max_hedge_ask."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, max_hedge_ask=0.80,
+        )
+        # Model P(UP)=0.40 → cheap_DN = 0.60 - 0.35 = +0.25 (strong DN edge)
+        # ask_UP = 0.65 (expensive but < 0.80)
+        # cheap_UP = 0.40 - 0.65 = -0.25 (overpriced)
+        book_up = make_book(0.60, 0.65)  # ask_UP = 0.65
+        book_dn = make_book(0.30, 0.35)  # ask_DN = 0.35 < 0.50
+        orders = engine.on_tick(0.50, 0.40, book_up, book_dn)
+        up_orders = [o for o in orders if o.side == "UP"]
+        assert len(up_orders) >= 1
+        assert "hedge" in up_orders[0].reason
+
+    def test_hedge_blocked_above_max_ask(self):
+        """Hedge blocked when ask > max_hedge_ask."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, max_hedge_ask=0.80,
+        )
+        # ask_UP = 0.85 > 0.80 → no hedge
+        book_up = make_book(0.80, 0.85)
+        book_dn = make_book(0.10, 0.15)  # DN very cheap
+        orders = engine.on_tick(0.50, 0.30, book_up, book_dn)
+        up_orders = [o for o in orders if o.side == "UP"]
+        # UP should NOT get a hedge order (ask too high)
+        hedge_orders = [o for o in up_orders if "hedge" in o.reason]
+        assert len(hedge_orders) == 0
+
+    def test_hedge_sizing_half_base(self):
+        """Hedge orders use half base order size."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, order_size=10.0, max_hedge_ask=0.80,
+        )
+        book_up = make_book(0.60, 0.65)
+        book_dn = make_book(0.30, 0.35)
+        orders = engine.on_tick(0.50, 0.40, book_up, book_dn)
+        hedge = [o for o in orders if "hedge" in o.reason]
+        if hedge:
+            assert hedge[0].dollars <= 6.0  # ~$5 = 10 * 0.5
+
+    def test_balance_fires_at_high_ask(self):
+        """Balance fires at ask=0.75 (was blocked by my_cheap > 0 in V3)."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, max_hedge_ask=0.80,
+        )
+        # Heavy DN, need UP to balance
+        engine._inventory.shares_dn = 100
+        engine._inventory.cost_dn = 30
+        # pnl_if_up = 0 - 30 = -30 → need UP
+        book_up = make_book(0.70, 0.75)  # ask=0.75 < max_hedge_ask=0.80
+        book_dn = make_book(0.20, 0.25)
+        orders = engine.on_tick(0.90, 0.50, book_up, book_dn)
+        up_orders = [o for o in orders if o.side == "UP"]
+        assert len(up_orders) >= 1
+
+    def test_balance_blocked_above_max_ask(self):
+        """Balance blocked when ask > max_hedge_ask."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, max_hedge_ask=0.80,
+        )
+        engine._inventory.shares_dn = 100
+        engine._inventory.cost_dn = 30
+        book_up = make_book(0.82, 0.88)  # ask=0.88 > 0.80
+        book_dn = make_book(0.10, 0.12)
+        orders = engine.on_tick(0.90, 0.50, book_up, book_dn)
+        up_balance = [o for o in orders if o.side == "UP" and "balance" in o.reason]
+        assert len(up_balance) == 0
+
+    def test_envelope_back_loaded(self):
+        """Back-loaded envelope: pace(0.33) < 0.30 of budget."""
+        engine = self._make_engine(bar_budget=200.0, cheap_threshold=0.10)
+        book_up = make_book(0.20, 0.25)
+        book_dn = make_book(0.20, 0.25)
+        # At t=0.33, edge ~0.40 → urgency ~2.0, pace = 0.33^2.0 = 0.109
+        # allowed = 200 * 0.109 = $21.8 → only ~4 orders at $5
+        total = 0
+        for i in range(8):
+            t = 0.33 + i * 0.001
+            orders = engine.on_tick(t, 0.65, book_up, book_dn)
+            for o in orders:
+                self._fill_order(engine, o)
+                total += o.dollars
+        assert total < 60  # back-loaded = less than 30% of $200
+
+    def test_kill_switch_delayed(self):
+        """Kill switch doesn't fire before kill_switch_after."""
+        engine = self._make_engine(
+            max_pair_cost=1.05, kill_switch_after=0.60,
+        )
+        engine._inventory.shares_up = 20
+        engine._inventory.shares_dn = 20
+        engine._inventory.cost_up = 10.6
+        engine._inventory.cost_dn = 10.6  # pair cost = 1.06
+        book_up = make_book(0.48, 0.52)
+        book_dn = make_book(0.48, 0.52)
+        # At t=0.40 (before 0.60) → should NOT kill
+        engine.on_tick(0.40, 0.55, book_up, book_dn)
+        assert not engine._stopped
+
+    def test_edge_scale_narrowed(self):
+        """Edge scaling uses 0.8x-1.2x range."""
+        engine = self._make_engine(
+            order_size=10.0, cheap_threshold=0.10,
+            edge_scale_lo=0.8, edge_scale_hi=1.2,
+        )
+        book_up = make_book(0.20, 0.25)  # ask < 0.50 → cheap tier
+        book_dn = make_book(0.48, 0.52)
+        orders = engine.on_tick(0.50, 0.70, book_up, book_dn)
+        up_orders = [o for o in orders if o.side == "UP"]
+        if up_orders:
+            # $10 base * [0.8, 1.2] = $8-12
+            assert 7.0 <= up_orders[0].dollars <= 13.0
+
+    def test_bilateral_accumulation(self):
+        """With directional model P(UP)=0.44, BOTH sides get orders."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, max_hedge_ask=0.80,
+        )
+        # Market: ask_UP=0.60, ask_DN=0.40 → both < 0.80
+        # Model: P(UP)=0.44 → cheap_UP = 0.44-0.60 = -0.16, cheap_DN = 0.56-0.40 = +0.16
+        # DN: Tier 1 (ask < 0.50) fires
+        # UP: Tier 3 (hedge) fires because other_cheap (DN) = 0.16 > threshold 0.10
+        book_up = make_book(0.55, 0.60)
+        book_dn = make_book(0.35, 0.40)
+        orders = engine.on_tick(0.50, 0.44, book_up, book_dn)
+        up_orders = [o for o in orders if o.side == "UP"]
+        dn_orders = [o for o in orders if o.side == "DN"]
+        assert len(up_orders) >= 1, "UP should get hedge order"
+        assert len(dn_orders) >= 1, "DN should get cheap order"
+
+    def test_share_match_forces_light_side(self):
+        """Share match monitor forces buying the light side."""
+        engine = self._make_engine(
+            min_share_match=0.30, max_hedge_ask=0.80,
+        )
+        # Heavy DN: 100 shares, 0 UP → share_match = 0%
+        engine._inventory.shares_dn = 100
+        engine._inventory.cost_dn = 30
+        book_up = make_book(0.60, 0.65)  # ask < max_hedge_ask
+        book_dn = make_book(0.30, 0.35)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        up_orders = [o for o in orders if o.side == "UP"]
+        assert len(up_orders) >= 1
+        assert "match_rebalance" in up_orders[0].reason
+
+    def test_share_match_no_force_when_balanced(self):
+        """Share match monitor doesn't fire when ratio is healthy."""
+        engine = self._make_engine(
+            min_share_match=0.30, max_hedge_ask=0.80, cheap_threshold=0.10,
+        )
+        engine._inventory.shares_up = 60
+        engine._inventory.shares_dn = 80  # 75% match > 30%
+        engine._inventory.cost_up = 30
+        engine._inventory.cost_dn = 24
+        book_up = make_book(0.60, 0.65)
+        book_dn = make_book(0.60, 0.65)
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        rebalance = [o for o in orders if "match_rebalance" in o.reason]
+        assert len(rebalance) == 0
+
+    def test_rebalance_subject_to_spacing(self):
+        """Match rebalance orders are paced by R2 (not exempt like balance)."""
+        engine = self._make_engine(
+            min_share_match=0.50, max_hedge_ask=0.80,
+        )
+        # Heavy DN, need UP rebalance
+        engine._inventory.shares_dn = 100
+        engine._inventory.cost_dn = 30
+        book_up = make_book(0.55, 0.60)
+        book_dn = make_book(0.35, 0.40)
+        # First tick: rebalance fires
+        orders1 = engine.on_tick(0.30, 0.50, book_up, book_dn)
+        rebal1 = [o for o in orders1 if "match_rebalance" in o.reason]
+        assert len(rebal1) >= 1
+        for o in rebal1:
+            self._fill_order(engine, o)
+        # Immediate second tick: should be blocked by R2 spacing
+        orders2 = engine.on_tick(0.301, 0.50, book_up, book_dn)
+        rebal2 = [o for o in orders2 if "match_rebalance" in o.reason]
+        assert len(rebal2) == 0  # blocked by spacing
+
+    def test_hedge_exempt_from_vwap(self):
+        """Hedge orders skip R6 VWAP gate (they inherently buy at worse prices)."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, max_hedge_ask=0.80, vwap_tolerance=0.10,
+        )
+        # Fill UP at 0.50 to set a VWAP baseline
+        fill_order = DutchOrder(
+            side="UP", limit_price=0.50, shares=10.0, dollars=5.0,
+            time_pct=0.2, placed_at=datetime.now(UTC), reason="cheap",
+        )
+        engine.on_fill(fill_order, fill_price=0.50, filled_shares=10.0)
+        # Now hedge buy at 0.65 (> 0.50 * 1.10 = 0.55) — would be blocked by R6
+        # But hedge orders should be exempt
+        book_up = make_book(0.60, 0.65)  # ask=0.65, hedge tier
+        book_dn = make_book(0.20, 0.25)  # cheap_dn = strong edge
+        orders = engine.on_tick(0.50, 0.40, book_up, book_dn)
+        up_hedge = [o for o in orders if o.side == "UP" and "hedge" in o.reason]
+        assert len(up_hedge) >= 1  # hedge goes through despite VWAP
+
+    def test_vwap_still_blocks_cheap_tier(self):
+        """R6 still blocks cheap/edge tiers when price deteriorates."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, vwap_tolerance=0.10,
+        )
+        # Fill DN at 0.30
+        fill_order = DutchOrder(
+            side="DN", limit_price=0.30, shares=10.0, dollars=3.0,
+            time_pct=0.2, placed_at=datetime.now(UTC), reason="cheap",
+        )
+        engine.on_fill(fill_order, fill_price=0.30, filled_shares=10.0)
+        # Cheap tier at ask=0.45 (> 0.30 * 1.10 = 0.33) — should be blocked
+        book_up = make_book(0.50, 0.55)
+        book_dn = make_book(0.40, 0.45)  # ask=0.45 < 0.50 → cheap tier
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        dn_orders = [o for o in orders if o.side == "DN"]
+        assert len(dn_orders) == 0  # blocked by R6 VWAP
+
+    def test_balance_subject_to_spacing(self):
+        """Balance orders are now paced by R2 (not exempt like emergency)."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, max_hedge_ask=0.80,
+        )
+        # Heavy DN, need UP to balance
+        engine._inventory.shares_dn = 100
+        engine._inventory.cost_dn = 30
+        # Set last UP order time close to now
+        engine._last_order_time_pct_up = 0.499
+
+        book_up = make_book(0.44, 0.48)
+        book_dn = make_book(0.44, 0.48)
+        # t=0.50, gap = 0.001 which is less than min_gap
+        orders = engine.on_tick(0.50, 0.50, book_up, book_dn)
+        up_balance = [o for o in orders if o.side == "UP" and "balance" in o.reason]
+        assert len(up_balance) == 0  # blocked by R2 spacing
+
+    def test_emergency_still_exempt_from_spacing(self):
+        """Emergency (last 30s) still bypasses R2 spacing."""
+        engine = self._make_engine(
+            cheap_threshold=0.10, max_hedge_ask=0.80,
+            min_share_match=0.0,  # disable share match to test emergency
+        )
+        engine._inventory.shares_up = 40
+        engine._inventory.cost_up = 20
+        engine._last_order_time_pct_dn = 0.969
+
+        book_up = make_book(0.48, 0.52)
+        book_dn = make_book(0.44, 0.48)
+        # t=0.97 → 27s left < 30s → emergency window
+        orders = engine.on_tick(0.97, 0.50, book_up, book_dn)
+        dn_emergency = [o for o in orders if "emergency" in o.reason]
+        assert len(dn_emergency) >= 1  # emergency bypasses R2
 
 
 class TestDutchBarSummary:
