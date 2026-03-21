@@ -1,1 +1,16 @@
-{"alerts": []}
+{"alerts": [
+  {
+    "severity": "CRITICAL",
+    "type": "sell_race",
+    "detected_at": "2026-03-21T11:24:07Z",
+    "evidence": "19/37 bars in 5m and 8/20 bars in 15m have sell_losing events with time_pct gap < 0.005 on same bar_id. Minimum gap observed: 0.000001.",
+    "resolved": false
+  },
+  {
+    "severity": "CRITICAL",
+    "type": "negative_shares",
+    "detected_at": "2026-03-21T11:24:07Z",
+    "evidence": "8 bars in 5m and 2 bars in 15m end with negative up_shares or dn_shares (e.g. 5m bar 1774089000: up=-20.88, dn=-46.87). Sells exceed purchased inventory.",
+    "resolved": false
+  }
+]}
