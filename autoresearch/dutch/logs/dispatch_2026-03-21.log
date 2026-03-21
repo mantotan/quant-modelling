@@ -12,3 +12,5 @@
 2026-03-21T22:47:42Z iter=2 role=researcher outcome=BTC_15m BASELINE pair_cost=0.9631 max_dd=167.63% bars=57; experiment queued: max_marginal_pair_cost 1.03->0.99
 2026-03-21T22:56:53Z iter=4 role=monitor outcome=3/3_processes_online_0_critical_1_warning(pair_cost_stuck)_5m_avg_pc=1.036_15m_paper_avg_pc=1.025_15m_backtest_avg_pc=0.951
 2026-03-21T23:42:10Z iter=7 role=researcher outcome=BTC_1h DISCARD pace_urgency_hi=2.5 no-effect; next=sell_loss_start 0.70->0.60
+2026-03-21T23:52:21Z iter=8 role=researcher outcome=ETH_5m BASELINE pair_cost=0.9236 avg_profit=-4.79 max_dd=431.42% bars=180 pair_advanced_to=ETH_15m
+2026-03-21T23:54:09Z iter=8 role=monitor outcome=healthy 0_CRITICAL_active 1_WARNING_pair_cost_stuck_improving(last10_avg=0.9505) 0_sells 0_neg_shares 0_zero_fills

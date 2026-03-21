@@ -32,7 +32,7 @@
     "detected_at": "2026-03-21T16:03:44Z",
     "evidence": "5m avg_pair_cost=0.983 (7/10 bars >0.98), 15m avg_pair_cost=1.005 (8/10 bars >0.98). Cumulative PnL: 5m=-$1981.70 (73 bars), 15m=-$891.18 (29 bars). Structural issue — high pair cost driving sustained losses.",
     "resolved": false,
-    "last_checked": "2026-03-22T00:30:00Z",
-    "check_note": "BTC_5m paper: 4/5 active bars >0.98 (avg=1.034), last bar_id=1774133400. BTC_15m paper: 8/10 >0.98 (avg=1.028, consec=4), last bar_id=1774132200. BTC_15m backtest improving: avg=0.951, only 5/10 >0.98. Resolution requires 5 consecutive active bars all <0.98 — not met on any paper TF. Total PnL: 5m=-$2147.27 (118 bars), 15m paper=-$977.28 (44 bars), 15m backtest=-$296.82 (53 bars). BTC_1h paper: 0 bars filled yet."
+    "last_checked": "2026-03-21T23:54:09Z",
+    "check_note": "BTC_15m backtest (53 bars total): 28/53 bars >0.98 (52.8%), max consecutive = 5 (threshold = 5, trigger met in history). Last 10 bars improving: avg_pair_cost=0.9505, only 1 consecutive >0.98 at end. Cumulative PnL: 15m backtest=-$296.82 (53 bars). 5m and 1h backtest data not available in replay mode. Resolution requires 5 consecutive bars all <0.98 — not yet achieved."
   }
 ]}
