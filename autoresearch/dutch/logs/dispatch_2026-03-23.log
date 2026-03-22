@@ -20,3 +20,4 @@
 2026-03-23T13:03:16Z iter=91 pair=BTC_1h role=researcher outcome=DISCARD max_onesided_cost 5.0->3.0 pair_cost=0.7905 (+1.0% vs best 0.7988) max_dd=6.4%
 2026-03-23T14:10:00Z iter=92 pair=ETH_5m role=researcher outcome=KEEP max_onesided_cost 5.0->2.0 pair_cost=0.7355 max_dd=22.9%
 2026-03-23T14:45:00Z iter=94 pair=ETH_15m role=researcher outcome=DISCARD(x2) re-eval 0.5600->0.6750 dataset variance; onesided=1.0 collapsed matched_ratio, floor confirmed at 1.5; next=ETH_1h
+2026-03-23T15:10:00Z iter=95 pair=ETH_1h role=researcher outcome=DISCARD re-eval 1.8% below threshold; staged bar_budget 200->250; advancing to SOL_5m
