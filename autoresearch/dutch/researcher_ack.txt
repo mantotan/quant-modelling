@@ -1,5 +1,6 @@
-iter=83 pair=ETH_1h timestamp=2026-03-23T00:00:00Z status=pending
-hypothesis: risk_ceil 0.15->0.20 -- increase per-bar capital allocation on ETH_1h
-rationale: ETH_1h skip series exhausted at 0.45. pair_cost=0.706 beats benchmark (0.85), max_dd=17% provides
-safe headroom. Strategy priority #1 and audit Tier 3 both direct risk_ceil increase. With 43% correct_side
-and -$0.49/bar avg_profit, more capital per bar may improve total_profit. max_dd=17% is far below 30% limit.
+iter=84 pair=SOL_5m timestamp=2026-03-24T00:35:00Z status=running
+hypothesis: max_onesided_cost 5.0->2.0 -- URGENT DD repair for SOL_5m
+rationale: SOL_5m max_dd=31.1% exceeds 30% threshold. Strategy priority #1 + audit directive both
+mandate this experiment next. ETH_15m confirmed this pattern twice (iter 68: 5->2 halved DD, iter 82:
+2->1.5 further halved). High confidence onesided cap will reduce DD below threshold and unlock further
+optimization. Current knobs/best_knobs are identical (last experiment was KEEP iter 71).

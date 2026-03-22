@@ -1,3 +1,6 @@
 2026-03-24T00:02:00Z iter=76 pair=XRP_1h status=DISCARD param=bar_budget 200->300
   eval: pair_cost=0.7434 profit=$0.26 max_dd=5.6% bars=33
   hypothesis: "bar_budget=300 pushes buys at worse prices on highly selective pair (3.3% match rate); XRP_1h optimal at 200; next: risk_ceil 0.15->0.20"
+2026-03-24T00:37:00Z iter=84 pair=SOL_5m status=KEEP param=max_onesided_cost 5.0->2.0
+  eval: pair_cost=0.7333 profit=$0.0504 max_dd=22.33% bars=393
+  hypothesis: "DD repair: max_dd=31.1% exceeded 30% threshold. Strategy priority #1. ETH_15m pattern (iters 68+82) confirmed onesided cap halves DD. Applied same fix to SOL_5m. Result: pair_cost -9.9%, max_dd halved to 22.3%, avg_profit 71x improvement."
