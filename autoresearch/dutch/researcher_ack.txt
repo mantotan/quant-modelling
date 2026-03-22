@@ -1,1 +1,4 @@
-iter=77 pair=BTC_5m timestamp=2026-03-23T00:20:00Z status=DISCARD param=- (baseline re-eval); next hypothesis: max_onesided_cost 5.0->3.0 [max_onesided_cost]
+iter=78 pair=BTC_15m timestamp=2026-03-23T05:00:00Z status=running
+hypothesis: compound change conviction_buy_skip 0.50->0.45 + max_onesided_cost 5.0->3.0
+rationale: skip=0.45 alone caused DD=37.9% (iter 51 DISCARD); adding onesided_cap=3.0 should contain DD
+while preserving the 1.4% pair_cost gain. Audit directive confirmed.

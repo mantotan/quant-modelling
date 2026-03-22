@@ -28,3 +28,6 @@
 2026-03-23T00:20:00Z iter=77 pair=BTC_5m status=DISCARD param=- (baseline re-eval) -
   eval: pair_cost=0.9446 profit=$0.25 max_dd=33.2% bars=385
   hypothesis: "max_dd=33.2% exceeds 30% on expanded dataset; all skip/cheap_threshold exhausted; applying max_onesided_cost 5.0->3.0 (ETH_15m analog iter 68 halved DD); moderate onesided cap expected to bring DD below 30% without hurting positive avg_profit (+$0.25/bar)"
+2026-03-23T05:02:00Z iter=78 pair=BTC_15m status=DISCARD param=conviction_buy_skip+max_onesided_cost 0.50->0.45+5.0->3.0
+  eval: pair_cost=0.8964 profit=$-0.01 max_dd=27.8% bars=130
+  hypothesis: "Compound change skip=0.45 + max_onesided_cost=3.0 per audit directive. Prior skip=0.45 alone caused DD=37.9% (iter 51 DISCARD). Adding onesided_cap=3.0 to contain DD while preserving pair_cost gain. Result: pair_cost improved 3.97% (0.9334->0.8964) and max_dd well-controlled at 27.8%, but avg_profit=-$0.01 fails strict threshold and 3.97%<5% fails KEEP RELAXED. Near-miss — compound change shows promise."
