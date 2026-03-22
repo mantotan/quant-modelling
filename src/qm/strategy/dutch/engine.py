@@ -109,6 +109,11 @@ class DutchConfig:
     # 0 = disabled.  6 = recommended for BTC 15m (validated on 130-bar sweep).
     flip_kill_after: int = 0
 
+    # V7.6: Buy warmup — don't place buy orders before this fraction of bar.
+    # Early predictions are noisy; waiting lets the model establish direction.
+    # 0.0 = disabled (buy from tick 1).  0.20 = skip first 20% of bar.
+    min_buy_time_pct: float = 0.0
+
     # V7.4: Resting limit orders — place below bid to catch dips.
     # 0.0 = disabled (reactive only, V7.3 behavior).
     resting_discount: float = 0.0
@@ -568,6 +573,10 @@ class DutchAccumulationEngine:
                 cost=round(self._inventory.total_cost + self._committed_spend, 2),
                 cap=self._config.max_onesided_cost,
             )
+            return self._sell_pass(time_pct, cal_prob, book_up, book_dn, [])
+
+        # -- V7.6: Buy warmup gate — skip early noisy predictions --
+        if self._config.min_buy_time_pct > 0 and time_pct < self._config.min_buy_time_pct:
             return self._sell_pass(time_pct, cal_prob, book_up, book_dn, [])
 
         # -- V7.5: Flip kill gate — too many model flips = whipsaw, sell only --

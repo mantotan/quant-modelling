@@ -354,9 +354,16 @@ async def polymarket_feed(
             market = await scanner.get_active_market(asset_enum)
 
             if market:
-                pm_markets[tf] = market
-                if market.condition_id != subscribed_cid:
-                    await _subscribe(market)
+                # Don't switch away from current bar until it actually ends
+                current = pm_markets.get(tf)
+                if (current and current.window_end
+                        and current.condition_id != market.condition_id
+                        and datetime.now(UTC) < current.window_end):
+                    pass  # Keep current bar's market + WSS
+                else:
+                    pm_markets[tf] = market
+                    if market.condition_id != subscribed_cid:
+                        await _subscribe(market)
             else:
                 pm_markets.pop(tf, None)
 
@@ -919,6 +926,7 @@ async def main_loop(args: argparse.Namespace) -> None:
     cal_prob = 0.5
     raw_prob = 0.5
     pred_us = 0.0
+    model_ready = False  # gate Dutch orders until model runs in current bar
 
     logger.info("Starting main loop (%s)... waiting for ticks",
                 "event-driven" if dutch_mode else f"{POLL_INTERVAL*1000:.0f}ms polling")
@@ -974,7 +982,85 @@ async def main_loop(args: argparse.Namespace) -> None:
         # -- Get partial bar --------------------------------------
         partial = bar_builder.get_partial_bar(asset_enum, tf)
         if partial is None:
-            continue
+            # V7.5: In Dutch mode, derive bar timing from Polymarket market
+            # so the engine can process book ticks before BarBuilder has data.
+            # This eliminates 30-120s latency at bar start.
+            if dutch_mode and dutch_engine:
+                pm_mkt = pm_markets.get(tf)
+                if pm_mkt and pm_mkt.window_end:
+                    bar_secs = BAR_SECONDS[tf]
+                    bar_id_from_market = int(pm_mkt.window_end.timestamp()) - int(bar_secs)
+                    now_ts = time.time()
+                    # Sanity: verify market points to a bar we're actually inside
+                    if now_ts < bar_id_from_market or now_ts >= bar_id_from_market + bar_secs + 5:
+                        continue  # Market points to wrong bar, skip
+                    elapsed_pct = max(0.0, min(1.0, (now_ts - bar_id_from_market) / bar_secs))
+                    # Handle bar boundary (new bar detected)
+                    if bar_id_from_market != current_bar_id and current_bar_id != 0:
+                        model_ready = False  # require fresh prediction for new bar
+                        cancelled = dutch_sim.cancel_all()
+                        for order in cancelled:
+                            dutch_engine.on_order_cancelled(order)
+                        summary = dutch_engine.resolve("")
+                        summary.fill_stats = {
+                            "orders_placed": dutch_sim.stats.placed,
+                            "orders_filled": dutch_sim.stats.filled,
+                            "partial_fills": dutch_sim.stats.partial,
+                            "would_fill_count": dutch_sim.stats.would_fill,
+                            "avg_fill_ticks": round(dutch_sim.stats.avg_fill_ticks, 1),
+                            "chased": dutch_sim.stats.chased,
+                            "cancelled": dutch_sim.stats.cancelled,
+                            "expired": dutch_sim.stats.expired,
+                        }
+                        if dutch_bar_condition_id:
+                            dutch_pending_resolutions.append({
+                                "condition_id": dutch_bar_condition_id,
+                                "summary": summary,
+                                "bar_id": current_bar_id,
+                            })
+                        dutch_engine.reset()
+                        dutch_sim.reset()
+                        cid = pm_mkt.condition_id if pm_mkt else ""
+                        dutch_bar_condition_id = cid
+                        dutch_engine.set_bar_info(
+                            bar_id=bar_id_from_market,
+                            condition_id=cid,
+                            window_start=str(bar_id_from_market),
+                            window_end=str(bar_id_from_market + int(bar_secs)),
+                        )
+                        current_bar_id = bar_id_from_market
+                    elif current_bar_id == 0:
+                        current_bar_id = bar_id_from_market
+                        cid = pm_mkt.condition_id if pm_mkt else ""
+                        dutch_bar_condition_id = cid
+                        dutch_engine.set_bar_info(
+                            bar_id=bar_id_from_market,
+                            condition_id=cid,
+                            window_start=str(bar_id_from_market),
+                            window_end=str(bar_id_from_market + int(bar_secs)),
+                        )
+                    # Feed engine with book data (no model update, use last cal_prob)
+                    ws_feed_early = ws_feeds.get(tf)
+                    if (ws_feed_early and ws_feed_early._connected.is_set()
+                            and ws_feed_early.best_bid_up > 0
+                            and ws_feed_early.best_ask_up < 1):
+                        book_up = ws_feed_early.get_book("up")
+                        book_dn = ws_feed_early.get_book("down")
+                        if model_ready:
+                            orders = dutch_engine.on_tick(elapsed_pct, cal_prob, book_up, book_dn)
+                        else:
+                            orders = []
+                        if dutch_engine.flip_killed and not orders:
+                            for c_order in dutch_sim.cancel_all():
+                                dutch_engine.on_order_cancelled(c_order)
+                        for order in orders:
+                            dutch_sim.place(order)
+                        fills = dutch_sim.on_tick(elapsed_pct, book_up, book_dn)
+                        for fill in fills:
+                            dutch_engine.on_fill(fill.order, fill.fill_price, fill.filled_shares)
+                continue
+            else:
+                continue
 
         last_price = partial.current_price
         bar_id = int(partial.window_start.timestamp())
@@ -982,6 +1068,7 @@ async def main_loop(args: argparse.Namespace) -> None:
 
         # Reset thresholds on new bar
         if bar_id != current_bar_id:
+            model_ready = False  # require fresh prediction for new bar
             # Dutch: finalize previous bar
             if dutch_mode and dutch_engine and current_bar_id != 0:
                 # Cancel unfilled orders and release pending sell reservations
@@ -1053,6 +1140,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                 )[0])
             pred_us = (time.perf_counter_ns() - t0) / 1000
             last_model_time = now
+            model_ready = True
 
         # -- Check market data ------------------------------------
         pm_market = pm_markets.get(tf)
@@ -1105,8 +1193,11 @@ async def main_loop(args: argparse.Namespace) -> None:
             book_up = ws_feed.get_book("up") if ws_feed and has_book else None
             book_dn = ws_feed.get_book("down") if ws_feed and has_book else None
 
-            # Engine decides orders
-            orders = dutch_engine.on_tick(elapsed_pct, cal_prob, book_up, book_dn)
+            # Engine decides orders (only when model has run this bar)
+            if model_ready:
+                orders = dutch_engine.on_tick(elapsed_pct, cal_prob, book_up, book_dn)
+            else:
+                orders = []
             # V7.5: Cancel pending orders on flip kill (matches sweep behavior).
             # cancel_all() is a no-op after first call per bar (returns []).
             if dutch_engine.flip_killed and not orders:

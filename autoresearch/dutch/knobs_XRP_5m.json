@@ -33,7 +33,7 @@
   "sell_loss_start": 0.7,
   "sell_dump_start": 0.9,
   "fill_simulator": {
-    "fill_ticks": 10,
+    "fill_ticks": 1,
     "chase_threshold": 0.03,
     "max_chase": 2,
     "spread_offset": 0.01,
@@ -46,5 +46,6 @@
     "min_order_usd"
   ],
   "_deprecated": [],
-  "bar_seconds": 300.0
+  "bar_seconds": 300.0,
+  "min_buy_time_pct": 0.15
 }
