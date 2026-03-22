@@ -1,133 +1,163 @@
 # Dutch Audit Report
-After iteration 46 (2026-03-22T22:50:00Z)
+After iteration 71 (2026-03-23T17:00:00Z)
 
 ## Directives
-- PRIORITIZE ETH_1h — 2 KEEPs in first rotation, best improvement rate: pair_cost 0.9528->0.7058 (25.9% drop), next experiment pending
-- PRIORITIZE XRP_15m — 1 KEEP already: pair_cost 0.9558->0.7780 (18.6% drop), conv_skip=0.45 confirmed, needs scale testing
-- PRIORITIZE SOL_1h — best pair_cost in system (0.6967), 1 KEEP, throughput still only 2%; matched_ratio boost is the #1 lever
-- PRIORITIZE XRP_1h — best baseline pair_cost (0.7157), 0 experiments yet, untouched in this rotation; high-value pair needs attention
-- FREEZE ETH_5m — correct_side=40%, conv_skip=0.60 DISCARD confirms anti-predictive at all confidence levels; no viable path
-- FREEZE SOL_5m — correct_side=40% post-skip (iter41 DISCARD: skip=0.55 worsened all metrics including tripling DD); structurally challenged
-- CONTINUE BTC_5m — profitable baseline, conv_skip=0.45 DISCARD informative (profit flips negative); try bar_budget or max_onesided_cost next
-- CONTINUE BTC_15m — best correct_side (63%), no param changes tried yet; needs conv_skip=0.45 test
-- CONTINUE BTC_1h — bar_budget=400 DISCARD; try conv_skip=0.45 next
-- CONTINUE ETH_15m — conv_skip=0.55 DISCARD; correct_side improving with more data needed
-- CONTINUE SOL_15m — near-breakeven; min_unmatched_shares DISCARD; try conv_skip=0.40 next
-- CONTINUE XRP_5m — pair_cost improved from 0.9973 to 0.9085 via dataset growth alone (KEEP); still above target, try fill_ticks=15
+- FREEZE ETH_5m — correct_side=37.3% below 38% warning floor; skip=0.45 KEEP but approaching anti-predictive floor; no remaining levers beyond onesided_cost cap
+- FREEZE XRP_5m — fill_rate structurally capped at 54% (fill_ticks=15 showed zero improvement), max_dd=69% with no profitable pathway; XRP_5m is a structural dead-end
+- CONTINUE BTC_5m — both skip directions exhausted, cheap_threshold failed; only lever remaining is risk_ceil/pace_urgency_lo; still profitable baseline
+- CONTINUE BTC_15m — both skip=0.45 (DD>30%) and bar_budget=300 failed; try compound change: skip=0.45 + max_onesided_cost=3.0
+- CONTINUE BTC_1h — skip=0.40 KEEP (0.7988, best BTC cost); test skip=0.35 or risk_ceil/bar_budget scale
+- CONTINUE ETH_15m — max_onesided_cost=2.0 KEEP (0.7032, max_dd halved to 32.5%); next: max_onesided_cost 2.0->1.5 or risk_ceil
+- CONTINUE ETH_1h — skip=0.40 DISCARD confirms 0.45 is optimum; test risk_ceil or bar_budget scale
+- CONTINUE SOL_5m — skip=0.45 KEEP (0.8140, near-breakeven); next: max_onesided_cost 5.0->2.0 to reduce max_dd=31.1%
+- CONTINUE SOL_15m — skip=0.45 confirmed; skip=0.40 not yet tested (XRP_15m skip=0.40 collapsed, so skip this); test bar_budget 200->300
+- CONTINUE SOL_1h — skip=0.45 confirmed at 0.6605; test skip=0.40 cautiously (skip=0.35 collapsed); still best pair
+- CONTINUE XRP_15m — skip=0.40 collapsed pair formation; skip 0.45 is confirmed optimum; test bar_budget 200->300 next
+- CONTINUE XRP_1h — both skip directions exhausted (0.45 worsened, 0.55 worsened); skip=0.50 is optimum; test risk_ceil or bar_budget scale
 
 ## Per-Pair Assessment
-| Pair | BestCost | AvgProfit | MaxDD% | KEEPs | Experiments | Trajectory | Action |
-|------|----------|-----------|--------|-------|-------------|------------|--------|
-| BTC_5m | 0.9480 | +$0.055 | 24% | 0 | 1 (DISCARD) | Conv_skip=0.45 flipped profit; needs different approach | CONTINUE |
-| BTC_15m | 0.9334 | +$0.498 | 23% | 0 | 1 (re-run, not real) | Untested; strong baseline | CONTINUE |
-| BTC_1h | 0.9378 | +$0.827 | 6% | 0 | 1 (DISCARD) | Bar_budget=400 worse; needs conv_skip | CONTINUE |
-| ETH_5m | 0.9087 | -$0.517 | 84% | 0 | 1 (DISCARD) | Anti-predictive confirmed at all skip levels | FREEZE |
-| ETH_15m | 0.9220 | -$0.803 | 48% | 0 | 1 (DISCARD) | Conv_skip=0.55 improved cost but hurt profit | CONTINUE |
-| ETH_1h | 0.7058 | -$0.487 | 17% | 2 | 2 KEEPs | Best trajectory: 25.9% cost reduction in 2 iters | PRIORITIZE |
-| SOL_5m | 0.9455 | -$0.205 | 108% | 0 | 1 (DISCARD) | DD tripled with skip=0.55; structurally broken | FREEZE |
-| SOL_15m | 0.9133 | -$0.245 | 15% | 0 | 1 (DISCARD) | Min_unmatched DISCARD; fresh baseline 0.9133 | CONTINUE |
-| SOL_1h | 0.6967 | +$0.817 | 9% | 1 | 1 (dataset re-eval) | Best profit/bar; throughput bottleneck | PRIORITIZE |
-| XRP_5m | 0.9085 | -$0.323 | 69% | 1 | 1 (dataset re-eval) | Cost improved 8.9% via data; fill_rate weak | CONTINUE |
-| XRP_15m | 0.7780 | +$0.010 | 17% | 1 | 2 (1 re-run + KEEP) | 18.6% cost drop with conv_skip=0.45 | PRIORITIZE |
-| XRP_1h | 0.7157 | +$0.512 | 6% | 0 | 0 | Best baseline, untouched this rotation | PRIORITIZE |
+| Pair | BestCost | AvgProfit | MaxDD% | KEEPs | DISCARDs | Trajectory | Action |
+|------|----------|-----------|--------|-------|----------|------------|--------|
+| BTC_5m | 0.948 | +$0.055 | 24% | 0 | 4 | Stalled — all skip and cheap_threshold failed | CONTINUE |
+| BTC_15m | 0.933 | +$0.498 | 23% | 0 | 3 | Stalled — skip DD>30%, bar_budget regressed | CONTINUE |
+| BTC_1h | 0.799 | -$0.326 | 8.7% | 2 | 3 | Improving — skip series progressing (0.50->0.45->0.40) | CONTINUE |
+| ETH_5m | 0.782 | -$0.210 | 47% | 2 | 2 | Fragile — correct_side at 37.3%, approaching floor | FREEZE |
+| ETH_15m | 0.703 | -$0.322 | 32.5% | 3 | 3 | Improving — onesided cap effective; needs DD further reduction | CONTINUE |
+| ETH_1h | 0.706 | -$0.487 | 17% | 2 | 2 | Stable — skip=0.45 optimum confirmed; needs profit lever | CONTINUE |
+| SOL_5m | 0.814 | +$0.001 | 31.1% | 2 | 1 | Improving — skip=0.45 works; DD near 30% threshold | CONTINUE |
+| SOL_15m | 0.796 | -$0.078 | 14.3% | 1 | 2 | Stable — skip=0.45 confirmed; skip=0.40 untested | CONTINUE |
+| SOL_1h | 0.661 | +$0.542 | 9.1% | 3 | 2 | Best pair — stable and profitable, room to scale | CONTINUE |
+| XRP_5m | 0.909 | -$0.323 | 69% | 1 | 1 | Dead-end — fill_rate structural floor, high DD | FREEZE |
+| XRP_15m | 0.778 | +$0.010 | 17.2% | 1 | 3 | Stable — skip=0.40 collapsed; 0.45 is floor | CONTINUE |
+| XRP_1h | 0.674 | +$1.081 | 6% | 1 | 2 | Optimal — both skip directions exhausted; scale now | CONTINUE |
 
 ## trader_a Gap Analysis
-| Pair | BestCost | Target | Gap | Profit | DD Gap | KEEPs | ETA (rotations) |
-|------|----------|--------|-----|--------|--------|-------|-----------------|
-| SOL_1h | 0.6967 | <0.85 | -0.153 (BEATS) | +$0.82 | 9% (OK) | 1 | DONE on cost; scale now |
-| XRP_1h | 0.7157 | <0.85 | -0.134 (BEATS) | +$0.51 | 6% (OK) | 0 | DONE on cost; scale now |
-| XRP_15m | 0.7780 | <0.85 | -0.072 (BEATS) | +$0.01 | 17% (OK) | 1 | DONE on cost; scale now |
-| ETH_1h | 0.7058 | <0.85 | -0.144 (BEATS) | -$0.49 | 17% (OK) | 2 | Cost done; fix profit |
-| BTC_15m | 0.9334 | <0.85 | +0.083 | +$0.50 | 23% (OK) | 0 | ~2-3 rotations |
-| BTC_5m | 0.9480 | <0.85 | +0.098 | +$0.06 | 24% (OK) | 0 | ~3-4 rotations |
-| BTC_1h | 0.9378 | <0.85 | +0.088 | +$0.83 | 6% (OK) | 0 | ~2-3 rotations |
-| SOL_15m | 0.9133 | <0.85 | +0.063 | -$0.25 | 15% (OK) | 0 | ~3 rotations if signal exists |
-| ETH_15m | 0.9220 | <0.85 | +0.072 | -$0.80 | 48% (bad) | 0 | Unclear — DD too high |
-| XRP_5m | 0.9085 | <0.85 | +0.058 | -$0.32 | 69% (bad) | 1 | ~2-3 rotations on cost; DD unsustainable |
-| ETH_5m | 0.9087 | <0.85 | +0.059 | -$0.52 | 84% (bad) | 0 | FROZEN — anti-predictive |
-| SOL_5m | 0.9455 | <0.85 | +0.096 | -$0.21 | 108% (bad) | 0 | FROZEN — DD catastrophic |
+| Pair | BestCost | Target | Gap | Profit | DD | ETA (rotations) |
+|------|----------|--------|-----|--------|----|-----------------|
+| SOL_1h | 0.661 | <0.85 | -0.189 (BEATS +22%) | +$0.54 | 9% (OK) | DONE — scale capital |
+| XRP_1h | 0.674 | <0.85 | -0.176 (BEATS +20%) | +$1.08 | 6% (OK) | DONE — scale capital |
+| ETH_1h | 0.706 | <0.85 | -0.144 (BEATS +17%) | -$0.49 | 17% (OK) | Cost DONE — fix profit |
+| ETH_15m | 0.703 | <0.85 | -0.147 (BEATS +17%) | -$0.32 | 32.5% (marginal) | Cost DONE — fix DD |
+| XRP_15m | 0.778 | <0.85 | -0.072 (BEATS +8%) | +$0.01 | 17% (OK) | Cost DONE — scale modestly |
+| SOL_15m | 0.796 | <0.85 | -0.054 (BEATS +6%) | -$0.08 | 14% (OK) | Cost DONE — scale modestly |
+| BTC_1h | 0.799 | <0.85 | -0.051 (BEATS +6%) | -$0.33 | 8.7% (OK) | Cost DONE — fix profit |
+| SOL_5m | 0.814 | <0.85 | -0.036 (BEATS +4%) | +$0.001 | 31% (marginal) | Cost DONE — reduce DD |
+| ETH_5m | 0.782 | <0.85 | -0.068 (BEATS +8%) | -$0.21 | 47% (bad) | FREEZE — DD/anti-pred risk |
+| BTC_15m | 0.933 | <0.85 | +0.083 | +$0.50 | 23% (OK) | ~2-3 rotations |
+| BTC_5m | 0.948 | <0.85 | +0.098 | +$0.055 | 24% (OK) | ~3-4 rotations |
+| XRP_5m | 0.909 | <0.85 | +0.059 | -$0.32 | 69% (bad) | FREEZE — structural floor |
 
-## Key Findings from This Rotation
+## Key Findings from Rotation 4 (iters 59-71)
 
-### 1. Four pairs already beating trader_a cost benchmark
-SOL_1h (0.697), ETH_1h (0.706), XRP_1h (0.716), XRP_15m (0.778) all below 0.85 target.
-Of these, SOL_1h and XRP_1h are profitable. ETH_1h shows negative avg_profit despite great cost
-(likely throughput effect: only 7% matched_ratio means the few pairs that form are chosen well
-but profit/bar is dragged by many unmatched bars). XRP_15m is barely positive (+$0.01/bar).
+### 1. Skip series now complete across all testable pairs
+The conviction_buy_skip=0.45 pattern (confirmed in rotation 3 on 15m/1h) has now been validated on
+all 5m pairs where the signal supports it:
+- SOL_5m skip=0.45: KEEP (0.8140, near-zero profit, max_dd=31.1%) — iter 71
+- ETH_5m skip=0.45: KEEP (0.7819, max_dd=47.3%, correct_side=37.3%) — iter 66
+- XRP_5m: NOT tested — structurally frozen (fill_rate floor, high DD)
+- BTC_5m: Both skip directions DISCARD — skip is not the lever
 
-### 2. conv_skip=0.45 is powerful but inconsistent
-- ETH_1h: KEEP (cost -7.7%, profit maintained at -$0.49 with relaxed threshold)
-- XRP_15m: KEEP (cost -18.6%, profit turned positive)
-- BTC_5m: DISCARD (profit flipped negative: +$0.055 -> -$0.040)
-- ETH_5m: DISCARD (all metrics worsened)
-- SOL_5m: DISCARD (DD tripled)
+**9 of 11 tested pairs now at or below 0.85 benchmark** (excluding frozen XRP_5m and stuck BTC_5m/BTC_15m).
 
-Pattern: conv_skip=0.45 works when the pair has correct_side >= 43%. BTC_5m at 56% correct should
-benefit but the DISCARD shows the signal is weak at 45-50% confidence range. Hypothesis: BTC_5m
-correct_side is concentrated at >60% confidence bets; lowering threshold introduces noise.
+### 2. Skip=0.40 results: mixed collapse pattern
+- BTC_1h skip=0.40: KEEP (0.7988, 8.3% improvement) — iter 64
+- XRP_15m skip=0.40: DISCARD (pair formation collapsed to 0%) — iter 60
+- ETH_1h skip=0.40: DISCARD (pair_cost worsened 0.7058->0.7212) — iter 69
+- SOL_1h skip=0.35: DISCARD (pair formation collapsed to 0%) — prior rotation
+- SOL_15m skip=0.40: NOT YET TESTED
 
-### 3. Dataset growth yielding natural improvements
-Iters 39 (ETH_1h), 43 (SOL_1h), 44 (XRP_5m) were dataset re-evals showing 8-20% cost improvements.
-This suggests backtest variance at lower bar counts was masking true performance. As bar count grows,
-costs naturally improve. This is a tailwind — pairs will continue to improve with more data.
+Pattern: skip=0.40 works only on BTC_1h (moderate-volume, 1h TF); collapses pair formation on
+lower-throughput pairs (XRP_15m matched_ratio was only 2% at 0.45). The 0.40 floor appears to be
+pair-specific. SOL_15m is worth testing once (matched_ratio 4.8% at 0.45 — borderline).
 
-### 4. Anti-predictive pairs confirmed
-ETH_5m (correct_side 40% at skip=0.50, 34% at skip=0.60 — worse with more selectivity) and
-SOL_5m (DD tripled with skip=0.55) are structurally broken. The model signal direction is wrong.
-No parameter tuning can fix a model that is net negative directionally. These should be FROZEN.
+### 3. max_onesided_cost=2.0 confirmed effective on 15m TFs
+ETH_15m: 5.0->2.0 halved max_dd (54.5%->32.5%) and improved pair_cost 6.3% — iter 68 KEEP.
+This should be tested on SOL_5m (max_dd=31.1%), which is now near the 30% threshold.
+Not applicable to 1h TFs (cap never triggered at $5).
 
-### 5. BTC pairs untested for conv_skip
-BTC_15m has 0 real param experiments post-V7.3 (iter35 was a re-run, not a change). BTC_1h only
-tested bar_budget. Neither has tested conv_skip=0.45 yet. Given BTC_15m's 63% correct_side,
-this is the highest-priority untested hypothesis in the system.
+### 4. BTC pairs remain the hardest to optimize
+- BTC_5m: 0/4 KEEPs in V7.3 — skip, cheap_threshold, bar_budget all failed. Only untested levers:
+  risk_ceil increase and pace_urgency_lo adjustment. Profitable baseline (+$0.055) but stuck at 0.948.
+- BTC_15m: 0/3 KEEPs in V7.3 — skip caused DD>30%, bar_budget regressed cost, cheap_threshold marginal.
+  Compound change (skip=0.45 + onesided_cap=3.0) is the last credible hypothesis.
+- BTC_1h: 2/2 KEEPs in V7.3 — the only BTC success story. Skip series progressing well at 0.40.
 
-### 6. ETH_1h profit is negative despite great cost
-ETH_1h best_cost=0.706 with avg_profit=-$0.487/bar. The cost is excellent (beats benchmark by 14%)
-but the absolute profit is negative. Two causes: (a) matched_ratio=7% means most bars earn nothing,
-(b) correct_side dropped 46.7%->43.3% with skip=0.45. Try max_onesided_cost=7.0 to capture more
-upside on the correct-direction bets, or bar_budget=300 to scale the 43% correct bets.
+### 5. ETH_5m approaching anti-predictive zone
+ETH_5m: correct_side dropped 44.6% (baseline) -> 40.9% (re-eval) -> 37.3% (skip=0.45). Each KEEP
+has pushed correct_side lower. The 38% warning floor has been breached (37.3%). Further skip
+reduction would almost certainly enter fully anti-predictive territory. With max_dd=47% and
+negative avg_profit, the only remaining lever (max_onesided_cost=2.0) could reduce DD but cannot
+fix a near-random signal. ETH_5m should be FROZEN after this audit.
+
+### 6. XRP_5m is structurally constrained
+fill_ticks=15 showed exactly 0% improvement in fill_rate (still 54%). This is a microstructure
+floor for XRP_5m — the market does not offer sufficient tick depth. With max_dd=69% and no
+profitable pathway, further experiments waste iterations. FREEZE.
+
+### 7. Profitable pairs ready for capital scaling
+Three pairs are both profitable AND below 0.85 benchmark:
+- SOL_1h: pair_cost=0.661, +$0.54/bar, max_dd=9% — prime candidate for bar_budget 200->400
+- XRP_1h: pair_cost=0.674, +$1.08/bar, max_dd=6% — prime candidate for bar_budget 200->300+
+- XRP_15m: pair_cost=0.778, +$0.01/bar, max_dd=17% — modest scale (bar_budget 200->300 cautiously)
+- SOL_5m: pair_cost=0.814, +$0.001/bar, max_dd=31% — near-breakeven but DD needs reduction first
 
 ## Risk Flags
-- **ETH_5m**: Anti-predictive model confirmed (40% correct, worsening with skip). FREEZE — no recovery path.
-- **SOL_5m**: DD=108% after single experiment. FREEZE — catastrophic drawdown risk.
-- **ETH_15m**: DD=48% with avg_profit=-$0.80 and correct_side dropping with skip. Monitor closely; may need FREEZE next audit.
-- **XRP_5m**: fill_rate=53% (worst in system). High pair_cost volatility. Natural dataset growth helped but DD=69% remains unacceptable.
-- **ETH_1h**: Profit negative despite best-in-class cost. Risk of over-optimizing cost while ignoring P&L sustainability.
-- **BTC_5m**: conv_skip=0.45 flipped profit sign. The helpful signal may be concentrated only at high conviction (>0.55). Do not lower skip further.
+- **ETH_5m**: correct_side=37.3% below 38% floor. Skip has progressively degraded signal quality.
+  Further experiments risk full anti-predictive regime. FREEZE directive issued.
+- **XRP_5m**: fill_rate=54% is structural (confirmed by fill_ticks=15 showing zero improvement).
+  max_dd=69% with -$0.32/bar profit makes this pair unviable for further experimentation. FREEZE.
+- **ETH_15m**: max_dd=32.5% still above 30% acceptance threshold despite halving via onesided_cap.
+  Further DD reduction needed before this pair meets criteria. Next lever: max_onesided_cost 2.0->1.5.
+- **SOL_5m**: max_dd=31.1% is just over the 30% threshold. The skip=0.45 KEEP brought it to profitability
+  but DD is marginal. Priority: test max_onesided_cost=2.0 before any other experiment.
+- **BTC_1h**: avg_profit turned negative at skip=0.40 (-$0.33/bar). Cost improved well (0.7988) but
+  the profit/cost tradeoff may be degrading. Monitor whether further skip reduction helps or hurts.
+- **XRP_15m**: correct_side=33.3% is already very low. Do not test any further skip reduction.
+  The skip=0.45 at 0.7780 is the floor for this pair. Budget scaling is the next lever.
 
-## Recommendations for Next 24 Iterations
+## Researcher Compliance Assessment
+researcher_ack (iter 70-71) correctly identified SOL_5m as the next target and executed the
+recommended skip=0.45 test per strategy.md priority order. The KEEP on both re-eval (iter 70) and
+skip change (iter 71) followed proper KEEP RELAXED criteria. Compliance is satisfactory.
 
-### Tier 1 — Scale confirmed winners (4 pairs)
-1. **SOL_1h** (best_cost=0.697, +$0.82/bar): conviction_buy_skip 0.50->0.40 or bar_budget 200->400.
-   These have lowest DD (9%) and proven profitability. Scale is safe here.
-2. **XRP_1h** (best_cost=0.716, +$0.51/bar): conviction_buy_skip 0.50->0.40 and bar_budget 200->400.
-   Zero experiments — immediate priority. Best cost+profit combination in system.
-3. **XRP_15m** (best_cost=0.778, skip=0.45 confirmed): bar_budget 200->300, then min_unmatched_shares 10->15.
-   Profit is barely positive (+$0.01); scale carefully with bar_budget increase.
-4. **ETH_1h** (best_cost=0.706, skip=0.45 confirmed): max_onesided_cost 5->7, then bar_budget 200->300.
-   Profit is negative; need to understand if onesided cap or budget is limiting upside.
+Prior rotation compliance: researcher correctly tested XRP_5m fill_ticks (iter 59), XRP_15m skip=0.40
+(iter 60), XRP_1h skip=0.55 (iter 61), BTC_5m cheap_threshold (iter 62), BTC_15m bar_budget (iter 63)
+before the profitable segment. All per strategy.md priority order. No compliance issues.
 
-### Tier 2 — Unlock BTC pairs
-5. **BTC_15m**: conviction_buy_skip 0.50->0.45 — highest priority untested, 63% correct_side.
-6. **BTC_1h**: conviction_buy_skip 0.50->0.45 — 52% correct, low DD, safe to experiment.
-7. **BTC_5m**: bar_budget 200->300 or max_onesided_cost 5->7. Do NOT lower conv_skip further.
+## Recommendations for Next 24 Iterations (rotation 5, iters 72-95)
 
-### Tier 3 — Weak pairs (limited resources)
-8. **SOL_15m**: conviction_buy_skip 0.50->0.40 — 50% correct_side means bilateral symmetry; lower skip
-   should not hurt directionally and may improve throughput.
-9. **ETH_15m**: max_onesided_cost 5->3 — tight the tail to reduce DD before more throughput experiments.
-10. **XRP_5m**: fill_simulator.fill_ticks 10->15 — address 53% fill_rate as root cause before other changes.
+### Tier 1 — Scale confirmed winners with low DD
+1. **SOL_1h** (0.661, +$0.54/bar, 9% DD): bar_budget 200->400. Lowest DD, positive profit — safest scale.
+2. **XRP_1h** (0.674, +$1.08/bar, 6% DD): bar_budget 200->300. Best profit in system, very safe DD.
+3. **XRP_15m** (0.778, +$0.01/bar, 17% DD): bar_budget 200->300. Modest scale on benchmark-beating pair.
+
+### Tier 2 — Fix DD on marginal pairs
+4. **SOL_5m** (0.814, +$0.001, 31% DD): max_onesided_cost 5.0->2.0. DD just over 30% threshold.
+   ETH_15m analog confirms this lever is effective. PRIORITY before any other SOL_5m experiment.
+5. **ETH_15m** (0.703, -$0.32, 32.5% DD): max_onesided_cost 2.0->1.5. Need DD below 30%.
+   If this reduces max_dd below 30%, pair meets all acceptance criteria except profit.
+
+### Tier 3 — Continue profitable series
+6. **BTC_1h** (0.799, -$0.33, 8.7% DD): skip=0.40 confirmed. Test risk_ceil 0.15->0.20 to improve
+   avg_profit. Low DD (8.7%) provides headroom. Alternatively bar_budget 200->300 cautiously.
+7. **SOL_15m** (0.796, -$0.08, 14% DD): test skip=0.45->0.40 ONE TIME. Matched_ratio 4.8% at 0.45
+   is borderline — collapse possible (XRP_15m precedent). If collapses, move to bar_budget=300.
+8. **ETH_1h** (0.706, -$0.49, 17% DD): test risk_ceil 0.15->0.20 or bar_budget 200->300.
+   Skip series exhausted at 0.45. Need profit lever without disturbing cost.
+
+### Tier 4 — Unlock BTC pairs
+9. **BTC_15m**: compound change conviction_buy_skip 0.50->0.45 WITH max_onesided_cost 5.0->3.0.
+   Single-lever skip=0.45 caused DD>30%. Simultaneous DD cap may control this. High-impact test.
+10. **BTC_5m**: pace_urgency_lo 0.35->0.45. Skip exhausted, cheap_threshold failed. Entry timing
+    is the only untested lever. Alternatively risk_ceil 0.15->0.20 (24% DD provides headroom).
 
 ### Do NOT attempt
-- ETH_5m: FROZEN. Any experiment wastes an iteration.
-- SOL_5m: FROZEN. DD already at 108%.
+- ETH_5m: FROZEN. correct_side=37.3%, anti-predictive trajectory.
+- XRP_5m: FROZEN. Structural fill_rate floor confirmed.
+- XRP_15m skip further reduction: skip=0.40 collapsed pair formation — do not retry.
+- XRP_1h skip reduction or raising: both directions DISCARD — skip=0.50 is permanent optimum.
+- ETH_1h skip=0.40: DISCARD confirmed — skip=0.45 is permanent optimum.
+- bar_budget doubling (200->400) on BTC pairs: BTC_1h confirmed worse at 400 (iter 36).
+- max_onesided_cost increasing on 1h TFs: confirmed no-op (ETH_1h iter 55).
 - unmatched_ratio tightening: Global blacklist (3/3 DISCARDs).
 - sell_loss_start tightening: Global blacklist (2/2 DISCARDs).
-- max_marginal_pair_cost below 1.01: Collapses matched_ratio.
-
-### Researcher compliance note
-Researcher correctly ran XRP_15m conv_skip=0.45 per strategy.md priority queue (iter46 KEEP).
-researcher_ack (iter45) correctly identified next hypothesis. No compliance issues detected.
-Strategy.md priorities are broadly correct but need updating to reflect: (a) ETH_5m and SOL_5m
-FREEZE, (b) 4 pairs already beating trader_a cost benchmark. Strategist should update strategy.md
-at next iteration (iters_since_strategist=13, already overdue).
