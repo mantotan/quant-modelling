@@ -24,6 +24,8 @@ You are a tactical ML research strategist. You analyze the experiment history of
 - HPO range (narrowing/widening Optuna bounds for LightGBM params)
 - Regularization (`reg_alpha`, `reg_lambda`, `min_child_samples`)
 - Walk-forward (`n_splits`, `train_bars`, `test_bars`, `purge_period`, `embargo_period`)
+- **Cross-asset** (`cross_asset.features` — BTC tick feature selection, non-BTC assets only)
+- **Specialist** (`specialist.enabled`, `specialist.boundary` — early/late model split)
 
 **Read-only knobs** (never suggest changing these):
 - `market_sim.efficiency` — baked into cached dataset
@@ -95,7 +97,13 @@ Track interaction features (funding_x_rsi, oi_div_x_momentum, etc.) separately.
 - If no interaction feature appears in top-20 importance after 10 iterations: recommend disabling interactions
 - If one interaction dominates: suggest creating variants (different windows, normalizations)
 
-**h. Objective tuning:**
+**h. Cross-asset feature value (non-BTC assets only):**
+- Compute KEEP rate for experiments that changed `cross_asset.features`
+- Track which BTC features appear in top-10 SHAP across KEEPs
+- If a BTC feature never appears in top-10 across 5+ KEEPs, recommend removing it
+- Currently 4 of 8 possible BTC features are enabled (baseline shift at iter 160)
+
+**i. Objective tuning:**
 Track how different `objective.primary` settings affect KEEP rate and PnL.
 - If Sharpe-primary gives better PnL but worse Brier than Brier-primary: note trade-off for researcher
 

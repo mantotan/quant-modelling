@@ -69,6 +69,13 @@ Priority chain — first match wins:
       - HPO range (narrowing n_estimators, learning_rate, max_depth, etc.)
       - Regularization (reg_alpha, reg_lambda, min_child_samples)
       - Walk-forward (n_splits, train_bars, test_bars, purge_period, embargo_period)
+      - **Cross-asset features** (cross_asset.features — add/remove BTC tick features, non-BTC only).
+        Valid: btc_distance_from_open, btc_vol_norm_distance, btc_partial_range,
+        btc_partial_bar_position, btc_elapsed_pct, btc_time_remaining_pct,
+        btc_volume_ratio_partial, btc_trade_intensity. Currently 4 of 8 enabled.
+      - **Specialist model** (specialist.enabled, specialist.boundary — early/late model split).
+        Late specialist is much stronger; combined Brier may be worse if early drags down.
+        Experiment: boundary 0.30/0.40/0.50.
    b. Compute KEEP rate per category. Pick the category with highest KEEP rate that hasn't been tried in last 3 iterations.
    c. Within that category, try the next logical step (tighten or loosen a threshold).
    d. If all categories tried recently → combine top 2 KEEP changes.
@@ -88,6 +95,12 @@ State your hypothesis clearly.
 Edit `autoresearch/knobs.json` with exactly ONE conceptual change.
 The file is JSON — ensure it remains valid JSON after your edit.
 Do NOT edit any Python source files.
+
+Editable cross-asset/specialist knobs:
+- `cross_asset.features` — add/remove BTC feature names (list of strings)
+- `specialist.enabled` — true/false
+- `specialist.boundary` — float (0.0 to 1.0)
+Do NOT set `cross_asset.enabled: false` (baseline since iter 160) or enable cross-asset for BTC.
 
 ## Phase 4: Run
 
@@ -130,6 +143,9 @@ Regular `--mode fast` exploration runs do NOT need `--save` unless directed.
   - Backtest: trade_selection param ("all", "best_edge", "first_confident") aligns with paper trading
   - Sharpe in results.tsv iters 1-39 was inflated ~100x (per-sample annualization bug, fixed from iter 40+)
   - CPCV results: ETH PBO=0.18 PASS, BTC PBO=0.96 FAIL, SOL PBO=0.64 FAIL (all OOS paths profitable)
+  - **Cross-asset baseline shift (iter 160)**: Non-BTC models now include 4 BTC tick features.
+    Compare KEEP/DISCARD against post-cross-asset best, not pre-cross-asset.
+  - Specialist results report `early_brier` + `late_brier` + combined `oos_brier`
 
 (Adjust `--asset` if a SWITCH directive is active. Use the selected `{tf}` from the timeframe rotation above.)
 

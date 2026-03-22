@@ -36,6 +36,14 @@ All fields in `autoresearch/knobs.json`:
 - `hpo_search_space` — Optuna parameter bounds (all ranges as `[lo, hi]`)
 - `walk_forward` — cross-validation config (splits, purge, embargo, train/test bars)
 - `backtest` — simulation params (spread, min_edge, max_trades_per_bar, max_daily_trades)
+- `cross_asset.enabled` — enable BTC tick features for non-BTC assets (true/false)
+- `cross_asset.features` — which BTC tick features to include (list of names).
+  Valid: btc_distance_from_open, btc_vol_norm_distance, btc_partial_range,
+  btc_partial_bar_position, btc_elapsed_pct, btc_time_remaining_pct,
+  btc_volume_ratio_partial, btc_trade_intensity
+- `specialist.enabled` — train separate early/late models (true/false)
+- `specialist.boundary` — time_pct cutoff between early and late (default 0.40)
+- `specialist.early_time_pcts` / `specialist.late_time_pcts` — which time_pcts per specialist
 
 ### What You Must NOT Change
 - `model` field (always "pulse")
@@ -47,11 +55,15 @@ All fields in `autoresearch/knobs.json`:
 - The training script code
 - Any `src/qm/` module
 - The cached dataset (.npz) — do NOT regenerate per iteration
+- `cross_asset.enabled` should stay `true` for non-BTC assets (baseline shift at iter 160)
+- Don't set `cross_asset.enabled: true` for BTC (BTC is the context asset, not the target)
 
 ### Pulse-Specific Rules
 - **Tick features (indices 0-7) are ALWAYS included** — they are the core signal. Never suggest removing them.
 - **min_child_samples must be >= 100** — lower values cause overfitting.
 - Walk-forward splits operate at **bar level**, not sample level. The script handles this automatically.
+- **Cross-asset features are tick-class** — always included when enabled, not filtered by `cached_features`. Uses bar_index + time_pct alignment with BTC dataset.npz.
+- **Specialist mode halves n_trials** per specialist to keep wall-clock parity. When specialist.enabled=true, saves model_early.lgb, model_late.lgb, calibrator_early.pkl, calibrator_late.pkl, specialist_config.json — all must be part of KEEP checkpoint.
 - **Architecture: single-snapshot at t=0.80.** Dataset time_pcts [0.003..0.80] don't include 0.30/0.50 from knobs.json — only 0.80 matches. This is accepted architecture per auditor ruling (2026-03-20). Do not regenerate datasets. Multi-snapshot exploration deferred to future research phase.
 
 ## System Phases

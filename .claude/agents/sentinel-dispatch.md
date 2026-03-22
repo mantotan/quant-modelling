@@ -85,6 +85,8 @@ Follow the spec's instructions exactly, with these adjustments:
 
 Execute the role completely — run the experiment, evaluate, commit, log results. Do not stop halfway.
 
+Note: `cross_asset` and `specialist` knobs are handled by the researcher/strategist/auditor specs. Dispatch does not need to track cross-asset state separately.
+
 ## Phase 5: Update Dispatch State
 
 After role execution completes:

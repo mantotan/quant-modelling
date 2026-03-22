@@ -54,6 +54,13 @@ Are KEEP rates declining over time? Are the kept changes getting smaller? If so,
 **f. Cross-asset and cross-timeframe readiness:**
 Has the researcher been stuck on one asset or one timeframe for too long? Would switching provide useful cross-validation signal? Track coverage across all 3 timeframes (5m, 15m, 1h) — if one timeframe has <20% of total iterations, recommend SWITCH to it.
 
+**Cross-asset BTC features deployed at iter 160** (9 non-BTC pairs retrained).
+Baseline shift: all non-BTC Brier values improved -6% to -9%.
+Post-cross-asset baselines: ETH/5m 0.199, ETH/15m 0.193, ETH/1h 0.192,
+SOL/5m 0.206, SOL/15m 0.200, SOL/1h 0.202,
+XRP/5m 0.209, XRP/15m 0.205, XRP/1h 0.208.
+Compare all future KEEP/DISCARD against these post-cross-asset baselines.
+
 **g. Alpha feature ROI:**
 Compare Brier/PnL before vs after alpha features were added (using timestamps in results.tsv).
 - If alpha features show zero lift after 20+ iterations: consider RETRAIN_BASELINE
@@ -61,6 +68,8 @@ Compare Brier/PnL before vs after alpha features were added (using timestamps in
 - Track `alpha_feature_share` from SHAP reports if available in training output
 
 **h. Feature space saturation:**
+Non-BTC models now have 34 features (30 base + 4 BTC cross-asset tick features).
+BTC models remain at 30 features. Cross-asset features are tick-class (always included when enabled).
 If total features > 50 and KEEP rate is declining:
 - Recommend feature pruning before adding more (researcher should disable low-importance groups)
 - Only issue ADD_ALPHA if current features are well-optimized (KEEP rate stable, no dead-weight features)
