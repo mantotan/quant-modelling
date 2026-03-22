@@ -127,3 +127,6 @@
 2026-03-23T03:04:22Z iter=118 pair=BTC_1h status=DISCARD param=conviction_buy_skip 0.55->0.40 (fix stale best_knobs)
   eval: pair_cost=0.9042 profit=$-0.5665 max_dd=12.39% bars=37
   hypothesis: "Re-eval with corrected conviction_buy_skip=0.40 from stale 0.55 value; best_knobs was stale since iter 64; pair_cost 0.9042 still fails to beat best KEEP 0.7988 due to 4 new unfavorable bars; dataset regression confirmed; pace_urgency_lo 0.35->0.45 set as next experiment"
+2026-03-23T03:08:45Z iter=119 pair=ETH_5m status=DISCARD param=max_onesided_cost 1.5->1.0
+  eval: pair_cost=0.0000 profit=$-4.76 max_dd=15.4% bars=422
+  hypothesis: "Continue onesided series (5->2->1.5 all KEEP). Test 1.5->1.0 as next step. Risk was matched_ratio collapse (currently 0.7% vs ETH_15m 1.0% at collapse). Result: full collapse at 0.0% matched_ratio, confirming floor at 1.5. Onesided series exhausted on ETH_5m."
