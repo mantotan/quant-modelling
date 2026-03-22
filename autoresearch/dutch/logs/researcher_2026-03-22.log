@@ -20,3 +20,6 @@
 2026-03-22T07:39:19Z iter=10 pair=SOL_5m status=BASELINE param=- -
   eval: pair_cost=0.9404 profit=$-5.12 max_dd=718.3% bars=274
   hypothesis: "No prior SOL_5m data. Running baseline to establish reference metrics. Strategy directive: collect all 6 SOL/XRP baselines before any experiments. SOL_5m matched_ratio=0.432 is low (similar to ETH_5m=0.455), max_dd=718.3% is very high (5m compounding effect). Pair cost 0.9404 is within expected range."
+2026-03-22T08:00:00Z iter=11 pair=SOL_15m status=BASELINE param=- -
+  eval: pair_cost=0.9513 profit=$-3.63 max_dd=167.1% bars=92
+  hypothesis: "No prior data for SOL_15m. Running baseline to establish reference metrics. matched_ratio=53.2% is in expected mid-range. correct_side_pct=22.2% is the highest seen so far (vs 10-15% for BTC/ETH), indicating SOL Pulse model has slightly better directional accuracy. Pre-staged unmatched_ratio=0.35 for next SOL_15m experiment (cross-pair hypothesis aligned with ETH pre-staging)."
