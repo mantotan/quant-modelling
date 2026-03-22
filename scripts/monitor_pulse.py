@@ -30,8 +30,10 @@ import signal
 import sys
 import time
 from collections import deque
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import aiohttp
 import lightgbm as lgb
@@ -96,6 +98,44 @@ else:
 # Mid velocity tracking window
 MID_HISTORY_SECS = 30.0
 
+# State save interval
+STATE_SAVE_INTERVAL = 300.0  # 5 minutes
+
+# Display interval
+DISPLAY_INTERVAL = 2.0
+
+
+@dataclass
+class TFState:
+    """Per-timeframe state for multi-TF Dutch paper trading."""
+
+    tf: Timeframe
+    tf_label: str
+    model: Any
+    calibrator: Any
+    feat_cache: LiveFeatureCache
+    dutch_engine: DutchAccumulationEngine | None = None
+    dutch_sim: LimitOrderSimulator | None = None
+    dutch_logger: DutchSummaryLogger | None = None
+    dutch_session: dict = field(default_factory=lambda: {
+        "wins": 0, "losses": 0, "total_pnl": 0.0,
+        "avg_pair_cost": 0.0, "bars": 0,
+    })
+    dutch_pending_resolutions: list = field(default_factory=list)
+    dutch_bar_condition_id: str = ""
+    scanner: MarketScanner | None = None
+    ws_feeds: dict = field(default_factory=dict)
+    pm_markets: dict = field(default_factory=dict)
+    mid_tracker: Any = None  # MidTracker, initialized post-creation
+    current_bar_id: int = 0
+    last_triggered: set = field(default_factory=set)
+    cal_prob: float = 0.5
+    raw_prob: float = 0.5
+    pred_us: float = 0.0
+    last_model_time: float = 0.0
+    dutch_state_file: Path | None = None
+    recent_bars: list = field(default_factory=list)
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Dutch Accumulation Paper Trader")
@@ -108,8 +148,12 @@ def parse_args() -> argparse.Namespace:
         help="Skip Polymarket odds polling",
     )
     p.add_argument(
-        "--timeframe", default="15m", choices=["5m", "15m", "1h"],
-        help="Timeframe to monitor (default: 15m)",
+        "--timeframes", default="5m,15m,1h",
+        help="Comma-separated timeframes (default: 5m,15m,1h)",
+    )
+    p.add_argument(
+        "--timeframe", default=None, choices=["5m", "15m", "1h"],
+        help="Single timeframe (deprecated — use --timeframes)",
     )
     p.add_argument(
         "--model-dir", default="data/models/pulse_v2",
@@ -354,13 +398,24 @@ async def polymarket_feed(
             market = await scanner.get_active_market(asset_enum)
 
             if market:
-                # Don't switch away from current bar until it actually ends
+                # Don't switch to a FUTURE bar while we're inside a current bar.
+                # But DO allow switching if the new market is for the bar we're
+                # actually in (fixes initial wrong-bar subscription after restart).
                 current = pm_markets.get(tf)
+                now_utc = datetime.now(UTC)
+                skip = False
                 if (current and current.window_end
                         and current.condition_id != market.condition_id
-                        and datetime.now(UTC) < current.window_end):
-                    pass  # Keep current bar's market + WSS
-                else:
+                        and now_utc < current.window_end):
+                    # Current bar still active. Only switch if new market's
+                    # window contains now (i.e. it's the bar we're actually in).
+                    if market.window_end and market.window_end > now_utc:
+                        bar_secs_check = int(BAR_SECONDS[tf])
+                        new_bar_start = int(market.window_end.timestamp()) - bar_secs_check
+                        new_bar_start_dt = datetime.fromtimestamp(new_bar_start, tz=UTC)
+                        if now_utc < new_bar_start_dt:
+                            skip = True  # New market is for a future bar
+                if not skip:
                     pm_markets[tf] = market
                     if market.condition_id != subscribed_cid:
                         await _subscribe(market)
@@ -442,6 +497,7 @@ def print_alpha_panel(
     has_book: bool,
     mid_vel: float | None,
     pred_us: float,
+    model_ready: bool = True,
 ) -> None:
     """Print the dutch scalping alpha panel."""
     now = datetime.now(UTC)
@@ -460,10 +516,13 @@ def print_alpha_panel(
     print(f"{'=' * 78}")
 
     # Model predictions
-    side = "UP" if cal_prob > 0.5 else "DN"
-    confidence = abs(cal_prob - 0.5) * 200  # 0-100% scale
-    print(f"\n  MODEL  |  Raw: {raw_prob:.4f}  Cal: {cal_prob:.4f}  "
-          f"Side: {side}  Confidence: {confidence:.1f}%")
+    if model_ready:
+        side = "UP" if cal_prob > 0.5 else "DN"
+        confidence = abs(cal_prob - 0.5) * 200  # 0-100% scale
+        print(f"\n  MODEL  |  Raw: {raw_prob:.4f}  Cal: {cal_prob:.4f}  "
+              f"Side: {side}  Confidence: {confidence:.1f}%")
+    else:
+        print("\n  MODEL  |  -- (waiting for first prediction) --")
 
     # 4-price panel + depth
     if has_book and ws_feed:
@@ -607,6 +666,7 @@ def print_dutch_panel(
     engine_snap: dict,
     sim_stats,
     session_stats: dict,
+    model_ready: bool = True,
 ) -> None:
     """Print the dutch accumulation live panel."""
     now_str = datetime.now(UTC).strftime("%H:%M:%S UTC")
@@ -624,7 +684,11 @@ def print_dutch_panel(
 
     budget_spent = engine_snap["total_cost"]
     budget_total = engine_snap.get("budget_remaining", 0) + budget_spent
-    print(f"\n  MODEL P(UP)={cal_prob:.4f}  |  Budget: ${budget_spent:.2f}/${budget_total:.2f} spent")
+    if model_ready:
+        model_str = f"P(UP)={cal_prob:.4f}"
+    else:
+        model_str = "P(UP)=-- (waiting)"
+    print(f"\n  MODEL {model_str}  |  Budget: ${budget_spent:.2f}/${budget_total:.2f} spent")
 
     # Inventory table
     s_up = engine_snap["shares_up"]
@@ -770,12 +834,226 @@ def _save_dutch_state(state_file: Path, session: dict, pending: list) -> None:
         logger.warning("Failed to save dutch state: %s", e)
 
 
+# -- Helper functions for per-TF processing --------------------------
+
+
+def _finalize_dutch_bar(state: TFState) -> None:
+    """Cancel orders, resolve bar, queue for resolution polling."""
+    if not state.dutch_engine or not state.dutch_sim:
+        return
+    cancelled = state.dutch_sim.cancel_all()
+    for order in cancelled:
+        state.dutch_engine.on_order_cancelled(order)
+    summary = state.dutch_engine.resolve("")
+    summary.fill_stats = {
+        "orders_placed": state.dutch_sim.stats.placed,
+        "orders_filled": state.dutch_sim.stats.filled,
+        "partial_fills": state.dutch_sim.stats.partial,
+        "would_fill_count": state.dutch_sim.stats.would_fill,
+        "avg_fill_ticks": round(state.dutch_sim.stats.avg_fill_ticks, 1),
+        "chased": state.dutch_sim.stats.chased,
+        "cancelled": state.dutch_sim.stats.cancelled,
+        "expired": state.dutch_sim.stats.expired,
+    }
+    if state.dutch_bar_condition_id:
+        state.dutch_pending_resolutions.append({
+            "condition_id": state.dutch_bar_condition_id,
+            "summary": summary,
+            "bar_id": state.current_bar_id,
+        })
+        logger.info(
+            "Dutch %s bar %d queued for resolution (matched=%.1f, cost=$%.2f)",
+            state.tf_label, state.current_bar_id,
+            summary.inventory.get("matched", 0),
+            summary.cost.get("total", 0),
+        )
+    state.dutch_engine.reset()
+    state.dutch_sim.reset()
+
+
+def _setup_new_bar(
+    state: TFState,
+    bar_id: int,
+    pm_market: PolymarketMarket | None,
+    *,
+    window_start_str: str | None = None,
+    window_end_str: str | None = None,
+) -> None:
+    """Reset engine/sim and set bar info for a new bar."""
+    if not state.dutch_engine:
+        return
+    cid = pm_market.condition_id if pm_market else ""
+    state.dutch_bar_condition_id = cid
+    w_s = window_start_str or str(bar_id)
+    w_e = window_end_str or str(bar_id + int(BAR_SECONDS[state.tf]))
+    state.dutch_engine.set_bar_info(
+        bar_id=bar_id,
+        condition_id=cid,
+        window_start=w_s,
+        window_end=w_e,
+    )
+
+
+def _run_inference(
+    state: TFState, partial, elapsed_pct: float,
+    btc_bar_builder: BarBuilder | None,
+) -> None:
+    """Run model prediction and update state probabilities."""
+    # Inject BTC context from parallel BarBuilder (cross-asset)
+    if btc_bar_builder is not None and isinstance(state.feat_cache, CrossAssetLiveFeatureCache):
+        btc_partial = btc_bar_builder.get_partial_bar(Asset.BTC, state.tf)
+        if btc_partial is not None:
+            state.feat_cache.set_btc_partial(btc_partial)
+
+    t0 = time.perf_counter_ns()
+    features = state.feat_cache.get_features(partial)
+    state.raw_prob = float(state.model.predict(features.reshape(1, -1))[0])
+    state.cal_prob = state.raw_prob
+    if state.calibrator:
+        state.cal_prob = float(state.calibrator.transform(
+            np.array([state.raw_prob]),
+            np.array([elapsed_pct]),
+        )[0])
+    state.pred_us = (time.perf_counter_ns() - t0) / 1000
+    state.last_model_time = time.time()
+
+
+def _dutch_tick(
+    state: TFState, elapsed_pct: float, book_up, book_dn,
+    args: argparse.Namespace, bar_id: int,
+) -> None:
+    """Run Dutch engine on_tick + simulator fills."""
+    if not state.dutch_engine or not state.dutch_sim:
+        return
+
+    # Engine decides orders (only when model has run this bar)
+    if state.last_model_time > 0:  # model_ready equivalent
+        orders = state.dutch_engine.on_tick(elapsed_pct, state.cal_prob, book_up, book_dn)
+    else:
+        orders = []
+    # V7.5: Cancel pending orders on flip kill (matches sweep behavior).
+    if state.dutch_engine.flip_killed and not orders:
+        for c_order in state.dutch_sim.cancel_all():
+            state.dutch_engine.on_order_cancelled(c_order)
+    for order in orders:
+        state.dutch_sim.place(order)
+
+    # Simulator processes fills
+    fills = state.dutch_sim.on_tick(elapsed_pct, book_up, book_dn)
+    for fill in fills:
+        state.dutch_engine.on_fill(fill.order, fill.fill_price, fill.filled_shares)
+
+    # Optional tick logging
+    if getattr(args, "dutch_tick_log", False) and state.dutch_logger:
+        state.dutch_logger.log_tick(bar_id, {
+            "time_pct": round(elapsed_pct, 4),
+            "cal_prob": round(state.cal_prob, 4),
+            "has_book": book_up is not None,
+            "snap": state.dutch_engine.snapshot(),
+            "pending_orders": len(state.dutch_sim.pending_orders),
+        })
+
+
+async def _check_resolutions(
+    state: TFState, asset_enum: Asset, scanner: MarketScanner,
+) -> None:
+    """Poll Gamma API for outcomes on pending bars."""
+    if not state.dutch_pending_resolutions:
+        return
+    if time.time() - state.dutch_session.get("_last_resolution_check", 0) < 30.0:
+        return
+    state.dutch_session["_last_resolution_check"] = time.time()
+    for item in state.dutch_pending_resolutions[:]:
+        try:
+            status = await scanner.get_market_status(
+                item["condition_id"], asset=asset_enum,
+            )
+            if status and status.get("resolved", False):
+                outcome_str = status.get("outcome", "")
+                outcome = "UP" if outcome_str.lower() in ("up", "yes") else "DN"
+                summary = item["summary"]
+                summary.compute_pnl(outcome)
+                if state.dutch_logger:
+                    state.dutch_logger.log_bar(summary)
+                profit = summary.pnl.get("profit", 0)
+                pair_cost = summary.cost.get("avg_pair_cost", 1.0)
+                state.dutch_session["total_pnl"] += profit
+                state.dutch_session["bars"] += 1
+                state.dutch_session["_sum_pair_cost"] = (
+                    state.dutch_session.get("_sum_pair_cost", 0) + pair_cost
+                )
+                state.dutch_session["avg_pair_cost"] = (
+                    state.dutch_session["_sum_pair_cost"] / state.dutch_session["bars"]
+                )
+                if profit >= 0:
+                    state.dutch_session["wins"] += 1
+                else:
+                    state.dutch_session["losses"] += 1
+                state.dutch_pending_resolutions.remove(item)
+                logger.info(
+                    "Dutch %s bar %d resolved %s: PnL=$%.2f (matched=%.1f, pair_cost=%.3f)",
+                    state.tf_label, item["bar_id"], outcome, profit,
+                    summary.inventory.get("matched", 0), pair_cost,
+                )
+        except Exception as e:
+            logger.debug("Resolution check %s failed: %s", state.tf_label, e)
+    # Cap pending list to prevent unbounded growth
+    if len(state.dutch_pending_resolutions) > 20:
+        dropped = len(state.dutch_pending_resolutions) - 20
+        state.dutch_pending_resolutions[:] = state.dutch_pending_resolutions[-20:]
+        logger.warning("Dropped %d stale pending resolutions (%s)", dropped, state.tf_label)
+
+
+def _save_tf_state(state: TFState) -> None:
+    """Persist session to JSON."""
+    if state.dutch_state_file:
+        _save_dutch_state(
+            state.dutch_state_file, state.dutch_session,
+            state.dutch_pending_resolutions,
+        )
+
+
+def _update_feature_cache(state: TFState, bar, pipeline: FeaturePipeline) -> None:
+    """Update feature cache from completed bar."""
+    state.recent_bars.append(bar)
+    state.recent_bars[:] = state.recent_bars[-500:]
+
+    if len(state.recent_bars) >= 20:
+        bars_data = {
+            "time": [b.timestamp for b in state.recent_bars],
+            "open": [b.open for b in state.recent_bars],
+            "high": [b.high for b in state.recent_bars],
+            "low": [b.low for b in state.recent_bars],
+            "close": [b.close for b in state.recent_bars],
+            "volume": [b.volume for b in state.recent_bars],
+            "trade_count": [b.trade_count for b in state.recent_bars],
+            "vwap": [b.vwap for b in state.recent_bars],
+        }
+        try:
+            bars_df = pl.DataFrame(bars_data)
+            featured = pipeline.compute(bars_df)
+            last_row = featured.row(-1, named=True)
+            cache_dict = {
+                name: float(val)
+                for name in pipeline.feature_names
+                if (val := last_row.get(name)) is not None
+            }
+            state.feat_cache.update_history(cache_dict)
+            logger.debug("Updated feature cache %s (%d features)", state.tf_label, len(cache_dict))
+        except Exception as e:
+            logger.warning("Feature cache update failed (%s): %s", state.tf_label, e)
+
+
 # -- Main loop --------------------------------------------------------
 
 async def main_loop(args: argparse.Namespace) -> None:
     model_dir = Path(args.model_dir)
-    tf = TF_MAP[args.timeframe]
-    tf_label = args.timeframe
+
+    # -- Resolve timeframes ----------------------------------------
+    if args.timeframe:
+        timeframes = [TF_MAP[args.timeframe]]
+    else:
+        timeframes = [TF_MAP[t.strip()] for t in args.timeframes.split(",")]
 
     # -- Asset resolution -----------------------------------------
     asset_label = args.asset
@@ -784,6 +1062,7 @@ async def main_loop(args: argparse.Namespace) -> None:
 
     dutch_mode = getattr(args, "dutch", False)
 
+    tf_labels_str = ",".join(TF_LABELS[tf] for tf in timeframes)
     print("=" * 60)
     if dutch_mode:
         print(f"  {asset_label} Dutch Accumulation Paper Trader")
@@ -791,7 +1070,7 @@ async def main_loop(args: argparse.Namespace) -> None:
         print(f"  {asset_label} Dutch Scalping Alpha Monitor")
     print("=" * 60)
     print(f"  Asset:       {asset_label}")
-    print(f"  Timeframe:   {tf_label}")
+    print(f"  Timeframes:  {tf_labels_str}")
     print(f"  Polymarket:  {'OFF' if args.no_polymarket else 'ON (WSS orderbook)'}")
     if dutch_mode:
         print(f"  Dutch:       ON (budget=${args.dutch_budget:.0f}, order=${args.dutch_order_size:.0f})")
@@ -799,91 +1078,101 @@ async def main_loop(args: argparse.Namespace) -> None:
     print(f"  Thresholds:  {[f'{t*100:.0f}%' for t in TIME_PCTS]}")
     print("=" * 60)
 
-    # -- Load model -----------------------------------------------
-    model, calibrator = load_model(model_dir, asset_label, tf_label)
+    # -- Per-TF initialization ------------------------------------
+    tf_states: dict[Timeframe, TFState] = {}
+    pipeline = FeaturePipeline()  # shared feature pipeline
+    needs_btc_feed = False  # track if any TF needs cross-asset BTC
 
-    # -- Feature cache (reordered to model) -----------------------
-    cache_dir = model_dir / f"{asset_label}_{tf_label}"
-    feat_cache = LiveFeatureCache.from_model_dir(
-        cache_dir, asset=asset_enum, timeframe=tf,
-    )
+    for tf in timeframes:
+        tf_label = TF_LABELS[tf]
 
-    # -- Warm-up --------------------------------------------------
-    warm_up_cache(feat_cache, asset_enum, tf)
+        # Load model + calibrator
+        model, calibrator = load_model(model_dir, asset_label, tf_label)
 
-    # -- BTC cross-asset feed (non-BTC models only) ---------------
-    btc_bar_builder: BarBuilder | None = None
-    btc_completed_bars: asyncio.Queue | None = None
-    if isinstance(feat_cache, CrossAssetLiveFeatureCache):
-        warm_up_btc(feat_cache, tf)
-        btc_bar_builder = BarBuilder(assets=[Asset.BTC], timeframes=[tf])
-        btc_completed_bars = asyncio.Queue()
+        # Feature cache
+        cache_dir = model_dir / f"{asset_label}_{tf_label}"
+        feat_cache = LiveFeatureCache.from_model_dir(
+            cache_dir, asset=asset_enum, timeframe=tf,
+        )
+        warm_up_cache(feat_cache, asset_enum, tf)
 
-    # -- BarBuilder (single TF) -----------------------------------
-    bar_builder = BarBuilder(assets=[asset_enum], timeframes=[tf])
+        if isinstance(feat_cache, CrossAssetLiveFeatureCache):
+            warm_up_btc(feat_cache, tf)
+            needs_btc_feed = True
+
+        state = TFState(
+            tf=tf,
+            tf_label=tf_label,
+            model=model,
+            calibrator=calibrator,
+            feat_cache=feat_cache,
+            mid_tracker=MidTracker(window_secs=MID_HISTORY_SECS),
+        )
+
+        # Dutch setup
+        if dutch_mode:
+            dutch_config, sim_kwargs = load_dutch_config(args, asset_label, tf_label, tf)
+            state.dutch_engine = DutchAccumulationEngine(dutch_config)
+            state.dutch_sim = LimitOrderSimulator(**sim_kwargs) if sim_kwargs else LimitOrderSimulator()
+            logger.info(
+                "Dutch %s config: budget=$%.0f, order=$%.0f, pair_cost<%.2f, "
+                "conv_skip=%.2f, conv_size=%.2f, onesided_cap=$%.0f",
+                tf_label,
+                dutch_config.bar_budget, dutch_config.order_size,
+                dutch_config.max_marginal_pair_cost,
+                dutch_config.conviction_buy_skip,
+                dutch_config.conviction_size_floor,
+                dutch_config.max_onesided_cost,
+            )
+            state.dutch_logger = DutchSummaryLogger(
+                base_dir=Path("data/dutch_paper"),
+                asset=asset_label,
+                timeframe=tf_label,
+            )
+            state.dutch_engine.set_event_callback(state.dutch_logger.log_event)
+            state.dutch_state_file = Path(f"data/dutch_paper/state_{asset_label}_{tf_label}.json")
+            if state.dutch_state_file.exists():
+                try:
+                    with open(state.dutch_state_file) as f:
+                        saved = json.load(f)
+                    if "session" in saved:
+                        state.dutch_session.update(saved["session"])
+                        logger.info("Restored dutch %s session: %dW %dL PnL=$%.2f",
+                                    tf_label, state.dutch_session["wins"],
+                                    state.dutch_session["losses"],
+                                    state.dutch_session["total_pnl"])
+                except Exception as e:
+                    logger.warning("Failed to load dutch state %s: %s", tf_label, e)
+            logger.info("Dutch %s enabled: budget=$%.0f, order=$%.0f, edge>%.2f",
+                        tf_label, args.dutch_budget, args.dutch_order_size,
+                        dutch_config.cheap_threshold)
+
+        # Polymarket scanner per TF
+        if not args.no_polymarket:
+            state.scanner = MarketScanner(
+                assets={asset_enum}, timeframe=tf,
+                connector_factory=create_connector,
+                min_time_remaining_sec=5.0,
+            )
+            state.scanner._cache_ttl = 2.0
+
+        tf_states[tf] = state
+
+    # -- Shared BarBuilder (all TFs, one price feed) ---------------
+    bar_builder = BarBuilder(assets=[asset_enum], timeframes=timeframes)
     completed_bars: asyncio.Queue = asyncio.Queue()
 
-    # -- Polymarket feed ------------------------------------------
-    ws_feeds: dict[Timeframe, PolymarketWSFeed] = {}
-    pm_markets: dict[Timeframe, PolymarketMarket] = {}
-
-    if not args.no_polymarket:
-        scanner = MarketScanner(
-            assets={asset_enum}, timeframe=tf,
-            connector_factory=create_connector,
-            min_time_remaining_sec=5.0,
-        )
-        scanner._cache_ttl = 2.0
-
-    # -- Mid velocity tracker -------------------------------------
-    mid_tracker = MidTracker(window_secs=MID_HISTORY_SECS)
-
-    # -- Dutch accumulation setup ---------------------------------
-    dutch_engine: DutchAccumulationEngine | None = None
-    dutch_sim: LimitOrderSimulator | None = None
-    dutch_logger: DutchSummaryLogger | None = None
-    dutch_session: dict = {"wins": 0, "losses": 0, "total_pnl": 0.0, "avg_pair_cost": 0.0, "bars": 0}
-    dutch_pending_resolutions: list[dict] = []
-    dutch_bar_condition_id: str = ""
-
-    if dutch_mode:
-        dutch_config, sim_kwargs = load_dutch_config(args, asset_label, tf_label, tf)
-        dutch_engine = DutchAccumulationEngine(dutch_config)
-        dutch_sim = LimitOrderSimulator(**sim_kwargs) if sim_kwargs else LimitOrderSimulator()
-        logger.info(
-            "Dutch V7.3 config: budget=$%.0f, order=$%.0f, pair_cost<%.2f, "
-            "conv_skip=%.2f, conv_size=%.2f, onesided_cap=$%.0f",
-            dutch_config.bar_budget, dutch_config.order_size,
-            dutch_config.max_marginal_pair_cost,
-            dutch_config.conviction_buy_skip,
-            dutch_config.conviction_size_floor,
-            dutch_config.max_onesided_cost,
-        )
-        dutch_logger = DutchSummaryLogger(
-            base_dir=Path("data/dutch_paper"),
-            asset=asset_label,
-            timeframe=tf_label,
-        )
-        dutch_engine.set_event_callback(dutch_logger.log_event)
-        # Load persisted session state (per-asset-TF to avoid collision)
-        dutch_state_file = Path(f"data/dutch_paper/state_{asset_label}_{tf_label}.json")
-        if dutch_state_file.exists():
-            try:
-                with open(dutch_state_file) as f:
-                    saved = json.load(f)
-                if "session" in saved:
-                    dutch_session.update(saved["session"])
-                    logger.info("Restored dutch session: %dW %dL PnL=$%.2f",
-                                dutch_session["wins"], dutch_session["losses"],
-                                dutch_session["total_pnl"])
-            except Exception as e:
-                logger.warning("Failed to load dutch state: %s", e)
-        logger.info("Dutch accumulation enabled: budget=$%.0f, order=$%.0f, edge>%.2f",
-                     args.dutch_budget, args.dutch_order_size, dutch_config.cheap_threshold)
+    # -- BTC cross-asset feed (shared across TFs) ------------------
+    btc_bar_builder: BarBuilder | None = None
+    btc_completed_bars: asyncio.Queue | None = None
+    if needs_btc_feed:
+        btc_bar_builder = BarBuilder(assets=[Asset.BTC], timeframes=timeframes)
+        btc_completed_bars = asyncio.Queue()
 
     # -- Start background tasks -----------------------------------
     running_flag = [True]
 
+    # Single shared price feed
     asyncio.create_task(price_feed(asset_enum, tv_symbol, bar_builder, completed_bars, running_flag))
 
     if btc_bar_builder is not None and btc_completed_bars is not None:
@@ -893,21 +1182,19 @@ async def main_loop(args: argparse.Namespace) -> None:
         ))
         logger.info("BTC cross-asset price feed started")
 
+    # Per-TF Polymarket feeds
     if not args.no_polymarket:
-        asyncio.create_task(
-            polymarket_feed(
-                asset_enum, tf, scanner, ws_feeds, pm_markets, running_flag,
-            ),
-        )
+        for tf, state in tf_states.items():
+            if state.scanner:
+                asyncio.create_task(
+                    polymarket_feed(
+                        asset_enum, tf, state.scanner,
+                        state.ws_feeds, state.pm_markets, running_flag,
+                    ),
+                )
 
-    # -- Threshold tracking ---------------------------------------
-    last_triggered: set[float] = set()
-    current_bar_id: int = 0
+    # -- Shared state ---------------------------------------------
     last_price: float = 0.0
-
-    # -- Feature pipeline for live cache updates ------------------
-    pipeline = FeaturePipeline()
-    recent_bars: list = []
 
     def handle_shutdown(sig_num, frame):
         logger.info("Shutdown signal received")
@@ -916,405 +1203,242 @@ async def main_loop(args: argparse.Namespace) -> None:
     signal.signal(signal.SIGINT, handle_shutdown)
     signal.signal(signal.SIGTERM, handle_shutdown)
 
-    # -- Timing cadences for event-driven loop --------------------
-    last_model_time = 0.0
+    # -- Timing cadences ------------------------------------------
     last_display_time = 0.0
     last_state_save = time.time()
-    MODEL_INTERVAL = 1.0      # model inference every 1s
-    DISPLAY_INTERVAL = 0.5    # display update every 0.5s
-    STATE_SAVE_INTERVAL = 300.0  # state persistence every 5 min
-    cal_prob = 0.5
-    raw_prob = 0.5
-    pred_us = 0.0
-    model_ready = False  # gate Dutch orders until model runs in current bar
+    MODEL_INTERVAL = 1.0
+    display_tf_idx = 0  # cycle through TFs for display
 
-    logger.info("Starting main loop (%s)... waiting for ticks",
-                "event-driven" if dutch_mode else f"{POLL_INTERVAL*1000:.0f}ms polling")
+    logger.info("Starting main loop (%s, %d TFs)... waiting for ticks",
+                "event-driven" if dutch_mode else f"{POLL_INTERVAL*1000:.0f}ms polling",
+                len(timeframes))
 
     while running_flag[0]:
         # -- WAIT: event-driven (dutch) or polling (non-dutch) ----
-        ws_feed = ws_feeds.get(tf)
-        if dutch_mode and ws_feed and ws_feed._connected.is_set():
-            try:
-                await asyncio.wait_for(ws_feed.book_updated.wait(), timeout=1.0)
-                ws_feed.book_updated.clear()
-            except asyncio.TimeoutError:
-                pass
-        else:
+        # In dutch mode, wait for ANY book update across all TF ws_feeds
+        waited = False
+        if dutch_mode:
+            for state in tf_states.values():
+                ws_feed = state.ws_feeds.get(state.tf)
+                if ws_feed and ws_feed._connected.is_set():
+                    try:
+                        await asyncio.wait_for(ws_feed.book_updated.wait(), timeout=0.2)
+                        ws_feed.book_updated.clear()
+                        waited = True
+                        break
+                    except asyncio.TimeoutError:
+                        pass
+        if not waited:
             await asyncio.sleep(POLL_INTERVAL)
 
-        # -- Process completed bars -------------------------------
+        # -- Process completed bars (route to correct TFState) ----
         while not completed_bars.empty():
             bar = completed_bars.get_nowait()
-            if bar.timeframe != tf:
+            state = tf_states.get(bar.timeframe)
+            if state is None:
                 continue
             print_bar_complete(bar)
+            _update_feature_cache(state, bar, pipeline)
 
-            # Update feature cache
-            recent_bars.append(bar)
-            recent_bars[:] = recent_bars[-500:]
+        # -- Process BTC completed bars (cross-asset, all TFs) ----
+        if btc_completed_bars is not None:
+            while not btc_completed_bars.empty():
+                btc_completed_bars.get_nowait()
+                # BTC bars consumed to keep queue clear; cache updated via partial
 
-            bars_data = {
-                "time": [b.timestamp for b in recent_bars],
-                "open": [b.open for b in recent_bars],
-                "high": [b.high for b in recent_bars],
-                "low": [b.low for b in recent_bars],
-                "close": [b.close for b in recent_bars],
-                "volume": [b.volume for b in recent_bars],
-                "trade_count": [b.trade_count for b in recent_bars],
-                "vwap": [b.vwap for b in recent_bars],
-            }
-            if len(recent_bars) >= 20:
-                try:
-                    bars_df = pl.DataFrame(bars_data)
-                    featured = pipeline.compute(bars_df)
-                    last_row = featured.row(-1, named=True)
-                    cache_dict = {
-                        name: float(val)
-                        for name in pipeline.feature_names
-                        if (val := last_row.get(name)) is not None
-                    }
-                    feat_cache.update_history(cache_dict)
-                    logger.debug("Updated feature cache (%d features)", len(cache_dict))
-                except Exception as e:
-                    logger.warning("Feature cache update failed: %s", e)
-
-        # -- Get partial bar --------------------------------------
-        partial = bar_builder.get_partial_bar(asset_enum, tf)
-        if partial is None:
-            # V7.5: In Dutch mode, derive bar timing from Polymarket market
-            # so the engine can process book ticks before BarBuilder has data.
-            # This eliminates 30-120s latency at bar start.
-            if dutch_mode and dutch_engine:
-                pm_mkt = pm_markets.get(tf)
-                if pm_mkt and pm_mkt.window_end:
-                    bar_secs = BAR_SECONDS[tf]
-                    bar_id_from_market = int(pm_mkt.window_end.timestamp()) - int(bar_secs)
-                    now_ts = time.time()
-                    # Sanity: verify market points to a bar we're actually inside
-                    if now_ts < bar_id_from_market or now_ts >= bar_id_from_market + bar_secs + 5:
-                        continue  # Market points to wrong bar, skip
-                    elapsed_pct = max(0.0, min(1.0, (now_ts - bar_id_from_market) / bar_secs))
-                    # Handle bar boundary (new bar detected)
-                    if bar_id_from_market != current_bar_id and current_bar_id != 0:
-                        model_ready = False  # require fresh prediction for new bar
-                        cancelled = dutch_sim.cancel_all()
-                        for order in cancelled:
-                            dutch_engine.on_order_cancelled(order)
-                        summary = dutch_engine.resolve("")
-                        summary.fill_stats = {
-                            "orders_placed": dutch_sim.stats.placed,
-                            "orders_filled": dutch_sim.stats.filled,
-                            "partial_fills": dutch_sim.stats.partial,
-                            "would_fill_count": dutch_sim.stats.would_fill,
-                            "avg_fill_ticks": round(dutch_sim.stats.avg_fill_ticks, 1),
-                            "chased": dutch_sim.stats.chased,
-                            "cancelled": dutch_sim.stats.cancelled,
-                            "expired": dutch_sim.stats.expired,
-                        }
-                        if dutch_bar_condition_id:
-                            dutch_pending_resolutions.append({
-                                "condition_id": dutch_bar_condition_id,
-                                "summary": summary,
-                                "bar_id": current_bar_id,
-                            })
-                        dutch_engine.reset()
-                        dutch_sim.reset()
-                        cid = pm_mkt.condition_id if pm_mkt else ""
-                        dutch_bar_condition_id = cid
-                        dutch_engine.set_bar_info(
-                            bar_id=bar_id_from_market,
-                            condition_id=cid,
-                            window_start=str(bar_id_from_market),
-                            window_end=str(bar_id_from_market + int(bar_secs)),
-                        )
-                        current_bar_id = bar_id_from_market
-                    elif current_bar_id == 0:
-                        current_bar_id = bar_id_from_market
-                        cid = pm_mkt.condition_id if pm_mkt else ""
-                        dutch_bar_condition_id = cid
-                        dutch_engine.set_bar_info(
-                            bar_id=bar_id_from_market,
-                            condition_id=cid,
-                            window_start=str(bar_id_from_market),
-                            window_end=str(bar_id_from_market + int(bar_secs)),
-                        )
-                    # Feed engine with book data (no model update, use last cal_prob)
-                    ws_feed_early = ws_feeds.get(tf)
-                    if (ws_feed_early and ws_feed_early._connected.is_set()
-                            and ws_feed_early.best_bid_up > 0
-                            and ws_feed_early.best_ask_up < 1):
-                        book_up = ws_feed_early.get_book("up")
-                        book_dn = ws_feed_early.get_book("down")
-                        if model_ready:
-                            orders = dutch_engine.on_tick(elapsed_pct, cal_prob, book_up, book_dn)
-                        else:
-                            orders = []
-                        if dutch_engine.flip_killed and not orders:
-                            for c_order in dutch_sim.cancel_all():
-                                dutch_engine.on_order_cancelled(c_order)
-                        for order in orders:
-                            dutch_sim.place(order)
-                        fills = dutch_sim.on_tick(elapsed_pct, book_up, book_dn)
-                        for fill in fills:
-                            dutch_engine.on_fill(fill.order, fill.fill_price, fill.filled_shares)
-                continue
-            else:
-                continue
-
-        last_price = partial.current_price
-        bar_id = int(partial.window_start.timestamp())
-        elapsed_pct = partial.elapsed_seconds / (BAR_SECONDS[tf] + 1e-10)
-
-        # Reset thresholds on new bar
-        if bar_id != current_bar_id:
-            model_ready = False  # require fresh prediction for new bar
-            # Dutch: finalize previous bar
-            if dutch_mode and dutch_engine and current_bar_id != 0:
-                # Cancel unfilled orders and release pending sell reservations
-                cancelled = dutch_sim.cancel_all()
-                for order in cancelled:
-                    dutch_engine.on_order_cancelled(order)
-                # Create summary (outcome pending — will be filled by resolution)
-                summary = dutch_engine.resolve("")
-                summary.fill_stats = {
-                    "orders_placed": dutch_sim.stats.placed,
-                    "orders_filled": dutch_sim.stats.filled,
-                    "partial_fills": dutch_sim.stats.partial,
-                    "would_fill_count": dutch_sim.stats.would_fill,
-                    "avg_fill_ticks": round(dutch_sim.stats.avg_fill_ticks, 1),
-                    "chased": dutch_sim.stats.chased,
-                    "cancelled": dutch_sim.stats.cancelled,
-                    "expired": dutch_sim.stats.expired,
-                }
-                # Queue for resolution via Gamma API
-                if dutch_bar_condition_id:
-                    dutch_pending_resolutions.append({
-                        "condition_id": dutch_bar_condition_id,
-                        "summary": summary,
-                        "bar_id": current_bar_id,
-                    })
-                    logger.info(
-                        "Dutch bar %d queued for resolution (matched=%.1f, cost=$%.2f)",
-                        current_bar_id, summary.inventory.get("matched", 0),
-                        summary.cost.get("total", 0),
-                    )
-                # Reset for new bar
-                dutch_engine.reset()
-                dutch_sim.reset()
-
-            # Set up new bar
-            if dutch_mode and dutch_engine:
-                pm_market = pm_markets.get(tf)
-                cid = pm_market.condition_id if pm_market else ""
-                dutch_bar_condition_id = cid
-                w_s = partial.window_start.astimezone(DISPLAY_TZ).strftime("%H:%M")
-                w_e = partial.window_end.astimezone(DISPLAY_TZ).strftime("%H:%M")
-                dutch_engine.set_bar_info(
-                    bar_id=bar_id,
-                    condition_id=cid,
-                    window_start=w_s,
-                    window_end=w_e,
-                )
-
-            current_bar_id = bar_id
-            last_triggered = set()
-
-        # -- Model inference at 1Hz (expensive ~1ms) ---------------
+        # -- Per-TF processing ------------------------------------
         now = time.time()
-        if now - last_model_time >= MODEL_INTERVAL:
-            # Inject BTC context from parallel BarBuilder (cross-asset)
-            if btc_bar_builder is not None and isinstance(feat_cache, CrossAssetLiveFeatureCache):
-                btc_partial = btc_bar_builder.get_partial_bar(Asset.BTC, tf)
-                if btc_partial is not None:
-                    feat_cache.set_btc_partial(btc_partial)
+        for tf, state in tf_states.items():
+            bar_secs = BAR_SECONDS[tf]
 
-            t0 = time.perf_counter_ns()
-            features = feat_cache.get_features(partial)
-            raw_prob = float(model.predict(features.reshape(1, -1))[0])
-            cal_prob = raw_prob
-            if calibrator:
-                cal_prob = float(calibrator.transform(
-                    np.array([raw_prob]),
-                    np.array([elapsed_pct]),
-                )[0])
-            pred_us = (time.perf_counter_ns() - t0) / 1000
-            last_model_time = now
-            model_ready = True
+            # -- Get partial bar ----------------------------------
+            partial = bar_builder.get_partial_bar(asset_enum, tf)
 
-        # -- Check market data ------------------------------------
-        pm_market = pm_markets.get(tf)
-        ws_feed = ws_feeds.get(tf)
+            if partial is None:
+                # V7.5: early-bar Dutch processing from Polymarket market timing
+                if dutch_mode and state.dutch_engine:
+                    pm_mkt = state.pm_markets.get(tf)
+                    if pm_mkt and pm_mkt.window_end:
+                        bar_id_from_market = int(pm_mkt.window_end.timestamp()) - int(bar_secs)
+                        now_ts = time.time()
+                        if now_ts < bar_id_from_market or now_ts >= bar_id_from_market + bar_secs + 5:
+                            continue
+                        elapsed_pct = max(0.0, min(1.0, (now_ts - bar_id_from_market) / bar_secs))
+                        # Handle bar boundary (new bar detected)
+                        if bar_id_from_market != state.current_bar_id and state.current_bar_id != 0:
+                            state.last_model_time = 0.0  # require fresh prediction
+                            _finalize_dutch_bar(state)
+                            _setup_new_bar(state, bar_id_from_market, pm_mkt)
+                            state.current_bar_id = bar_id_from_market
+                        elif state.current_bar_id == 0:
+                            state.current_bar_id = bar_id_from_market
+                            _setup_new_bar(state, bar_id_from_market, pm_mkt)
+                        # Feed engine with book data
+                        ws_feed_early = state.ws_feeds.get(tf)
+                        if (ws_feed_early and ws_feed_early._connected.is_set()
+                                and ws_feed_early.best_bid_up > 0
+                                and ws_feed_early.best_ask_up < 1):
+                            book_up = ws_feed_early.get_book("up")
+                            book_dn = ws_feed_early.get_book("down")
+                            _dutch_tick(state, elapsed_pct, book_up, book_dn, args, bar_id_from_market)
+                continue  # no partial bar yet for this TF
 
-        # Verify market matches current bar by deriving bar start from window_end
-        # (Gamma API startDate is market creation time, NOT bar boundary)
-        market_matches = True
-        if pm_market and pm_market.window_end:
-            bar_secs = int(BAR_SECONDS[tf])
-            market_bar_start = int(pm_market.window_end.timestamp()) - bar_secs
-            if market_bar_start != bar_id:
-                market_matches = False
+            last_price = partial.current_price
+            bar_id = int(partial.window_start.timestamp())
+            elapsed_pct = partial.elapsed_seconds / (bar_secs + 1e-10)
 
-        has_book = (
-            market_matches
-            and ws_feed is not None
-            and ws_feed._connected.is_set()
-            and ws_feed.best_bid_up > 0
-            and ws_feed.best_ask_up < 1
-        )
+            # Reset on new bar
+            if bar_id != state.current_bar_id:
+                state.last_model_time = 0.0  # require fresh prediction
+                # Dutch: finalize previous bar
+                if dutch_mode and state.dutch_engine and state.current_bar_id != 0:
+                    _finalize_dutch_bar(state)
 
-        # Update mid tracker
-        if has_book and ws_feed:
-            mid_tracker.update(ws_feed.mid_up)
+                # Set up new bar
+                if dutch_mode and state.dutch_engine:
+                    pm_market = state.pm_markets.get(tf)
+                    w_s = partial.window_start.astimezone(DISPLAY_TZ).strftime("%H:%M")
+                    w_e = partial.window_end.astimezone(DISPLAY_TZ).strftime("%H:%M")
+                    _setup_new_bar(state, bar_id, pm_market, window_start_str=w_s, window_end_str=w_e)
 
-        mid_vel = mid_tracker.velocity()
+                state.current_bar_id = bar_id
+                state.last_triggered = set()
 
-        # -- Check threshold crossings ----------------------------
-        for threshold in TIME_PCTS:
-            if threshold in last_triggered:
-                continue
-            if elapsed_pct >= threshold:
-                last_triggered.add(threshold)
-                if has_book and ws_feed:
-                    print_threshold(
-                        tf_label, threshold, raw_prob, cal_prob,
-                        ws_feed.best_ask_up, ws_feed.best_ask_down,
-                        cal_prob - ws_feed.best_ask_up,
-                        (1 - cal_prob) - ws_feed.best_ask_down,
-                    )
-                else:
-                    print_threshold(
-                        tf_label, threshold, raw_prob, cal_prob,
-                        None, None, None, None,
-                    )
+            # -- Model inference at 1Hz ----------------------------
+            if now - state.last_model_time >= MODEL_INTERVAL:
+                _run_inference(state, partial, elapsed_pct, btc_bar_builder)
 
-        # -- Dutch tick processing ----------------------------------
-        if dutch_mode and dutch_engine and dutch_sim:
-            book_up = ws_feed.get_book("up") if ws_feed and has_book else None
-            book_dn = ws_feed.get_book("down") if ws_feed and has_book else None
+            # -- Check market data --------------------------------
+            pm_market = state.pm_markets.get(tf)
+            ws_feed = state.ws_feeds.get(tf)
 
-            # Engine decides orders (only when model has run this bar)
-            if model_ready:
-                orders = dutch_engine.on_tick(elapsed_pct, cal_prob, book_up, book_dn)
-            else:
-                orders = []
-            # V7.5: Cancel pending orders on flip kill (matches sweep behavior).
-            # cancel_all() is a no-op after first call per bar (returns []).
-            if dutch_engine.flip_killed and not orders:
-                for c_order in dutch_sim.cancel_all():
-                    dutch_engine.on_order_cancelled(c_order)
-            for order in orders:
-                dutch_sim.place(order)
+            market_matches = True
+            if pm_market and pm_market.window_end:
+                bar_secs_int = int(bar_secs)
+                market_bar_start = int(pm_market.window_end.timestamp()) - bar_secs_int
+                if market_bar_start != bar_id:
+                    market_matches = False
 
-            # Simulator processes fills
-            fills = dutch_sim.on_tick(elapsed_pct, book_up, book_dn)
-            for fill in fills:
-                dutch_engine.on_fill(fill.order, fill.fill_price, fill.filled_shares)
+            has_book = (
+                market_matches
+                and ws_feed is not None
+                and ws_feed._connected.is_set()
+                and ws_feed.best_bid_up > 0
+                and ws_feed.best_ask_up < 1
+            )
 
-            # Optional tick logging
-            if getattr(args, "dutch_tick_log", False) and dutch_logger:
-                dutch_logger.log_tick(bar_id, {
-                    "time_pct": round(elapsed_pct, 4),
-                    "cal_prob": round(cal_prob, 4),
-                    "has_book": has_book,
-                    "snap": dutch_engine.snapshot(),
-                    "pending_orders": len(dutch_sim.pending_orders),
-                })
+            if has_book and ws_feed:
+                state.mid_tracker.update(ws_feed.mid_up)
 
-        # -- Check dutch pending resolutions (every 30s) -----------
-        if (
-            dutch_mode
-            and dutch_pending_resolutions
-            and not args.no_polymarket
-            and time.time() - dutch_session.get("_last_resolution_check", 0) >= 30.0
-        ):
-            dutch_session["_last_resolution_check"] = time.time()
-            for item in dutch_pending_resolutions[:]:
-                try:
-                    status = await scanner.get_market_status(
-                        item["condition_id"], asset=asset_enum,
-                    )
-                    if status and status.get("resolved", False):
-                        outcome_str = status.get("outcome", "")
-                        outcome = "UP" if outcome_str.lower() in ("up", "yes") else "DN"
-                        summary = item["summary"]
-                        summary.compute_pnl(outcome)
-                        if dutch_logger:
-                            dutch_logger.log_bar(summary)
-                        profit = summary.pnl.get("profit", 0)
-                        pair_cost = summary.cost.get("avg_pair_cost", 1.0)
-                        dutch_session["total_pnl"] += profit
-                        dutch_session["bars"] += 1
-                        dutch_session["_sum_pair_cost"] = (
-                            dutch_session.get("_sum_pair_cost", 0) + pair_cost
+            mid_vel = state.mid_tracker.velocity()
+
+            # -- Threshold crossings ------------------------------
+            for threshold in TIME_PCTS:
+                if threshold in state.last_triggered:
+                    continue
+                if elapsed_pct >= threshold:
+                    state.last_triggered.add(threshold)
+                    if has_book and ws_feed:
+                        print_threshold(
+                            state.tf_label, threshold, state.raw_prob, state.cal_prob,
+                            ws_feed.best_ask_up, ws_feed.best_ask_down,
+                            state.cal_prob - ws_feed.best_ask_up,
+                            (1 - state.cal_prob) - ws_feed.best_ask_down,
                         )
-                        dutch_session["avg_pair_cost"] = (
-                            dutch_session["_sum_pair_cost"] / dutch_session["bars"]
+                    else:
+                        print_threshold(
+                            state.tf_label, threshold, state.raw_prob, state.cal_prob,
+                            None, None, None, None,
                         )
-                        if profit >= 0:
-                            dutch_session["wins"] += 1
-                        else:
-                            dutch_session["losses"] += 1
-                        dutch_pending_resolutions.remove(item)
-                        logger.info(
-                            "Dutch bar %d resolved %s: PnL=$%.2f (matched=%.1f, pair_cost=%.3f)",
-                            item["bar_id"], outcome, profit,
-                            summary.inventory.get("matched", 0), pair_cost,
-                        )
-                except Exception as e:
-                    logger.debug("Resolution check failed: %s", e)
-            # Cap pending list to prevent unbounded growth
-            if len(dutch_pending_resolutions) > 20:
-                dropped = len(dutch_pending_resolutions) - 20
-                dutch_pending_resolutions[:] = dutch_pending_resolutions[-20:]
-                logger.warning("Dropped %d stale pending resolutions", dropped)
 
-        # -- Display at cadence ------------------------------------
+            # -- Dutch tick processing ----------------------------
+            if dutch_mode and state.dutch_engine and state.dutch_sim:
+                book_up = ws_feed.get_book("up") if ws_feed and has_book else None
+                book_dn = ws_feed.get_book("down") if ws_feed and has_book else None
+                _dutch_tick(state, elapsed_pct, book_up, book_dn, args, bar_id)
+
+            # -- Resolution polling (every 30s) -------------------
+            if dutch_mode and not args.no_polymarket and state.scanner:
+                await _check_resolutions(state, asset_enum, state.scanner)
+
+        # -- Display at cadence (cycle through TFs) ----------------
         now_disp = time.time()
         if now_disp - last_display_time >= DISPLAY_INTERVAL:
             last_display_time = now_disp
-            if dutch_mode and dutch_engine:
-                print_dutch_panel(
-                    asset_label=asset_label,
-                    price=last_price,
-                    partial=partial,
-                    tf_label=tf_label,
-                    cal_prob=cal_prob,
-                    ws_feed=ws_feed,
-                    has_book=has_book,
-                    mid_vel=mid_vel,
-                    pred_us=pred_us,
-                    engine_snap=dutch_engine.snapshot(),
-                    sim_stats=dutch_sim.stats if dutch_sim else None,
-                    session_stats=dutch_session,
-                )
-            else:
-                print_alpha_panel(
-                    asset_label=asset_label,
-                    price=last_price,
-                    partial=partial,
-                    tf_label=tf_label,
-                    raw_prob=raw_prob,
-                    cal_prob=cal_prob,
-                    ws_feed=ws_feed,
-                    has_book=has_book,
-                    mid_vel=mid_vel,
-                    pred_us=pred_us,
-                )
+            # Pick TF to display (cycle through)
+            tf_list = list(tf_states.keys())
+            if tf_list:
+                display_tf = tf_list[display_tf_idx % len(tf_list)]
+                display_state = tf_states[display_tf]
+                display_partial = bar_builder.get_partial_bar(asset_enum, display_tf)
 
-        # -- State persistence (every 5 min) -----------------------
+                if display_partial is not None:
+                    ws_feed = display_state.ws_feeds.get(display_tf)
+                    pm_market = display_state.pm_markets.get(display_tf)
+                    market_matches = True
+                    if pm_market and pm_market.window_end:
+                        bar_secs_int = int(BAR_SECONDS[display_tf])
+                        market_bar_start = int(pm_market.window_end.timestamp()) - bar_secs_int
+                        if market_bar_start != int(display_partial.window_start.timestamp()):
+                            market_matches = False
+                    has_book = (
+                        market_matches
+                        and ws_feed is not None
+                        and ws_feed._connected.is_set()
+                        and ws_feed.best_bid_up > 0
+                        and ws_feed.best_ask_up < 1
+                    )
+                    mid_vel = display_state.mid_tracker.velocity()
+                    model_ready = display_state.last_model_time > 0
+
+                    if dutch_mode and display_state.dutch_engine:
+                        print_dutch_panel(
+                            asset_label=asset_label,
+                            price=last_price,
+                            partial=display_partial,
+                            tf_label=f"{display_state.tf_label} [{display_tf_idx % len(tf_list) + 1}/{len(tf_list)}]",
+                            cal_prob=display_state.cal_prob,
+                            ws_feed=ws_feed,
+                            has_book=has_book,
+                            mid_vel=mid_vel,
+                            pred_us=display_state.pred_us,
+                            engine_snap=display_state.dutch_engine.snapshot(),
+                            sim_stats=display_state.dutch_sim.stats if display_state.dutch_sim else None,
+                            session_stats=display_state.dutch_session,
+                            model_ready=model_ready,
+                        )
+                    else:
+                        print_alpha_panel(
+                            asset_label=asset_label,
+                            price=last_price,
+                            partial=display_partial,
+                            tf_label=f"{display_state.tf_label} [{display_tf_idx % len(tf_list) + 1}/{len(tf_list)}]",
+                            raw_prob=display_state.raw_prob,
+                            cal_prob=display_state.cal_prob,
+                            ws_feed=ws_feed,
+                            has_book=has_book,
+                            mid_vel=mid_vel,
+                            pred_us=display_state.pred_us,
+                            model_ready=model_ready,
+                        )
+                # Cycle to next TF every display interval
+                display_tf_idx += 1
+
+        # -- State persistence (every 5 min, all TFs) -------------
         if dutch_mode and now_disp - last_state_save >= STATE_SAVE_INTERVAL:
             last_state_save = now_disp
-            _save_dutch_state(dutch_state_file, dutch_session, dutch_pending_resolutions)
+            for state in tf_states.values():
+                _save_tf_state(state)
 
     # -- Shutdown -------------------------------------------------
     logger.info("Shutting down...")
-    if dutch_mode:
-        _save_dutch_state(dutch_state_file, dutch_session, dutch_pending_resolutions)
-    if dutch_logger:
-        dutch_logger.close()
-    for feed in ws_feeds.values():
-        feed.stop()
+    for state in tf_states.values():
+        if dutch_mode:
+            _save_tf_state(state)
+        if state.dutch_logger:
+            state.dutch_logger.close()
+        for feed in state.ws_feeds.values():
+            feed.stop()
     logger.info("Monitor stopped.")
 
 
