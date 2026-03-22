@@ -1,3 +1,4 @@
-iter=126 pair=XRP_15m timestamp=2026-03-23T00:00:00Z
+iter=127 pair=XRP_1h timestamp=2026-03-23T04:00:00Z
 Role: RESEARCHER (BACKTEST MODE)
-Experiment: pace_urgency_lo 0.30->0.25 (pre-staged in knobs, per audit.md directive)
+Experiment: max_onesided_cost 5.0->2.0 (already staged in knobs_XRP_1h.json=2.0 vs best_knobs=5.0)
+Hypothesis: XRP_1h has DD=6% (system-best) and avg_profit=+$1.08/bar. Onesided cap=2.0 may cap tail costs. Audit confirms: try onesided=2.0 since DD=5% safe.

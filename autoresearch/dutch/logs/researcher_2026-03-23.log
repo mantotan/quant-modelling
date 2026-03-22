@@ -139,3 +139,6 @@
 2026-03-23T03:41:53Z iter=126 pair=XRP_15m status=DISCARD param=pace_urgency_lo 0.30->0.25
   eval: pair_cost=0.6378 profit=$-0.02 max_dd=12.9% bars=144
   hypothesis: "audit.md directed pace_urgency_lo 0.30->0.25 as continuation of the pace series that yielded 18% improvement at 0.35->0.30; however result shows no improvement at this step (0.6378=0.6378); floor confirmed at pace_urgency_lo=0.30 for XRP_15m"
+2026-03-23T04:00:00Z iter=127 pair=XRP_1h status=DISCARD param=max_onesided_cost 5.0->2.0
+  eval: pair_cost=0.7271 profit=+$0.34 max_dd=4.7% bars=37
+  hypothesis: "XRP_1h DD=6% (system-best) should tolerate onesided cap=2.0 like BTC_5m. BUT low matched_ratio=3.4% makes pair formation sensitive -- cap restricts quality pairs. Floor at onesided=5.0 confirmed. Next: pace_urgency_hi 0.85->0.75"

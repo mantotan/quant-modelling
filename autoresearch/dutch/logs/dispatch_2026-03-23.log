@@ -40,3 +40,4 @@
 2026-03-23T22:05:00Z iter=120 pair=ETH_15m role=researcher outcome=DISCARD -- corrected stale conviction_buy_skip 0.55->0.45, pair_cost=0.560 confirmed at 143 bars, pace_urgency_lo 0.35->0.30 staged for iter 121
 2026-03-23T03:30:40Z iter=122 pair=SOL_5m role=researcher outcome=DISCARD_re-eval_matched_ratio_0pct_2nd_consecutive_collapse
 2026-03-23T03:41:53Z iter=126 pair=XRP_15m role=researcher outcome=DISCARD pace_urgency_lo 0.30->0.25 no improvement pair_cost=0.6378 max_dd=12.9%
+2026-03-23T04:00:00Z iter=127 pair=XRP_1h role=RESEARCHER outcome=DISCARD max_onesided_cost 5.0->2.0 worsened pair_cost 7.9% (0.6738->0.7271), floor at onesided=5.0 confirmed
