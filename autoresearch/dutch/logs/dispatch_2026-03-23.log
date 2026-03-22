@@ -30,3 +30,4 @@
 2026-03-23T20:22:00Z iter=104 pair=BTC_5m role=researcher outcome=KEEP max_onesided_cost 5.0->2.0 pair_cost=0.9220 max_dd=15.3%
 2026-03-23T19:12:21Z iter=107 pair=ETH_5m role=researcher outcome=KEEP max_onesided_cost 2.0->1.5 pair_cost=0.6329 max_dd=13.8% avg_profit=+$0.01
 2026-03-23T20:50:00Z iter=107 pair=ETH_15m role=strategist outcome=rotation7_KEEP_rate=50%_(6/12)_pace_urgency_lo=0.30_breakthrough_+18%_XRP_15m_BTC_5m_first_KEEP_onesided=2.0_ETH_5m_onesided_1.5_KEEP_best_pair=ETH_15m_worst_pair=XRP_5m
+2026-03-23T19:50:00Z iter=112 pair=SOL_15m role=researcher outcome=DISCARD x3: re-eval regression on 140 bars, onesided_cost=2.0 collapsed pairs to 0%, bar_budget=400 neutral; advanced to SOL_1h

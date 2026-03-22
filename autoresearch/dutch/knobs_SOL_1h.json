@@ -1,7 +1,7 @@
 {
   "strategy": "dutch_accumulation",
   "version": "v7",
-  "bar_budget": 300.0,
+  "bar_budget": 400.0,
   "order_size": 5.0,
   "min_order_usd": 1.0,
   "cheap_threshold": 0.1,
@@ -24,7 +24,7 @@
   "risk_exponent": 2.0,
   "conviction_market_start": 0.3,
   "conviction_market_full": 1.0,
-  "conviction_buy_skip": 0.55,
+  "conviction_buy_skip": 0.45,
   "conviction_size_floor": 0.3,
   "max_onesided_cost": 5.0,
   "profit_protect_min_pairs": 5,
