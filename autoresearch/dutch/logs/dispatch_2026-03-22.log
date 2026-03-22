@@ -43,3 +43,4 @@
 2026-03-23T00:00:00Z iter=52 pair=ETH_5m role=researcher outcome=ETH_5m FREEZE -- audit directive, anti-predictive confirmed, pair rotation advanced to ETH_15m
 2026-03-22T22:53:00Z iter=54 pair=ETH_15m role=researcher outcome=KEEP conviction_buy_skip 0.50->0.45 pair_cost=0.7506(9.1% gain) avg_profit=-$0.70 max_dd=53% KEEP_RELAXED next=ETH_1h
 2026-03-22T23:25:00Z iter=55 pair=ETH_1h role=researcher outcome=DISCARD max_onesided_cost 5.0->7.0 zero effect pair_cost=0.7076(vs best 0.7058) avg_profit=-$0.55 max_dd=18.1% onesided_cap inert at 1h next=SOL_5m
+2026-03-22T23:30:00Z iter=55 pair=SOL_5m role=researcher outcome=FROZEN per audit.md directive (correct_side=40%, DD=108% after conv_skip=0.55) -- skipped without experiment, pair rotated to SOL_15m

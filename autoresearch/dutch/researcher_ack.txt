@@ -1,6 +1,5 @@
-iter=55 pair=ETH_1h timestamp=2026-03-22T23:20:00Z
-Status: Running backtest evaluation then hypothesis for ETH_1h.
-Phase: BACKTEST MODE (replay_available)
-Planned change: max_onesided_cost 5.0->7.0 (auditor Tier 1 directive for ETH_1h)
-Prior experiments: iter26 BASELINE, iter39 KEEP (re-eval), iter40 KEEP (conv_skip 0.50->0.45)
-Best known: pair_cost=0.7058 (beats 0.85 benchmark), avg_profit=-$0.49/bar, max_dd=17%
+iter=56 pair=SOL_5m timestamp=2026-03-22T23:30:00Z
+Status: FROZEN — SOL_5m skipped per audit.md directive.
+Reason: FREEZE SOL_5m — correct_side=40% post-skip (iter41 DISCARD: skip=0.55 worsened all metrics
+including tripling DD to 108%); structurally challenged. No viable parameter path identified.
+Action: Advancing pair rotation to SOL_15m without experiment.
