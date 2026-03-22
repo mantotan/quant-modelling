@@ -13,3 +13,6 @@
 2026-03-23T16:30:00Z iter=69 pair=ETH_1h status=DISCARD param=conviction_buy_skip 0.45->0.40
   eval: pair_cost=0.7212 profit=hBc0.28 max_dd=14.0% bars=33
   hypothesis: "conviction_buy_skip 0.45->0.40 -- continue skip series; BTC_1h confirmed skip=0.40 KEEP (iter64). Result: pair_cost regressed 0.7058->0.7212 (+2.2%) despite avg_profit improving. ETH_1h matches XRP_1h anomaly -- skip=0.45 is the floor; further reduction adds lower-quality pairs at worse prices. Blacklist skip=0.40 for ETH_1h."
+2026-03-23T16:40:00Z iter=71 pair=SOL_5m status=KEEP param=conviction_buy_skip 0.50->0.45
+  eval: pair_cost=0.8140 profit=+$0.0007 max_dd=31.14% bars=382
+  hypothesis: "conviction_buy_skip 0.50->0.45 on SOL_5m — SOL_15m analog (14.9% improvement at skip=0.45). V7.3 baseline re-eval first showed natural improvement (0.9455->0.8884, 6% gain). Skip=0.45 then pushed further to 0.8140 (8.4% from re-eval), avg_profit turned positive. Skip=0.45 now confirmed across all SOL TFs (5m/15m/1h). max_dd=31.14% marginally above 30% threshold but KEEP RELAXED applies."

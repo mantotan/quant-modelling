@@ -1,8 +1,9 @@
-iter=69 pair=ETH_1h timestamp=2026-03-23T16:00:00Z
+iter=70 pair=SOL_5m timestamp=2026-03-23T16:35:00Z
 Role: RESEARCHER (BACKTEST MODE)
-Status: Running backtest for ETH_1h, then testing conviction_buy_skip 0.45->0.40
-Hypothesis: conviction_buy_skip 0.45->0.40 -- continue skip series on ETH_1h.
-BTC_1h confirmed skip=0.40 KEEP (iter 64: 0.8707->0.7988, 8.3% improvement).
-ETH_1h best pair_cost: 0.7058 (iter 40, conviction_buy_skip=0.45 KEEP RELAXED).
-Watch: correct_side was 43.3% at skip=0.45 -- if 0.40 drops below 40%, halt series.
-max_onesided_cost increasing is blacklisted for 1h TFs (zero effect, cap never hit).
+Status: Running backtest for SOL_5m, then testing conviction_buy_skip 0.50->0.45
+Hypothesis: conviction_buy_skip 0.50->0.45 -- lowering skip direction, untested on V7.3 for SOL_5m.
+  SOL_15m analog: 14.9% improvement at skip=0.45 (0.9348->0.7956, KEEP iter 56)
+  All 15m/1h pairs tested: 6/6 KEEP at skip=0.45 (universal pattern)
+  Note: audit FREEZE was for skip=0.55 raising direction -- strategy.md post-iter-58 explicitly approves skip=0.45
+  SOL_5m V7.3 baseline: pair_cost=0.9455, avg_profit=-$0.205, max_dd=31.56%
+  Warning: max_dd is already near 30% threshold -- monitor closely
