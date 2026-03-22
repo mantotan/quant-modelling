@@ -89,3 +89,6 @@
   eval: pair_cost=0.8170 profit=$1.43 max_dd=6.16% bars=36
   hypothesis: "risk_ceil 0.15->0.20 per strategy priority #1; SOL_1h has 5.8% DD with exceptional headroom; SOL_15m analog (iter 99) confirmed KEEP; pair_cost 0.8170 still above best 0.6547 -- 2 new expensive bars dominate signal"
 2026-03-23T19:10:00Z iter=101 pair=XRP_5m role=researcher outcome=FROZEN(audit-directive) — structural fill_rate=54% floor, max_dd=69%, pair skipped; advanced to XRP_15m
+2026-03-23T20:00:00Z iter=102 pair=XRP_15m status=KEEP param=pace_urgency_lo 0.35->0.30
+  eval: pair_cost=0.6378 profit=-$0.01 max_dd=11.0% bars=137
+  hypothesis: "Earlier urgency timing (pace_urgency_lo 0.35->0.30) captures pairs before price moves; XRP_15m matched_ratio=2% too selective; earlier gate entry improves pair quality"

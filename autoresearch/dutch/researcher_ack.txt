@@ -1,6 +1,10 @@
-iter=102 pair=XRP_5m timestamp=2026-03-23T19:10:00Z
+iter=102 pair=XRP_15m timestamp=2026-03-23T20:00:00Z
 Phase: BACKTEST MODE (replay_available)
-Status: FROZEN per audit.md directive (iter 95)
-Reason: structural fill_rate=54% floor confirmed (fill_ticks=15 zero effect), max_dd=69%, no profitable pathway
-Audit note: "Do not unfreeze unless fill mechanism change (fill_ticks=20 final test)" — skipping this iteration
-Action: Advancing pair rotation to XRP_15m
+Status: KEEP
+param: pace_urgency_lo 0.35->0.30
+pair_cost: 0.6378 (best was 0.7780, improved 18.0%)
+avg_profit: -$0.01/bar (KEEP RELAXED: >5% cost gain + profit > -2.0)
+max_dd: 11.0% (improved from 17.2%)
+bars_evaluated: 137
+Next hypothesis: conviction_market_start 0.30->0.25 applied to knobs_XRP_15m.json
+Next pair: XRP_1h (pair_index=11)
