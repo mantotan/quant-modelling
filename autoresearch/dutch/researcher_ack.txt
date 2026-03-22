@@ -1,5 +1,6 @@
-iter=51 pair=BTC_15m timestamp=2026-03-22T22:22:00Z
-status=DISCARD param=conviction_buy_skip 0.50->0.45
-eval: pair_cost=0.9201 profit=$-0.09 max_dd=37.9% bars=123
-reason: marginal pair_cost improvement (1.4%, below KEEP RELAXED 5% threshold), max_dd exceeded 30% (37.9%), avg_profit negative
-next: bar_budget 200->300 (knobs_BTC_15m.json already updated, ready for next dispatch)
+iter=52 pair=BTC_1h timestamp=2026-03-22T23:55:00Z
+Status: BACKTEST MODE — running conviction_buy_skip 0.50->0.45 experiment
+Priority: strategy.md #1 for BTC_1h (ETH_1h analog — KEEP at pair_cost 0.9528->0.7058)
+Best known: pair_cost=0.9244 (iter36 baseline, V7.3), max_dd=6%, avg_profit=+$0.827
+Hypothesis: Lower skip allows more selective pair formation at 1h resolution. 52% correct_side
+should benefit. Watch max_dd doesn't exceed 30% (currently only 6%).

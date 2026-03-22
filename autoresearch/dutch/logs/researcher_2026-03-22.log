@@ -104,3 +104,6 @@
 2026-03-22T22:22:00Z iter=51 pair=BTC_15m status=DISCARD param=conviction_buy_skip 0.50->0.45
   eval: pair_cost=0.9201 profit=-$0.09 max_dd=37.9% bars=123
   hypothesis: "conviction_buy_skip 0.50->0.45 — strategy.md #1 priority for BTC_15m (63% correct_side, untested on V7.3). Lower threshold expected to add net-positive trades given high correct_side. Result: only 1.4% pair_cost improvement (below 5% KEEP RELAXED threshold), max_dd exceeded 30% at 37.9%, avg_profit negative. Next: bar_budget 200->300"
+2026-03-22T23:55:00Z iter=52 pair=BTC_1h status=KEEP param=conviction_buy_skip 0.50->0.45
+  eval: pair_cost=0.8707 profit=$0.36 max_dd=9.26% bars=32
+  hypothesis: "ETH_1h analog â€” lower skip threshold allows more selective pair formation at 1h resolution. BTC_1h has 52% correct_side; expect similar improvement to ETH_1h (0.9528->0.7058). Pair_cost improved 5.8% (0.9244->0.8707), avg_profit positive +$0.36/bar. Pattern confirmed."
