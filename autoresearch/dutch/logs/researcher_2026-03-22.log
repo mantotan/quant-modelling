@@ -95,3 +95,9 @@
 2026-03-22T23:11:59Z iter=48 pair=XRP_1h status=DISCARD param=conviction_buy_skip 0.50→0.45
   eval: pair_cost=0.7045 profit=+$0.93 max_dd=5.40% bars=32
   hypothesis: "Following 1h pattern success (ETH_1h, XRP_15m): lower conviction_buy_skip 0.50->0.45 to add throughput on XRP_1h's 57% correct_side; result: pair_cost worsened 0.6738->0.7045 — XRP_1h baseline already highly optimized by dataset growth; lower skip adds marginal pairs at worse prices"
+2026-03-22T23:30:00Z iter=49 pair=BTC_5m status=DISCARD param=- -→-
+  eval: pair_cost=0.9465 profit=$0.15 max_dd=33.21% bars=363
+  hypothesis: "extended-dataset re-eval of V7.3 baseline; pair_cost marginally improved 0.16% but max_dd exceeded 30% threshold; DISCARD — knobs unchanged"
+2026-03-22T23:45:00Z iter=50 pair=BTC_5m status=DISCARD param=conviction_buy_skip 0.50→0.55
+  eval: pair_cost=0.9525 profit=-$0.24 max_dd=64.40% bars=364
+  hypothesis: "strategy.md priority #1 for BTC_5m: since 0.45 failed (iter33), try tighter skip=0.55; 56% correct_side suggests high-confidence signals may be better; RESULT: worsened all metrics — higher matched_ratio at worse prices; both skip directions fail for BTC_5m"

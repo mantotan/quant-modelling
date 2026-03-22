@@ -1,10 +1,5 @@
-iter=47 pair=XRP_1h timestamp=2026-03-22T23:10:17Z
-Phase 0: BACKTEST MODE (sub_phase=replay_available)
-Status: Running experiment on XRP_1h
-Previous: iter 46 XRP_15m KEEP (conviction_buy_skip 0.50->0.45, pair_cost 0.9558->0.7780)
-Current pair: XRP_1h (pair_index=11)
-Audit directive: PRIORITIZE XRP_1h — best baseline pair_cost (0.7157), 0 experiments yet
-Strategy.md priority: conviction_buy_skip 0.50->0.45 (1h pattern confirmed on ETH_1h, XRP_15m)
-Hypothesis: Lower conviction_buy_skip 0.50->0.45 on XRP_1h. XRP_1h has 57% correct_side (best 1h),
-  pair_cost=0.716 (already beats 0.85 benchmark), avg_profit=+$0.51/bar. Analogous to ETH_1h (KEEP)
-  and XRP_15m (KEEP). Expect further cost improvement and potentially better throughput.
+iter=50 pair=BTC_5m timestamp=2026-03-22T23:45:00Z
+status=DISCARD (conviction_buy_skip 0.50->0.55 worsened all metrics)
+result: pair_cost=0.9525 profit=-$0.24 max_dd=64.4% bars=364
+next_pair=BTC_15m next_hypothesis=conviction_buy_skip 0.50->0.45 (strategy.md priority #1, 63% correct_side)
+note: Both skip directions tested for BTC_5m (0.45=DISCARD iter33, 0.55=DISCARD iter50). Next lever: bar_budget 200->300
