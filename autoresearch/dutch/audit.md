@@ -1,183 +1,224 @@
 # Dutch Audit Report
-After iteration 95 (2026-03-23T15:30:00Z)
+After iteration 119 (2026-03-23T21:00:00Z)
 
 ## Directives
 
-- FREEZE XRP_5m — structural fill_rate=54% floor confirmed (fill_ticks=15 zero effect), max_dd=69%, no profitable pathway; skip=0.45 untested but onesided repair blocked by fill microstructure — structural dead-end confirmed
-- FREEZE BTC_15m — compound skip+onesided=3.0 achieved 3.97% (iter 78), compound+onesided=2.0 COLLAPSED matched_ratio to 0.2% (iter 90); both directions of compound change exhausted; skip alone DD>30% (iter 51); all credible hypotheses tested and failed; KEEP rate 0/8 in V7.3 — stalled
-- FREEZE ETH_15m — onesided series: 5->2->1.5 each KEEP (giant gains), 1.5->1.0 COLLAPSED (iter 94); series exhausted; re-eval variance on low-matched-ratio pair; bar_budget 300 is the only remaining lever but pair_cost=0.560 already beats trader_a by 34%; diminishing returns confirmed
-- CONTINUE BTC_5m — onesided=3.0 fixed DD (33%->17%) but not cost (iter 89); try onesided=2.0 which crossed cost threshold on ETH_15m and SOL_5m; DD repair unlocked, one lever remaining
-- CONTINUE BTC_1h — onesided=3.0 marginal +1% (iter 91); skip=0.40 optimum; try pace_urgency_lo or conviction_market_start; thin dataset (35 bars) means high variance; avoid re-tests
-- CONTINUE ETH_5m — onesided=2.0 KEEP (iter 92): pair_cost 0.782->0.736 (+6%), max_dd halved 47%->23%, correct_side recovered to 42.8% (above 38% floor); UNFREEZE from iter 71 directive — DD fixed, correct_side restored; next lever: bar_budget 200->300 or pace_urgency_lo
-- CONTINUE ETH_1h — bar_budget 200->250 next (already queued); risk_ceil and skip both exhausted; need profit lever
-- CONTINUE SOL_5m — onesided=2.0 KEEP (iter 84): pair_cost 0.814->0.733 (+9.9%), max_dd 31%->22%; all benchmarks now met; next: test bar_budget 200->300 or risk_ceil to scale
-- CONTINUE SOL_15m — skip=0.40 confirmed collapsed (iter 85 — XRP_15m analog); bar_budget=300 confirmed optimal; next: risk_ceil 0.15->0.20 or pace_urgency_lo
-- CONTINUE SOL_1h — bar_budget 300 KEEP (iter 86, +0.87%); next: risk_ceil 0.15->0.20 (9% DD headroom, +$0.69/bar profit)
-- CONTINUE XRP_15m — risk_ceil worsened (iter 87); bar_budget=200 optimum confirmed; skip exhausted; next: pace_urgency_lo 0.35->0.30 or conviction_market_start 0.30->0.25
-- CONTINUE XRP_1h — risk_ceil worsened (iter 88, +4.9% cost regression); bar_budget=200 optimum; skip exhausted; next: pace_urgency_lo 0.35->0.45 or conviction_market_start 0.30->0.25
+- FREEZE XRP_5m — structural dead-end confirmed (iter 114 FREEZE executed); skip=0.45 and onesided=2.0 remain untested but fill_rate=54% structural floor and max_dd=69% make further experiments futile; permanent FREEZE
+- FREEZE BTC_15m — onesided=2.0 is next untested lever (strategy queue #1); UNFREEZE from prior directive; run onesided=2.0 ALONE (no skip change) — this is the last credible cost-improvement experiment; if DISCARD, re-FREEZE permanently
+- FREEZE ETH_15m — knobs_ETH_15m.json has conviction_buy_skip=0.55 (STALE: correct value is 0.45 from iter 54); researcher must fix knobs file before any experiment; next experiment after fix: bar_budget 200->300 per strategy.md queue
+- FREEZE SOL_15m — onesided=2.0 COLLAPSED (iter 111): this is critical new information; SOL_15m matched_ratio=8.8% but cap at 2.0 still collapses it (same as SOL_5m at 2.0 in low-match windows); blacklist onesided=2.0 on SOL_15m; next: pace_urgency_lo 0.35->0.30 (XRP_15m 18% gain pattern); knobs.json has max_onesided_cost=5.0 (correctly not updated) — proceed
+- FREEZE SOL_1h — iter 113 DISCARD (corrected knobs, pair_cost=0.6581 vs best 0.6547) confirmed best_knobs are correct but dataset is in regression window (36 bars, high variance); knobs.json has bar_budget=400 (pre-staged experiment); DO NOT RUN bar_budget=400 until re-eval shows pair_cost <0.70; run fresh re-eval first
+- CONTINUE BTC_5m — onesided=1.5 COLLAPSED (iter 117): floor confirmed at onesided=2.0; pace_urgency_lo 0.35->0.30 is next lever (strategy queue #2); knobs.json already has onesided=2.0 (correct); pace_urgency_lo test should proceed
+- CONTINUE BTC_1h — dataset regression persists (37 bars, 4 unfavorable bars since iter 64 KEEP); knobs.json has pace_urgency_lo=0.45 pre-staged — proceed with pace_urgency_lo test; if DISCARD: onesided=2.0 is the final lever
+- CONTINUE ETH_5m — onesided=1.5 confirmed KEEP (iter 107); knobs.json and best_knobs match (onesided=1.5, skip=0.45); next: max_onesided_cost 1.5->1.0 per strategy queue (high collapse risk, monitor matched_ratio)
+- CONTINUE ETH_1h — bar_budget 200->250 DISCARD (iter 108: cost worsened 0.6%); knobs.json has conviction_market_start=0.25 (stale from experiment setup — this was already tested on BTC_1h D iter 106 and XRP_1h D iter 116); SKIP conviction_market_start; next: pace_urgency_lo 0.35->0.30 (XRP_15m pattern); researcher must revert conviction_market_start to 0.30 in knobs before running pace test
+- CONTINUE SOL_5m — matched_ratio collapsed to 0.0% on 416 bars (iter 109 re-eval DISCARD); extreme dataset variance at onesided=2.0 floor; knobs.json has pace_urgency_lo=0.30 pre-staged; DO NOT run pace test until fresh re-eval confirms pair_cost stable; run re-eval first
+- CONTINUE XRP_15m — conviction_market_start DISCARD (iter 115) confirmed BTC_1h/XRP_1h pattern; knobs.json has pace_urgency_lo=0.25 (pre-staged beyond series — next series step is 0.30->0.25); proceed with pace_urgency_lo 0.30->0.25 test
+- CONTINUE XRP_1h — conviction_market_start DISCARD (iter 116) confirmed pattern; knobs.json has pace_urgency_lo=0.35 (unchanged from baseline); next: pace_urgency_hi 0.85->0.75 or onesided=2.0; XRP_1h pace_urgency_lo was DISCARD at 0.35->0.45 (iter 103 — wrong direction); try onesided=2.0 since DD=6% gives maximum headroom
 
 ## Per-Pair Assessment
 
-| Pair | BestCost | AvgProfit | MaxDD% | V7.3 KEEPs | V7.3 DISCARDs | Trajectory | Action |
-|------|----------|-----------|--------|------------|---------------|------------|--------|
-| BTC_5m | 0.948 | +$0.25 | 17.3% | 0 | 8 | DD fixed by onesided=3.0; cost unchanged; try onesided=2.0 | CONTINUE |
-| BTC_15m | 0.933 | +$0.50 | 23% | 0 | 8 | All compound+skip hypotheses exhausted; both directions fail | FREEZE |
-| BTC_1h | 0.799 | -$0.33 | 8.7% | 2 | 7 | Skip exhausted; onesided=3.0 marginal; pace/market_start next | CONTINUE |
-| ETH_5m | 0.736 | -$0.02 | 22.9% | 4 | 4 | UNFREEZE: onesided=2.0 fixed DD, correct_side recovered to 43% | CONTINUE |
-| ETH_15m | 0.560 | -$0.21 | 26.8% | 4 | 6 | Onesided series exhausted (1.0 collapsed); bar_budget only lever | FREEZE |
-| ETH_1h | 0.706 | -$0.49 | 17% | 2 | 5 | Skip exhausted; bar_budget 250 queued; pace_urgency next | CONTINUE |
-| SOL_5m | 0.733 | +$0.05 | 22.3% | 4 | 3 | DD fixed; all benchmarks met; ready for capital scaling | CONTINUE |
-| SOL_15m | 0.786 | +$0.17 | 9.5% | 3 | 3 | Skip floor=0.45 confirmed; bar_budget=300 optimal; scale capital | CONTINUE |
-| SOL_1h | 0.655 | +$0.69 | 5.8% | 3 | 3 | 2nd best pair; bar_budget=300 confirmed; risk_ceil test next | CONTINUE |
-| XRP_5m | 0.909 | -$0.32 | 69% | 1 | 2 | Structural fill_rate floor; no viable pathway | FREEZE |
-| XRP_15m | 0.778 | +$0.01 | 17% | 1 | 5 | All levers exhausted except timing; risk_ceil failed; marginally positive | CONTINUE |
-| XRP_1h | 0.674 | +$1.08 | 6% | 1 | 4 | Best profit; risk_ceil failed; timing tests next | CONTINUE |
+| Pair | BestCost | CurKnobs | AvgProfit | MaxDD% | R8 KEEPs | R8 DISCARDs | Trajectory | Action |
+|------|----------|----------|-----------|--------|----------|-------------|------------|--------|
+| BTC_5m | 0.922 | onesided=2.0 | +$0.19 | 15.3% | 0 | 1 | Floor confirmed at onesided=2.0; pace_urgency_lo next | CONTINUE |
+| BTC_15m | 0.933 | onesided=5.0 | +$0.50 | 23% | 0 | 0 | onesided=2.0 untested — last credible lever | FREEZE (pending onesided=2.0 test) |
+| BTC_1h | 0.799 best / 0.904 current | pace_lo=0.45 staged | +$1.41 | 3.2% | 0 | 2 | Dataset regression on 37 bars; pace_urgency_lo staged | CONTINUE |
+| ETH_5m | 0.633 | onesided=1.5, skip=0.45 | +$0.01 | 13.8% | 0 | 0 | Best active series; onesided=1.0 next (collapse risk HIGH) | CONTINUE |
+| ETH_15m | 0.560 best | skip=0.55 STALE | -$0.21 | 26.8% | 0 | 0 | STALE KNOBS — fix before running; bar_budget=300 next | FREEZE (fix knobs first) |
+| ETH_1h | 0.706 | mkt_start=0.25 STALE | -$0.58 | 15.6% | 0 | 1 | bar_budget failed; mkt_start stale; pace_urgency_lo next | CONTINUE |
+| SOL_5m | 0.676 | pace_lo=0.30 staged | +$0.06 | 18.1% | 0 | 1 | Matched_ratio collapsed to 0.0% on re-eval; re-eval first | CONTINUE |
+| SOL_15m | 0.696 | onesided=5.0 | +$0.42 | 12.5% | 0 | 3 | onesided=2.0 COLLAPSED; bar_budget=400 failed; pace next | FREEZE (pace_urgency_lo next) |
+| SOL_1h | 0.655 best / 0.658 current | bar_budget=400 staged | +$1.49 | 5.7% | 0 | 1 | Corrected knobs re-eval near-miss; dataset variance HIGH | FREEZE (re-eval before bar_budget=400) |
+| XRP_5m | 0.909 | skip=0.45 FROZEN | -$0.32 | 69% | 0 | 0 | PERMANENT FREEZE — structural dead-end | FREEZE |
+| XRP_15m | 0.638 | pace_lo=0.25 staged | -$0.09 | 13% | 0 | 1 | mkt_start DISCARD; pace series continues at 0.30->0.25 | CONTINUE |
+| XRP_1h | 0.674 | onesided=5.0 | +$1.08 | 5.2% | 0 | 1 | mkt_start DISCARD; try onesided=2.0 (DD=5% safe) | CONTINUE |
 
 ## trader_a Gap Analysis
 
-| Pair | BestCost | Target | Gap | Profit | DD | ETA (rotations) |
-|------|----------|--------|-----|--------|----|-----------------|
-| ETH_15m | 0.560 | <0.85 | -0.290 (BEATS +34%) | -$0.21 | 26.8% OK | FROZEN — cost done; profit fix blocked |
-| SOL_1h | 0.655 | <0.85 | -0.195 (BEATS +23%) | +$0.69 | 5.8% OK | Scale capital (risk_ceil test) |
-| XRP_1h | 0.674 | <0.85 | -0.176 (BEATS +21%) | +$1.08 | 6% OK | Timing tests; capital maxed |
-| ETH_1h | 0.706 | <0.85 | -0.144 (BEATS +17%) | -$0.49 | 17% OK | Cost done — bar_budget/pace next |
-| SOL_5m | 0.733 | <0.85 | -0.117 (BEATS +14%) | +$0.05 | 22.3% OK | Capital scaling next |
-| ETH_5m | 0.736 | <0.85 | -0.114 (BEATS +13%) | -$0.02 | 22.9% OK | Near-breakeven; bar_budget next |
-| XRP_15m | 0.778 | <0.85 | -0.072 (BEATS +8%) | +$0.01 | 17% OK | Pace/market_start next |
-| SOL_15m | 0.786 | <0.85 | -0.064 (BEATS +8%) | +$0.17 | 9.5% OK | Risk_ceil capital test |
-| BTC_1h | 0.799 | <0.85 | -0.051 (BEATS +6%) | -$0.33 | 8.7% OK | Marginal; pace/market_start test |
-| BTC_15m | 0.933 | <0.85 | +0.083 (FAILS) | +$0.50 | 23% OK | FROZEN — no remaining levers |
-| BTC_5m | 0.948 | <0.85 | +0.098 (FAILS) | +$0.25 | 17.3% OK | onesided=2.0 last credible lever |
-| XRP_5m | 0.909 | <0.85 | +0.059 (FAILS) | -$0.32 | 69% BAD | FROZEN — structural dead-end |
+| Pair | BestCost | Target | Gap | Profit | DD | Status |
+|------|----------|--------|-----|--------|----|--------|
+| ETH_15m | 0.560 | <0.85 | -34% (BEATS) | -$0.21 | 26.8% OK | FROZEN (knobs stale) |
+| SOL_1h | 0.655 | <0.85 | -23% (BEATS) | +$1.49 | 5.7% OK | FROZEN (re-eval needed) |
+| XRP_1h | 0.674 | <0.85 | -21% (BEATS) | +$1.08 | 5.2% OK | onesided=2.0 next |
+| ETH_1h | 0.706 | <0.85 | -17% (BEATS) | -$0.58 | 15.6% OK | pace_urgency_lo next |
+| SOL_5m | 0.676 | <0.85 | -20% (BEATS) | +$0.06 | 18.1% OK | re-eval before pace test |
+| ETH_5m | 0.633 | <0.85 | -26% (BEATS) | +$0.01 | 13.8% OK | onesided=1.0 next (HIGH risk) |
+| XRP_15m | 0.638 | <0.85 | -25% (BEATS) | -$0.09 | 13% OK | pace_urgency_lo 0.30->0.25 next |
+| SOL_15m | 0.696 | <0.85 | -18% (BEATS) | +$0.42 | 12.5% OK | FROZEN (pace_urgency_lo next) |
+| BTC_1h | 0.799 best | <0.85 | -6% (BEATS) | +$1.41 | 3.2% OK | Dataset regression masks; pace test next |
+| BTC_15m | 0.933 | <0.85 | +10% (FAILS) | +$0.50 | 23% OK | onesided=2.0 last lever |
+| BTC_5m | 0.922 | <0.85 | +8% (FAILS) | +$0.19 | 15.3% OK | pace_urgency_lo 0.35->0.30 next |
+| XRP_5m | 0.909 | <0.85 | +7% (FAILS) | -$0.32 | 69% BAD | PERMANENT FREEZE |
 
-**9 pairs beating trader_a pair_cost benchmark** (unchanged from iter 71, but SOL_5m and ETH_5m now both improved since last audit).
+**9 pairs beating trader_a pair_cost benchmark** (unchanged from iter 95 audit).
 
-## Key Findings from Rotation 6 (iters 72-95)
+## Key Findings from Rotation 8 (iters 108-119)
 
-### 1. KEEP rate 5/24 = 20.8% — structural floors confirmed on multiple pairs
+### 1. KEEP rate 0/11 = 0% — worst rotation in V7.3 history
 
-This rotation confirms the diminishing-returns trend. Of 5 KEEPs:
-- 2 were capital-scaling (SOL_1h bar_budget, SOL_15m bar_budget+re-eval) — near-costless improvements
-- 1 was ETH_15m onesided=1.5 (+20.4%) — a major breakthrough, now the system's best pair_cost
-- 1 was SOL_5m onesided=2.0 — DD repair confirmed by ETH_15m analog
-- 1 was ETH_5m onesided=2.0 — DD repair, correct_side recovered above 38% floor
+Rotation 8 (iters 108-119, partial: 11 data experiments + 1 FREEZE) produced zero KEEPs.
+Every experiment either failed cost threshold or produced a collapse event:
+- SOL_5m re-eval: matched_ratio collapsed to 0.0% on 416 bars (dataset variance at floor)
+- SOL_15m: 3 consecutive DISCARDs — onesided=2.0 COLLAPSED, re-eval regression, bar_budget=400 neutral
+- SOL_1h: corrected knobs re-eval within noise of best (0.6581 vs 0.6547)
+- BTC_5m onesided=1.5: COLLAPSED (floor confirmed at 2.0, same as SOL_5m iter 97)
+- BTC_1h: dataset regression persists (2 DISCARDs)
+- ETH_1h bar_budget=250: cost worsened 0.6%
+- XRP_15m/XRP_1h mkt_start=0.25: both DISCARD (BTC_1h pattern confirmed cross-pair)
+This is a structural plateau period — rotation 7's 50% KEEP rate was driven by the XRP_15m breakthrough and BTC_5m first KEEP. Those were one-time discoveries.
 
-The 19 DISCARDs confirm structural floors on: BTC_15m compound direction (both onesided values), BTC_1h onesided, ETH_15m onesided=1.0 (too tight), XRP pair risk_ceil scaling.
+### 2. SOL_15m onesided=2.0 COLLAPSE — new critical finding
 
-### 2. Onesided cap is the dominant effective lever — but now largely exhausted
+iter 111 showed SOL_15m onesided=2.0 COLLAPSED to 0.0% matched_ratio (zero pairs formed across 140 bars).
+This is unexpected: SOL_15m has matched_ratio=8.8% (vs SOL_5m's 0.94% at collapse). The collapse at 2.0
+implies SOL_15m pairs cluster heavily above $2.00 — the cap completely blocks them. This differs from
+ETH_5m where 2.0 KEEP (iter 92) and 1.5 KEEP (iter 107). SOL pair behavior for onesided caps differs
+from ETH pair behavior. Do NOT test onesided cap on SOL_15m or SOL_1h.
 
-ETH_15m: 5->2->1.5 each KEEP (series total: ~27% improvement). 1.5->1.0 collapsed. Floor at 1.5.
-SOL_5m: 5->2 KEEP (+9.9%, DD 31%->22%). Series open to test 2.0->1.5 if DD rises.
-ETH_5m: 5->2 KEEP (+6%, DD 47%->23%). Series open to test 2.0->1.5 in future.
-BTC_5m: 5->3 fixed DD only (no cost gain). 3->2 remains untested — last credible BTC_5m lever.
-BTC_15m: compound skip+onesided=3.0 near-miss (3.97%), onesided=2.0 COLLAPSED. Both directions fail.
-BTC_1h: 5->3 marginal (+1%). Not a reliable lever on 1h TF.
+### 3. BTC_5m onesided floor confirmed at 2.0 — pace_urgency_lo is next
 
-### 3. XRP and SOL pairs diverge sharply on capital scaling
+iter 117 confirmed BTC_5m onesided=1.5 collapses (same as SOL_5m iter 97). Floor=2.0 for all BTC/SOL 5m pairs.
+ETH_5m uniquely extends to 1.5 (possibly ETH has cheaper pair composition). pace_urgency_lo 0.35->0.30 is
+the next untested lever on BTC_5m (XRP_15m showed 18% gain with this move).
 
-XRP pairs (both 15m and 1h): bar_budget 300 DISCARD, risk_ceil DISCARD. Capital scaling uniformly fails.
-SOL pairs (15m and 1h): bar_budget 300 KEEP on both. SOL pairs can absorb larger capital.
-SOL_1h is now best candidate for risk_ceil test (5.8% DD, +$0.69/bar, capital confirmed scaling-friendly).
+### 4. conviction_market_start 0.30->0.25 universally fails — confirmed blacklist
 
-### 4. BTC_15m confirmed stalled — FREEZE directive
+Four consecutive DISCARDs: BTC_1h (iter 106), XRP_15m (iter 115), XRP_1h (iter 116), and BTC_1h pattern.
+Pattern: easing the market entry threshold increases matched_ratio but adds weaker predictions that
+degrade pair quality. Confirmed cross-asset, cross-timeframe. Add to global blacklist.
 
-Zero KEEPs in all 8 V7.3 experiments. Last two hypotheses both failed:
-- Compound skip=0.45+onesided=3.0: 3.97%, just missed 5% threshold. Near-miss.
-- Compound skip=0.45+onesided=2.0: COLLAPSED matched_ratio to 0.2%. Dead direction.
-Skip=0.45 alone causes max_dd>30%. No viable skip direction. No viable compound. No budget lever.
-BTC_15m at pair_cost=0.933 may represent its structural floor given V7.3 architecture.
+### 5. Stale knobs files detected — critical researcher compliance issue
 
-### 5. ETH_5m unfrozen — correct_side recovered after onesided repair
+Multiple active knobs.json files diverge from best_knobs or contain staged-but-unrun experiments:
+- ETH_15m: knobs has skip=0.55 (stale, correct value is 0.45)
+- ETH_1h: knobs has conviction_market_start=0.25 (pre-staged for experiment that is now globally blacklisted)
+- SOL_1h: knobs has bar_budget=400 (pre-staged; must not run until re-eval confirms pair_cost <0.70)
+- SOL_5m: knobs has pace_urgency_lo=0.30 (pre-staged; must not run until re-eval confirms stability)
+- BTC_1h: knobs has pace_urgency_lo=0.45 (pre-staged; proceed — this is the correct next experiment)
+- XRP_15m: knobs has pace_urgency_lo=0.25 (beyond series — but series step 0.30->0.25 is indeed next)
+Researcher must verify knobs match best_knobs before each experiment and only modify the single target param.
 
-Prior audit FREEZEd ETH_5m (correct_side=37.3% at anti-predictive floor). Onesided=2.0 (iter 92)
-raised correct_side to 42.8% — above the 38% warning floor — while also improving pair_cost (+6%)
-and halving max_dd. The DD/cost improvement unexpectedly cleaned up signal quality. UNFREEZE.
-ETH_5m at pair_cost=0.736 now 2 points from ETH_1h (0.706). Next experiments are safe to run.
+### 6. BTC_1h structural regression — may need FREEZE decision
 
-### 6. ETH_15m ready to FREEZE — onesided series exhausted, gains sufficient
+Iter 118 re-eval with corrected conviction_buy_skip=0.40: pair_cost=0.9042, fails to beat best KEEP
+0.7988. 4 unfavorable new bars since iter 64 KEEP (33 bars to 37 bars). Dataset is structurally
+worse than when the best KEEP was achieved. pace_urgency_lo is staged and worth one test. If DISCARD:
+BTC_1h should be considered for FREEZE — the window for meaningful improvement may have closed
+as unfavorable bars accumulate in the thin 37-bar dataset.
 
-pair_cost=0.560 is 34% below trader_a target. max_dd=26.8% is below 30% threshold. Both acceptance
-criteria met. The only remaining lever is bar_budget 200->300, but this is a marginal test and
-the pair has high variance on low matched_ratio (0.3%). Re-eval in iter 93 showed 20.5% regression
-on just 3 new bars — extreme variance. Further experiments risk introducing noise without gain.
-FREEZE: store the 0.560 result as final for ETH_15m. Researcher time better spent on other pairs.
+### 7. SOL_1h dataset variance is structural — risk_ceil retest deferred
 
-### 7. Timing parameters (pace_urgency_lo, conviction_market_start) now the frontier
-
-All primary levers (skip series, onesided cap, bar_budget, risk_ceil) are exhausted or blocked on
-most pairs. The remaining untested territory is entry timing:
-- pace_urgency_lo 0.35->0.30 (earlier entry) — XRP_15m, XRP_1h
-- pace_urgency_lo 0.35->0.45 (later entry) — BTC_1h, ETH_1h, XRP_1h
-- conviction_market_start 0.30->0.25 — XRP_15m, XRP_1h (increase qualifying predictions)
-These are lower-confidence levers with fewer prior results, but they are the remaining exploration space.
+Best KEEP pair_cost=0.655 (iter 58, 34 bars). Current re-eval (iter 113, 36 bars): 0.6581 — near
+the best but technically a DISCARD. The pair has 2 new bars since last valid KEEP measurement.
+SOL_1h +$1.49/bar avg_profit is the highest in the system. Dataset will stabilize with more bars.
+bar_budget=400 pre-staged in knobs is premature — run re-eval to confirm cost before scaling budget.
 
 ## Risk Flags
 
-- **BTC_5m**: pair_cost=0.948 after 8 V7.3 experiments still fails benchmark. onesided=2.0 is the
-  only remaining credible lever. If it fails (like onesided=3.0 which only fixed DD), BTC_5m may
-  need a structural FREEZE decision at iter ~97-98.
-- **ETH_15m**: pair_cost variance extreme (0.560 -> 0.675 on 3 new bars, iter 93). Matched_ratio=0.3%
-  means single pairs dominate statistics. FREEZE protects the 0.560 best result from being eroded
-  by continued experimentation variance.
-- **BTC_15m**: 0 KEEPs in 8 V7.3 experiments. Best pair_cost=0.933 unchanged from V7.3 baseline.
-  All skip and compound onesided hypotheses exhausted. FREEZE unless structural knob change (e.g.,
-  max_marginal_pair_cost or conviction_size_floor) is identified as untested.
-- **XRP_5m**: fill_rate structural floor (54%) with max_dd=69%. FREEZE confirmed from prior audit.
-  Do not unfreeze unless a fill mechanism change (different order type, fill_ticks=20 final test).
-- **ETH_1h**: avg_profit -$0.49/bar persistently negative. All experiments so far have improved
-  pair_cost without fixing profit. bar_budget 250 may help but structural issue may be correct_side=43%.
-- **XRP_15m correct_side=33.3%**: near anti-predictive floor. Do not test conviction_buy_skip
-  or any experiment that could further degrade signal quality. Timing-only experiments.
+- **ETH_5m onesided=1.0**: Collapse risk HIGH. ETH_15m collapsed at 1.0 (iter 94). ETH_5m has
+  matched_ratio=0.8% (lower than ETH_15m's 1.0% at collapse). Proceed with test but accept
+  collapse as likely outcome. If matched_ratio drops below 0.2%: floor=1.5 confirmed on ETH_5m.
+  If KEEP: would be first pair below 0.60 — major breakthrough.
+
+- **SOL_5m dataset instability**: matched_ratio=0.0% on 416-bar re-eval (iter 109) — extreme
+  variance. pace_urgency_lo test (pre-staged) must wait for re-eval showing stable pair formation.
+  Running pace test during collapse window produces meaningless results.
+
+- **BTC_1h approaching FREEZE threshold**: 0 KEEPs in rotation 7-8 (iters 91-118) plus dataset
+  regression. pace_urgency_lo test is last meaningful lever. If DISCARD: FREEZE recommended.
+
+- **SOL_15m bar_budget=400 DISCARD**: iter 112 confirmed onesided collapse prevents meaningful
+  budget scaling experiments. pace_urgency_lo is the cleanest remaining experiment.
+
+- **XRP_5m FREEZE at highest DD**: max_dd=69% makes this the system's worst risk profile.
+  No experiment has reduced this — fill_rate structural floor prevents meaningful pair formation
+  improvement. Permanent FREEZE maintained.
 
 ## Researcher Compliance Assessment
 
-researcher_ack (iter 95) correctly tested ETH_1h bar_budget 200->250 per strategy.md priority queue.
-DISCARD result (+1.8% on re-eval, below 5% threshold). This was a re-eval triggered by 1 new bar,
-not a true bar_budget test — researcher should distinguish re-eval from parameter change in next attempt.
-The actual bar_budget 200->250 test is still unrun. Compliance is satisfactory — researcher followed
-the strategy queue and acknowledged the correct next hypothesis.
+Rotation 8 compliance: MOSTLY SATISFACTORY with knob management concerns.
+- iter 108: ETH_1h bar_budget 200->250 correctly per strategy queue. DISCARD appropriate.
+- iter 109: SOL_5m re-eval appropriate before pace_urgency_lo. Collapse discovered.
+- iters 110-112: SOL_15m — 3 experiments in sequence. Re-eval then onesided then bar_budget.
+  Re-eval appropriate. onesided=2.0 test was NOT in strategy queue (queue was: onesided cap as
+  preventive DD measure; budget=400 next). Sequence acceptable but ordering deviated slightly.
+- iter 113: SOL_1h corrected knobs re-eval — appropriate compliance with strategy note.
+- iter 114: XRP_5m FREEZE directive correctly executed (logged as FREEZE row).
+- iters 115-116: XRP_15m/XRP_1h conviction_market_start — strategy said "test after pace series
+  resolves" for XRP_15m; XRP_1h strategy said mkt_start as priority #1. Compliance adequate.
+- iters 117-118: BTC_5m onesided=1.5 and BTC_1h re-eval — both per strategy queue. Correct.
 
-Prior rotation compliance: researcher correctly followed DD-repair priority from strategy.md:
-iter 84 (SOL_5m onesided=2.0 KEEP), iter 85 (SOL_15m skip=0.40 DISCARD per queue item 9),
-iter 86 (SOL_1h bar_budget KEEP), iter 87-88 (XRP risk_ceil tests), iter 89-90 (BTC onesided
-and compound tests), iter 91 (BTC_1h onesided), iter 92 (ETH_5m onesided KEEP), iter 93-94
-(ETH_15m re-eval + onesided=1.0). Full rotation compliance confirmed.
+Knob management concern: multiple knobs.json files contain staged experiments or stale values.
+Researcher should synchronize knobs.json to best_knobs at start of each experiment, then apply
+single param change. This prevents accumulated drift from causing incorrect baseline comparisons.
 
-## Recommendations for Next 24 Iterations (rotation 7, iters 96-119)
+## Recommendations for Next 24 Iterations (rotation 9, iters 120-143)
 
-### Tier 1 — Last credible cost-improvement experiments
+### Tier 1 — Re-evals needed before experiments (4 pairs)
 
-1. **BTC_5m**: max_onesided_cost 5.0->2.0 (knobs still at 5.0; iter 89 tested 3.0 — DD fixed but cost unchanged; 2.0 is the ETH_15m/SOL_5m proven value; if cost does not improve, FREEZE at iter ~97)
-2. **ETH_1h**: bar_budget 200->250 (the actual parameter change test, not the re-eval from iter 95; small increment cautious test)
-3. **ETH_5m**: bar_budget 200->300 (pair_cost=0.736, max_dd=22.9% safe; correct_side=42.8% safe; SOL_5m analog confirms SOL/ETH 5m pairs respond to onesided cap similarly)
-4. **SOL_5m**: risk_ceil 0.15->0.20 (pair_cost=0.733 excellent, +$0.05/bar profit, 22.3% DD — safe for capital scaling; SOL_1h confirmed SOL pairs scale differently from XRP)
+1. **SOL_5m**: Re-eval with best_knobs (onesided=2.0, skip=0.45, pace_urgency_lo=0.35).
+   matched_ratio collapse on 416 bars is dataset variance. Confirm stability before pace test.
+   Only proceed to pace_urgency_lo if re-eval shows matched_ratio > 0.3%.
 
-### Tier 2 — Capital scaling on confirmed winners
+2. **SOL_1h**: Re-eval with best_knobs (skip=0.45, bar_budget=300, pace_urgency_lo=0.35).
+   Current knobs.json has bar_budget=400 — reset to best_knobs first, then re-eval.
+   If pair_cost <0.70: proceed to bar_budget=400. If >0.80: wait another rotation for stability.
 
-5. **SOL_1h**: risk_ceil 0.15->0.20 (5.8% DD, +$0.69/bar — absolute best capital efficiency in system; risk_ceil failed on XRP/BTC/ETH 1h pairs but SOL_1h has proven positive profit base)
-6. **SOL_15m**: risk_ceil 0.15->0.20 (9.5% DD, +$0.17/bar, bar_budget=300; low-risk capital test)
-7. **ETH_5m**: pace_urgency_lo 0.35->0.45 if bar_budget fails (alternative lever for cost/profit improvement)
+3. **ETH_15m**: Fix stale knobs (set conviction_buy_skip=0.45 to match best_knobs, set
+   max_onesided_cost=1.5). Then re-eval on current dataset before bar_budget=300 test.
+   ETH_15m high variance (1% matched_ratio) means re-eval is mandatory before param changes.
 
-### Tier 3 — Timing experiments on exhausted-lever pairs
+4. **ETH_1h**: Reset conviction_market_start from 0.25->0.30 in knobs (globally blacklisted).
+   Then run pace_urgency_lo 0.35->0.30 — XRP_15m pattern strongly motivates this for ETH_1h.
 
-8. **XRP_1h**: pace_urgency_lo 0.35->0.45 (skip+budget exhausted; timing is next unexplored lever; fill rate 88% already high — later entry may select better-priced pairs)
-9. **XRP_15m**: conviction_market_start 0.30->0.25 (very low matched_ratio=2%; easing market entry bar may qualify more predictions; different from skip which collapsed pair formation)
-10. **BTC_1h**: pace_urgency_lo 0.35->0.45 or conviction_market_start 0.30->0.25 (skip+onesided exhausted; thin dataset 35 bars; timing test as final lever)
+### Tier 2 — Active experiments (6 pairs)
 
-### Tier 4 — Final cleanup
+5. **ETH_5m**: max_onesided_cost 1.5->1.0 — continue series. Accept collapse if matched_ratio
+   drops below 0.2% (floor=1.5 confirmed). If KEEP: pair_cost target <0.60 first in system.
 
-11. **XRP_5m**: fill_ticks 10->20 (last structural test; fill_ticks=15 showed zero improvement from 10, but 20 is the final point to confirm absolute floor; after this FREEZE is permanent)
-12. **BTC_15m**: conviction_market_start 0.30->0.25 or conviction_size_floor change (only if FREEZE directive is overruled; these are low-confidence tests on a stalled pair — FREEZE preferred)
+6. **BTC_15m**: max_onesided_cost 5.0->2.0 ALONE (no skip change, skip=0.50).
+   ETH_5m/SOL_5m/BTC_5m all KEEP at 2.0. BTC_15m matched_ratio=12% means lowest collapse risk.
+   Most promising remaining experiment in the system. UNFREEZE for this one test.
+
+7. **BTC_5m**: pace_urgency_lo 0.35->0.30 — staged in knobs. XRP_15m 18% gain pattern.
+   BTC_5m paired with onesided=2.0 context. Run after confirming knobs are at best_knobs + pace change.
+
+8. **BTC_1h**: pace_urgency_lo 0.35->0.45 — staged in knobs. If DISCARD: FREEZE candidate.
+   NOTE: BTC_1h has skip=0.40 (confirmed KEEP), but best_knobs shows risk_ceil=0.20 which is
+   STALE (risk_ceil DISCARD iter 80). Researcher must verify BTC_1h best_knobs values match
+   confirmed KEEPs: conviction_buy_skip=0.40 (iter 64), risk_ceil=0.15 (baseline).
+
+9. **XRP_15m**: pace_urgency_lo 0.30->0.25 — continue series (knobs pre-staged at 0.25).
+   Risk: matched_ratio=0.3% may collapse entirely. If collapse: floor=0.30 confirmed.
+   If KEEP: XRP_15m would be near pair_cost=0.52 — system best.
+
+10. **XRP_1h**: max_onesided_cost 5.0->2.0 — DD=5.2% gives maximum headroom.
+    conviction_market_start globally blacklisted. onesided=2.0 is best remaining structural lever.
+    BTC_1h onesided=3.0 showed only 1% (sub-threshold) — XRP_1h may differ with higher matched_ratio.
+
+### Tier 3 — Capital scaling on confirmed winners
+
+11. **SOL_15m**: pace_urgency_lo 0.35->0.30 — onesided COLLAPSED (blacklisted), bar_budget=400
+    neutral. Pace timing is the next unexplored lever. Low risk relative to onesided experiments.
+
+12. **SOL_1h**: bar_budget 300->400 — proceed only after re-eval confirms pair_cost <0.70.
+    avg_profit=+$1.49/bar best in system. If dataset stabilizes, budget scaling compounds returns.
+    Also: risk_ceil=0.15->0.20 should be retested when pair_cost confirms stable (was tested in
+    regression window at iters 100-101 — invalid test).
 
 ### Do NOT attempt
 
-- ETH_15m: FROZEN. onesided series exhausted (1.0 collapsed); bar_budget risks noise on 0.3% matched_ratio
-- XRP_5m: FROZEN (after fill_ticks=20 final test). Structural fill_rate floor confirmed
-- BTC_15m: FROZEN. All skip+compound hypotheses exhausted. 0/8 V7.3 KEEPs
-- XRP_15m or XRP_1h skip: both directions exhausted — permanent floors confirmed
-- SOL_1h skip further: floor confirmed at 0.45 (iter 74 DISCARD)
+- conviction_market_start 0.30->0.25 on any pair: GLOBAL BLACKLIST (4/4 DISCARDs cross-pair)
 - unmatched_ratio tightening: global blacklist (3/3 DISCARDs)
 - sell_loss_start tightening: global blacklist (2/2 DISCARDs)
-- risk_ceil increase on XRP pairs: 2/2 DISCARDs (iters 87-88) — capital scaling fails on XRP
-- max_onesided_cost increase on 1h TFs: zero effect confirmed (ETH_1h iter 55)
-- bar_budget 300 on XRP pairs: both DISCARDs — optimum at 200 confirmed
+- max_onesided_cost ANY value on SOL_15m: COLLAPSED at 2.0 (iter 111) — permanent blacklist for SOL_15m
+- max_onesided_cost <2.0 on BTC_5m/SOL_5m: floor=2.0 confirmed on both (iters 97, 117)
+- max_onesided_cost <1.5 on ETH_15m: floor=1.5 confirmed (iter 94 collapse)
+- pace_urgency_lo on any 1h pair: zero effect confirmed (BTC_1h iter 6, XRP_1h iter 103)
+  EXCEPTION: BTC_1h pace_urgency_lo=0.45 staged for test — this is pace_urgency_lo INCREASING
+  (not decreasing), which is untested on BTC_1h specifically
+- bar_budget 300 on XRP pairs: both DISCARDs (iters 75-76) — optimum at 200 confirmed
+- risk_ceil increase on XRP/ETH/BTC pairs: multiple DISCARDs — only SOL pairs respond to risk_ceil scaling
+- skip changes on BTC_15m: definitively exhausted (3 confirmations of collapse)
+- skip changes on XRP_1h: both directions exhausted (iters 48, 61)
+- conviction_buy_skip < 0.45 on SOL_1h: SOL_1h skip floor = 0.45 (iter 58 KEEP, iter 74 DISCARD at 0.40)

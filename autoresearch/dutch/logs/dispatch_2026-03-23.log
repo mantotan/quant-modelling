@@ -34,3 +34,5 @@
 2026-03-23T00:00:00Z iter=114 pair=XRP_5m role=researcher outcome=FREEZE -- audit directive, structural dead-end, advanced to XRP_15m
 2026-03-23T12:00:00Z iter=115 pair=XRP_15m role=researcher outcome=DISCARD conviction_market_start 0.30->0.25 no pair_cost improvement (0.6378=0.6378)
 2026-03-23T12:30:00Z iter=116 pair=XRP_1h role=researcher outcome=DISCARD conviction_market_start 0.30->0.25 worsened pair_cost; next max_onesided_cost 5.0->2.0
+2026-03-23T03:08:45Z iter=119 pair=ETH_5m role=RESEARCHER outcome=DISCARD max_onesided_cost 1.5->1.0 full collapse (matched_ratio 0.0%), floor=1.5 confirmed
+2026-03-23T21:00:00Z iter=119 pair=ETH_15m role=auditor outcome=FREEZE_XRP5m_permanent+BTC15m_UNFREEZE_onesided2+0_KEEPs_rotation8+conviction_mkt_start_global_blacklist+stale_knobs_flagged

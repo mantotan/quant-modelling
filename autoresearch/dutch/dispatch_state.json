@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 4,
-  "last_updated": "2026-03-23T03:08:45Z",
-  "last_role": "researcher",
+  "last_updated": "2026-03-23T21:00:00Z",
+  "last_role": "auditor",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 107,
-  "last_auditor_at": 95,
+  "last_auditor_at": 119,
   "total_iterations": 119,
-  "last_exit_reason": "ETH_5m: DISCARD -- max_onesided_cost 1.5->1.0 collapsed pair formation: matched_ratio 0.7%->0.0%, pair_cost 0.6329->0.0000; floor confirmed at 1.5, same pattern as ETH_15m collapse at iter 94"
+  "last_exit_reason": "AUDITOR: rotation 8 analysis complete (0/11 KEEPs). Key findings: conviction_market_start globally blacklisted, SOL_15m onesided=2.0 COLLAPSED blacklisted, BTC_5m/SOL_5m floor confirmed at onesided=2.0, multiple stale knobs detected. Directives: FREEZE XRP_5m permanent, BTC_15m UNFREEZE for onesided=2.0 test, SOL_1h/SOL_5m/ETH_15m re-evals needed before experiments."
 }
