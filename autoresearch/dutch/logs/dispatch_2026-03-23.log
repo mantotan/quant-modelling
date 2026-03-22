@@ -1,0 +1,2 @@
+2026-03-23T16:00:00Z iter=58 pair=XRP_5m role=strategist outcome=KEEP_rate=44%_best=SOL_1h(0.661)_worst=ETH_15m(DD=70%)_7pairs_beat_benchmark
+2026-03-23T16:15:00Z iter=59 pair=XRP_5m role=RESEARCHER outcome=DISCARD fill_ticks 10->15 marginal gain, fill_rate structural limit; next=conviction_buy_skip 0.50->0.45

@@ -131,3 +131,6 @@
 2026-03-22T16:15:00Z iter=62 pair=BTC_5m status=DISCARD param=cheap_threshold 0.10->0.12
   eval: pair_cost=0.9444 profit=$0.21 max_dd=33.2% bars=374
   hypothesis: "Loosening cheap_threshold 0.10->0.12 to increase pair formation volume on this profitable pair. Prior tightening to 0.07 failed. Loosening direction untested. Result: marginal pair_cost gain (0.38%) but max_dd 33.2% exceeds 30% hard threshold. DISCARD."
+2026-03-22T16:22:00Z iter=63 pair=BTC_15m status=DISCARD param=bar_budget 200->300
+  eval: pair_cost=0.9429 profit=$0.44 max_dd=19.3% bars=126
+  hypothesis: "bar_budget 200->300 worsened pair_cost (0.9334->0.9429); reverting. Next: cheap_threshold 0.10->0.12 — only tightening direction tested on V7.3; loosening is untested on this profitable pair"

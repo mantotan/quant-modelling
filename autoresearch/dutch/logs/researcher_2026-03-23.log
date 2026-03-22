@@ -1,0 +1,9 @@
+2026-03-23T15:44:55Z iter=57 pair=SOL_1h status=DISCARD param=conviction_buy_skip 0.50->0.35
+  eval: pair_cost=0.0000 profit=$-0.1187 max_dd=2.46% bars=32
+  hypothesis: "conviction_buy_skip 0.50->0.35 too aggressive — zero pair formation (matched_ratio=0%), skip=0.35 excludes nearly all trades"
+2026-03-23T15:46:49Z iter=58 pair=SOL_1h status=KEEP param=conviction_buy_skip 0.50->0.45
+  eval: pair_cost=0.6605 profit=$+0.5424 max_dd=9.07% bars=32
+  hypothesis: "conviction_buy_skip 0.50->0.45 — ETH_1h/SOL_15m analog pattern. SOL_1h 57% correct_side. Lower skip adds throughput while maintaining direction quality. Strategy priority #1 for SOL_1h. Result: pair_cost 5.2% improvement (0.6967->0.6605), avg_profit +$0.54/bar positive, max_dd unchanged."
+2026-03-23T16:15:00Z iter=59 pair=XRP_5m status=DISCARD param=fill_ticks 10->15
+  eval: pair_cost=0.8998 profit=$-0.3041 max_dd=66.97% bars=373
+  hypothesis: "fill_ticks 10->15 — audit.md recommended for XRP_5m 54% fill_rate (worst in system). Strategy priority #3. Result: pair_cost only 0.96% improvement (0.9085->0.8998), fill_rate unchanged at 54% — structural microstructure limit. Does not meet 5% KEEP RELAXED threshold. DISCARD. Next: conviction_buy_skip 0.50->0.45 (strategy priority #1, XRP_15m analog showed 18.6% improvement)."

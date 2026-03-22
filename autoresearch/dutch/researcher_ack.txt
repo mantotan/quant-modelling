@@ -1,7 +1,9 @@
-iter=62 pair=BTC_5m timestamp=2026-03-22T16:10:00Z
+iter=63 pair=BTC_15m timestamp=2026-03-22T16:22:00Z
 Role: RESEARCHER (BACKTEST MODE)
+Evaluated: bar_budget 200->300 — DISCARD (pair_cost 0.9334->0.9429, cost regression)
 Hypothesis: cheap_threshold 0.10->0.12 — loosening entry threshold.
-BTC_5m is profitable at baseline (+$0.055/bar, 56% correct_side) but conviction_buy_skip is exhausted (both 0.45 and 0.55 DISCARDs).
-Loosening cheap_threshold from 0.10->0.12 should increase pair formation volume slightly without disrupting cost discipline.
-Prior test tightened to 0.07 (iter 17, DISCARD); the loosening direction is completely untested.
-Current best_knobs avg_pair_cost=0.9480 (iter 21 BASELINE).
+BTC_15m is profitable at baseline (+$0.498/bar, 63% correct_side, matched_ratio=12%).
+Only tightening direction tested (0.07, DISCARD iter 17). Loosening to 0.12 is untested on V7.3.
+Slightly more liberal entry may increase matched_ratio and avg_profit without disrupting cost discipline.
+Next iteration will run backtest and evaluate.
+Current best_knobs avg_pair_cost=0.9334 (V7.3 baseline, no KEEP yet for BTC_15m).
