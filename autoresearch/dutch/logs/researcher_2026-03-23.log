@@ -22,3 +22,6 @@
 2026-03-23T23:51:00Z iter=74 pair=SOL_1h status=DISCARD param=conviction_buy_skip 0.45->0.40
   eval: pair_cost=0.7367 profit=$0.42 max_dd=10.8% bars=33
   hypothesis: "BTC_1h succeeded at skip=0.40 (iter 64, +8.3%); SOL_1h has 9% DD and +$0.56/bar — similar profile. Test whether skip series can continue. But matched_ratio=3.0% at 0.45 is thin — collapse risk. Result: pair_cost worsened 11.5% (0.6605->0.7367). skip=0.45 is confirmed optimum for SOL_1h. Next: bar_budget 200->300 (audit Tier 1 safety scale)"
+2026-03-23T23:54:35Z iter=75 pair=XRP_15m status=DISCARD param=bar_budget 200->300
+  eval: pair_cost=0.7832 profit=hBc0.10/bar max_dd=10.9% bars=129
+  hypothesis: bar_budget scale-up from 200->300 tested; pair_cost slightly worsened (0.7780->0.7832), avg_profit turned negative; DD improved 17.2->10.9%; next: risk_ceil 0.15->0.20 to test per-bar capital allocation lever on this benchmark-beating pair

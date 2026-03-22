@@ -1,7 +1,1 @@
-iter=74 pair=SOL_1h timestamp=2026-03-23T23:50:00Z
-Role: RESEARCHER (BACKTEST MODE)
-Status: Running experiment on SOL_1h, testing conviction_buy_skip 0.45->0.40
-Hypothesis: skip=0.40 may further improve pair_cost on best pair (0.6605, +$0.56/bar, 9% DD)
-Following strategy.md priority #1 + audit Tier 3: BTC_1h succeeded at skip=0.40 (iter 64, +8.3%)
-SOL_1h has matched_ratio=3.0% at skip=0.45 — collapse risk if drops to 0% (like XRP_15m at iter 60)
-Best known pair_cost for SOL_1h: 0.6605 (iter 58, KEEP at skip=0.45)
+iter=75 pair=XRP_15m timestamp=2026-03-23T23:54:35Z status=DISCARD param=bar_budget 200->300; next hypothesis: risk_ceil 0.15->0.20
