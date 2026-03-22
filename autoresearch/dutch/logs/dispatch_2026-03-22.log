@@ -7,3 +7,4 @@
 2026-03-22T06:39:33Z iter=6 role=researcher outcome=BTC_1h DISCARD pair_cost=0.9588 max_dd=29.78% next=pace_urgency_hi_2.0->2.5
 2026-03-22T07:21:26Z iter=9 role=researcher outcome=ETH_15m BASELINE pair_cost=0.9569 avg_profit=$-6.25 max_dd=284.48% bars=91 next=unmatched_ratio_0.50->0.35 pair_rotated_to=ETH_1h(pair_index=5)
 2026-03-22T07:26:47Z iter=9 role=monitor outcome=healthy 0/0 live processes (replay mode), pair_cost_stuck WARNING active, no new bars since last check (53 bars total BTC_15m), PnL=-96.82 cumulative
+2026-03-22T07:31:10Z iter=10 role=researcher outcome=ETH_1h BASELINE pair_cost=0.9626 avg_profit=$-8.50 max_dd=102.03% bars=24 next=unmatched_ratio_0.50->0.35 pair_rotated_to=SOL_5m(pair_index=6)
