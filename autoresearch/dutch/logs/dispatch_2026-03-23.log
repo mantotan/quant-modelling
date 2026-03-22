@@ -16,3 +16,5 @@
 2026-03-23T09:00:00Z iter=86 pair=XRP_5m role=researcher outcome=FROZEN -- audit.md FREEZE directive: fill_rate structural floor 54% + max_dd=69%, no experiment run, pair rotated to XRP_15m
 2026-03-23T10:45:00Z iter=87 pair=XRP_15m role=researcher outcome=DISCARD risk_ceil 0.15->0.20 worsened pair_cost 0.7780->0.7849, profit -0.19, max_dd 16.9%; next: pace_urgency_lo 0.35->0.30
 2026-03-23T12:00:00Z iter=89 pair=BTC_5m role=researcher outcome=DISCARD max_onesided_cost 5.0->3.0 fixed DD 33.2%->17.25% but cost marginally worse; next hypothesis: 5.0->2.0
+2026-03-23T12:15:00Z iter=90 pair=BTC_15m role=researcher outcome=DISCARD compound skip=0.45+onesided=2.0 collapsed matched_ratio, pair_cost 1.0800 (+15.7%)
+2026-03-23T13:03:16Z iter=91 pair=BTC_1h role=researcher outcome=DISCARD max_onesided_cost 5.0->3.0 pair_cost=0.7905 (+1.0% vs best 0.7988) max_dd=6.4%
