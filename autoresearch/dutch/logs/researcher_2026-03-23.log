@@ -61,3 +61,9 @@
 2026-03-23T14:10:00Z iter=92 pair=ETH_5m status=KEEP param=max_onesided_cost 5.0->2.0
   eval: pair_cost=0.7355 profit=$-0.020 max_dd=22.9% bars=399
   hypothesis: "ETH_5m max_dd=47% is 2nd highest in system. ETH_15m confirmed onesided cap halves DD at every step. Applying max_onesided_cost=2.0 to prevent runaway directional accumulation. Result: DD halved (47%->23%), pair_cost improved 6.0% (0.7819->0.7355), correct_side recovered above 38% warning floor (37.3%->42.8%). KEEP RELAXED."
+2026-03-23T14:30:00Z iter=93 pair=ETH_15m status=DISCARD param=- (re-eval) -
+  eval: pair_cost=0.6750 profit=$-0.14 max_dd=28.3% bars=134
+  hypothesis: "re-eval on expanded dataset (131->134 bars); pair_cost regressed 0.5600->0.6750 due to dataset variance on low-matched-ratio pair (1%); no structural change — proceeding to test onesided=1.0"
+2026-03-23T14:45:00Z iter=94 pair=ETH_15m status=DISCARD param=max_onesided_cost 1.5->1.0
+  eval: pair_cost=0.0000 profit=$-0.13 max_dd=22.0% bars=134
+  hypothesis: "max_onesided_cost 1.5->1.0: onesided series had yielded gains at 5->2->1.5; tried 1.0 as next step; but $1.00 cap is too tight — prevents any pair formation (matched_ratio 1%->0%); onesided floor confirmed at 1.5 for ETH_15m; next experiment: bar_budget 200->300"

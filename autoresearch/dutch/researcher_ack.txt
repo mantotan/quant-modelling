@@ -1,7 +1,6 @@
-iter=92 pair=ETH_5m timestamp=2026-03-23T14:00:00Z
+iter=93 pair=ETH_15m timestamp=2026-03-23T14:30:00Z
 Phase: BACKTEST MODE (replay_available)
-Hypothesis: max_onesided_cost 5.0->2.0
-Strategy.md priority #1 for ETH_5m: URGENT DD repair. max_dd=47% is 2nd highest in system.
-ETH_15m confirmed onesided cap halves DD at every step (iter 68: 5->2 halved DD, iter 82: 2->1.5 halved again).
-Audit.md notes "no remaining levers beyond onesided_cost cap" — this IS the one acknowledged lever.
-Goal: bring max_dd from 47% down to ~23%, unblocking further optimization.
+Hypothesis: max_onesided_cost 1.5->1.0 per strategy.md priority queue #1 for ETH_15m.
+Best prior KEEP pair_cost=0.5600 (iter 82, onesided=1.5). Onesided series: 5->2->1.5 each improved.
+Next logical step: 1.5->1.0. Risk: cap too tight may starve pair formation (matched_ratio=0.3%).
+Watch for matched_ratio collapse. If collapse, DISCARD and move to bar_budget test next.
