@@ -1,4 +1,4 @@
-iter=44 pair=XRP_5m timestamp=2026-03-22T22:00:00Z
+iter=45 pair=XRP_15m timestamp=2026-03-22T22:35:00Z
 Mode: BACKTEST (replay_available)
-Action: V7.3 baseline re-eval on 362 bars (73 more than iter 30): pair_cost improved 0.9973->0.9085 (8.9%), avg_profit improved -$0.398->-$0.32/bar. KEEP RELAXED (>5% cost improvement, profit > -2.0). Updated best_knobs.
-Next hypothesis: fill_simulator.fill_ticks 10->15 — fill rate 53.7% is worst in system; more patience for limit order fills should improve pair formation quality and reduce pair_cost.
+Action: V7.3 baseline re-eval on 121 bars (vs 97 baseline): pair_cost=0.9091 (4.88% improvement from 0.9558, just below 5% KEEP RELAXED threshold), avg_profit=-$0.28 (worsened from -$0.146), max_dd=35.6% (up from 20.91%). DISCARD — does not meet KEEP or KEEP RELAXED criteria.
+Next hypothesis: conviction_buy_skip 0.50->0.45 — 52% correct_side means more trades at 45-50% confidence are likely directionally correct. Expect throughput increase (matched_ratio from 13%); watch pair_cost stays below 0.9091.

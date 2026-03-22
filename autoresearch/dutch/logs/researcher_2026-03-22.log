@@ -86,3 +86,6 @@
 2026-03-22T22:00:00Z iter=44 pair=XRP_5m status=KEEP param=- -→-
   eval: pair_cost=0.9085 profit=$-0.3232 total_profit=$-116.77 matched=0.0760 fill=0.5370 correct=0.4470 max_dd=68.70% bars=362
   hypothesis: "V7.3 baseline re-eval on 362 bars (73 more than iter 30). pair_cost improved 8.9% (0.9973->0.9085), avg_profit improved -$0.398->-$0.32. KEEP RELAXED — >5% cost improvement, profit > -2.0. Next: fill_simulator.fill_ticks 10->15. XRP_5m has worst fill rate in system (53.7%). More limit order patience should improve fill quality and reduce pair_cost further."
+2026-03-22T22:40:00Z iter=46 pair=XRP_15m status=KEEP param=conviction_buy_skip 0.50->0.45
+  eval: pair_cost=0.7780 profit=+$0.010 max_dd=17.2% bars=122
+  hypothesis: "52% correct_side means 45% threshold still captures directionally correct trades; lowering skip improved pair selectivity dramatically, pair_cost dropped 18.6% to 0.778 — best non-1h pair cost in system"
