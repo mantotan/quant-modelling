@@ -1,6 +1,4 @@
-iter=89 pair=BTC_5m timestamp=2026-03-23T12:00:00Z
+iter=90 pair=BTC_15m timestamp=2026-03-23T12:10:00Z
 Phase: BACKTEST MODE (replay_available)
-Status: Evaluating pending experiment — max_onesided_cost 5.0->3.0
-Hypothesis: BTC_5m has max_dd=33.2% exceeding 30% threshold. Strategy priority #1 is max_onesided_cost reduction.
-Current knobs show 3.0 (previously set as hypothesis). Evaluating this now before attempting 2.0.
-If 3.0 insufficient to bring max_dd<30%, will try 2.0 next iteration.
+Hypothesis: compound conviction_buy_skip 0.50->0.45 + max_onesided_cost 5.0->2.0
+Strategy priority #1 for BTC_15m. Iter 78 compound (onesided=3.0) achieved 3.97%, just below 5% KEEP RELAXED threshold. Tightening onesided to 2.0 (matching ETH_15m confirmed winner) to cross threshold.

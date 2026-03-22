@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_15m",
+  "current_pair": "BTC_1h",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 1,
-  "last_updated": "2026-03-23T12:00:00Z",
+  "pair_index": 2,
+  "last_updated": "2026-03-23T12:15:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 83,
   "last_auditor_at": 71,
-  "total_iterations": 89,
-  "last_exit_reason": "researcher: BTC_5m DISCARD -- max_onesided_cost 5.0->3.0 fixed DD crisis (33.2%->17.25%) but pair_cost marginally worsened (0.9480->0.9518); next: max_onesided_cost 5.0->2.0 [max_onesided_cost]"
+  "total_iterations": 90,
+  "last_exit_reason": "researcher: BTC_15m DISCARD -- compound skip=0.45+onesided=2.0 collapsed matched_ratio 11.9%->0.2%, pair_cost worsened 15.7% (0.9334->1.0800); skip=0.45 starves pair formation even with onesided=2.0 cap [conviction_buy_skip+max_onesided_cost]"
 }

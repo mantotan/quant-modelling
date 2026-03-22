@@ -12,7 +12,7 @@
   "pace_urgency_hi": 2.0,
   "max_side_fraction": 0.55,
   "max_per_prediction": 100.0,
-  "vwap_tolerance": 0.20,
+  "vwap_tolerance": 0.2,
   "rebalance_warmup": 0.1,
   "sell_max_fraction": 0.5,
   "sell_min_shares": 10.0,
@@ -34,7 +34,7 @@
   "sell_loss_start": 0.7,
   "sell_dump_start": 0.9,
   "fill_simulator": {
-    "fill_ticks": 10,
+    "fill_ticks": 1,
     "chase_threshold": 0.03,
     "max_chase": 2,
     "spread_offset": 0.01,

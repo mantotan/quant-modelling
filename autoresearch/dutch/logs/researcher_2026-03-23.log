@@ -52,3 +52,6 @@
 2026-03-23T12:00:00Z iter=89 pair=BTC_5m status=DISCARD param=max_onesided_cost 5.0->3.0
   eval: pair_cost=0.9518 profit=$0.3191 max_dd=17.25% bars=395
   hypothesis: "max_onesided_cost 3.0 confirmed the DD fix pattern (33.2%->17.25%) but pair_cost marginally worse (+0.38%). Trying 2.0 next as strategy priority #1 — tighter cap should yield same or better DD reduction with potentially better pair_cost. ETH_15m series (5->2->1.5) shows consistent improvement at each step. Next hypothesis: max_onesided_cost 5.0->2.0."
+2026-03-23T12:15:00Z iter=90 pair=BTC_15m status=DISCARD param=conviction_buy_skip+max_onesided_cost 0.50+5.0->0.45+2.0
+  eval: pair_cost=1.0800 profit=$0.11 max_dd=13.7% bars=133
+  hypothesis: "Compound skip=0.45+onesided=2.0 (strategy priority #1 for BTC_15m). Iter 78 compound with onesided=3.0 got 3.97% improvement. Tightening to onesided=2.0 per ETH_15m confirmed pattern hoped to cross 5% KEEP RELAXED threshold. Result: matched_ratio collapsed to 0.2% from 11.9%; pair_cost worsened 15.7% to 1.080. Skip=0.45 starves pair formation regardless of onesided cap. DD controlled at 13.7% (success) but near-zero matching makes cost metric meaningless. 5th consecutive DISCARD for BTC_15m."
