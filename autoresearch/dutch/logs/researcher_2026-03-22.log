@@ -32,3 +32,6 @@
 2026-03-22T14:58:37Z iter=14 pair=XRP_15m status=BASELINE param=- (no changes)
   eval: pair_cost=0.9627 profit=$-447.50 max_dd=228.43% bars=93
   hypothesis: "Collect baseline metrics for XRP_15m. matched_ratio=52.1%, correct_side_pct=15.1%, sell_ratio=0.0. Pattern consistent with other pairs."
+2026-03-22T15:02:00Z iter=15 pair=XRP_1h status=BASELINE param=- (no change)
+  eval: pair_cost=0.9377 profit=$-148.63 max_dd=75.28% bars=25
+  hypothesis: "All 12 baselines complete. Staged unmatched_ratio 0.50->0.35 for next iteration (cross-pair experiment batch begins)."

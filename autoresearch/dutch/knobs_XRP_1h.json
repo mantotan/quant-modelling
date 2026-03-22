@@ -26,7 +26,7 @@
   "conviction_market_full": 1.00,
   "profit_protect_min_pairs": 5,
   "min_unmatched_shares": 20.0,
-  "unmatched_ratio": 0.50,
+  "unmatched_ratio": 0.35,
   "sell_loss_start": 0.70,
   "sell_dump_start": 0.90,
   "fill_simulator": {

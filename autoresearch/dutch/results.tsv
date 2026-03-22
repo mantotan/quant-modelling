@@ -14,3 +14,4 @@ iteration	pair	timestamp	status	avg_pair_cost	avg_profit	total_profit	matched_ra
 12	SOL_1h	2026-03-22T08:10:00Z	BASELINE	0.9345	-8.8388	-212.1300	0.4570	0.8460	0.0420	0.2200	0.0000	106.10	24	baseline observation — no changes	-
 13	XRP_5m	2026-03-22T14:55:49Z	BASELINE	0.9273	-3.2248	-896.4700	0.3320	0.7980	0.2330	0.0750	0.0000	448.20	278	baseline observation — no changes	-
 14	XRP_15m	2026-03-22T14:58:37Z	BASELINE	0.9627	-4.8118	-447.4961	0.5205	0.8286	0.1505	0.1835	0.0000	228.43	93	baseline observation — no changes	-
+15	XRP_1h	2026-03-22T15:01:33Z	BASELINE	0.9377	-5.9451	-148.6273	0.5343	0.8271	0.1250	0.2244	0.0000	75.28	25	baseline observation — no changes	-

@@ -1,5 +1,6 @@
-iter=14 pair=XRP_15m timestamp=2026-03-22T14:58:37Z
-Status: BASELINE recorded. pair_cost=0.9627, matched_ratio=52.1%, correct_side_pct=15.1%.
+iter=15 pair=XRP_1h timestamp=2026-03-22T15:02:00Z
+Status: BASELINE recorded. pair_cost=0.9377, matched_ratio=53.4%, correct_side_pct=12.5%.
 Phase: BACKTEST MODE (replay_available)
-XRP_15m baseline: mid-range pair_cost (0.9627), matched_ratio=52.1% (similar to ETH_15m), sell_ratio=0.0.
-Next pair: XRP_1h (last baseline in rotation). After XRP_1h, all 12 baselines complete.
+XRP_1h baseline: pair_cost=0.9377 (second-best after BTC_1h), matched_ratio=53.4%, max_dd=75.28%.
+All 12 baselines now complete. Staged unmatched_ratio 0.50->0.35 for next experiment batch.
+Next pair: BTC_5m (rotation restart, experiment phase begins).
