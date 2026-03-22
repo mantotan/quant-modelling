@@ -1,3 +1,2 @@
-iter=124 pair=SOL_1h timestamp=2026-03-22T20:36:36Z
-Status: Re-eval with best_knobs (bar_budget=300). Knobs stale (bar_budget=400 pre-staged), resetting to best_knobs before re-eval.
-Audit directive: FREEZE SOL_1h -- run re-eval first; if pair_cost <0.70 proceed to bar_budget=400.
+iter=125 pair=XRP_5m timestamp=2026-03-22T20:39:26Z
+Status: FREEZE — permanent FREEZE directive from audit.md; structural dead-end (fill_rate=54% floor, max_dd=69%); advancing rotation to XRP_15m
