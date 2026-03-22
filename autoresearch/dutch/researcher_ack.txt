@@ -1,4 +1,4 @@
-iter=117 pair=BTC_15m timestamp=2026-03-22T20:01:10Z
-STATUS: FROZEN — audit.md directive active
-REASON: FREEZE BTC_15m — all skip+compound onesided hypotheses exhausted; KEEP rate 0/8 in V7.3; both directions of compound change tested and failed; no remaining credible levers
-ACTION: Skipping experiment, advancing pair rotation to BTC_1h
+iter=118 pair=BTC_1h timestamp=2026-03-23T03:04:22Z
+STATUS: DISCARD
+REASON: Re-eval with corrected conviction_buy_skip=0.40 (fix stale best_knobs from iter 64 KEEP value); pair_cost=0.9042 on 37 bars fails to beat best KEEP 0.7988 (33 bars); 4 new unfavorable bars since iter 64 cause dataset regression
+NEXT: pace_urgency_lo 0.35->0.45 (priority queue item #2, untested on BTC_1h)

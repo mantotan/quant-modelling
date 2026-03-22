@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_1h",
+  "current_pair": "ETH_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 2,
-  "last_updated": "2026-03-22T20:01:10Z",
+  "pair_index": 3,
+  "last_updated": "2026-03-23T03:04:22Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 107,
   "last_auditor_at": 95,
-  "total_iterations": 117,
-  "last_exit_reason": "BTC_15m: FROZEN -- audit.md directive active; all skip+compound onesided hypotheses exhausted; KEEP rate 0/8 in V7.3; advancing to BTC_1h"
+  "total_iterations": 118,
+  "last_exit_reason": "BTC_1h: DISCARD -- re-eval with corrected conviction_buy_skip=0.40 (stale best_knobs fix); pair_cost 0.9042 fails to beat best KEEP 0.7988; dataset regression on 37 bars; pace_urgency_lo 0.45 queued as next experiment"
 }
