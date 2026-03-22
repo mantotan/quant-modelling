@@ -26,3 +26,6 @@
 2026-03-22T08:10:00Z iter=12 pair=SOL_1h status=BASELINE param=- no_change
   eval: pair_cost=0.9345 profit=$-212.13 max_dd=106.1% bars=24
   hypothesis: "BASELINE — first observation for SOL_1h. No knob changes."
+2026-03-22T14:55:49Z iter=13 pair=XRP_5m status=BASELINE param=- -
+  eval: pair_cost=0.9273 profit=$-896.47 max_dd=448.2% bars=278
+  hypothesis: "BASELINE run — no changes. XRP_5m notable: lowest matched_ratio (33.2%) of all pairs but highest correct_side_pct (23.3%). Next: collect XRP_15m/1h baselines, then run unmatched_ratio=0.35 cross-pair experiment."

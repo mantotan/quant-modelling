@@ -15,3 +15,4 @@
 2026-03-22T07:47:03Z iter=12 EXIT reason=no_role_matched elapsed=1216s alerts=0
 2026-03-22T07:48:51Z iter=12 EXIT reason=incubating elapsed=21m alerts=0
 2026-03-22T08:10:00Z iter=12 pair=SOL_1h role=RESEARCHER outcome=BASELINE pair_cost=0.9345 profit=$-212.13 max_dd=106.1%
+2026-03-22T14:55:49Z iter=13 pair=XRP_5m role=researcher outcome=BASELINE pair_cost=0.9273 matched=33.2% bars=278

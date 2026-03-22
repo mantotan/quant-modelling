@@ -1,5 +1,5 @@
-iter=12 pair=SOL_1h timestamp=2026-03-22T08:10:00Z
-Status: BASELINE run — no knob changes. First iteration for SOL_1h.
+iter=13 pair=XRP_5m timestamp=2026-03-22T14:55:49Z
+Status: BASELINE recorded. pair_cost=0.9273, matched_ratio=33.2%, correct_side_pct=23.3%.
 Phase: BACKTEST MODE (replay_available)
-Strategy directive: collect baselines for all SOL/XRP pairs before any experiments.
-Next hypothesis (after baseline): unmatched_ratio 0.50->0.35 (cross-pair hypothesis).
+XRP_5m baseline notable: lowest matched_ratio of all pairs (33.2%), highest correct_side_pct (23.3%).
+Next hypothesis: unmatched_ratio 0.50->0.35 (cross-pair hypothesis, after XRP baselines complete).
