@@ -1,4 +1,6 @@
-iter=53 pair=ETH_5m timestamp=2026-03-22T23:59:00Z
-STATUS: FREEZE — ETH_5m is frozen per audit.md directive.
-Reason: correct_side=40%, conv_skip=0.60 DISCARD confirms anti-predictive at all confidence levels.
-No experiment run. Pair rotation advanced to ETH_15m (pair_index=4).
+iter=53 pair=ETH_15m timestamp=2026-03-22T00:00:00Z
+Status: Running backtest evaluation then hypothesis for ETH_15m.
+Phase: BACKTEST MODE (replay_available)
+Planned change: conviction_buy_skip 0.50->0.45 (strategy.md priority #1 for ETH_15m)
+Prior experiments: iter20 DISCARD (unmatched_ratio), iter38 DISCARD (conviction_buy_skip 0.55)
+V7.3 BASELINE: pair_cost=0.9220, avg_profit=-$0.803/bar, correct_side=46%, max_dd=48%
