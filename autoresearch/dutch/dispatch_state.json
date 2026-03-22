@@ -1,5 +1,5 @@
 {
-  "current_pair": "ETH_1h",
+  "current_pair": "SOL_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 5,
-  "last_updated": "2026-03-23T22:05:00Z",
+  "pair_index": 6,
+  "last_updated": "2026-03-22T20:26:26Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 119,
   "last_auditor_at": 119,
-  "total_iterations": 120,
-  "last_exit_reason": "RESEARCHER iter=120: ETH_15m DISCARD -- corrected stale conviction_buy_skip 0.55->0.45, pair_cost=0.5600 matches historical best. Next experiment staged: pace_urgency_lo 0.35->0.30 per strategy.md queue."
+  "total_iterations": 121,
+  "last_exit_reason": "RESEARCHER iter=121: ETH_1h DISCARD -- pace_urgency_lo 0.35->0.30 improved pair_cost 4.1% (0.7058->0.6768) but avg_profit negative (-$0.55/bar); relaxed threshold not met (needs >5%). Next: max_onesided_cost 5.0->2.0 per strategy.md queue."
 }

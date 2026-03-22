@@ -1,2 +1,2 @@
-iter=120 pair=ETH_15m timestamp=2026-03-23T22:00:00Z
-Status: BACKTEST MODE — fixing stale conviction_buy_skip=0.55->0.45 per audit.md directive, then re-eval
+iter=121 pair=ETH_1h timestamp=2026-03-22T20:26:26Z
+Status: DISCARD -- pace_urgency_lo 0.35->0.30 improved pair_cost 4.1% (0.7058->0.6768) but avg_profit=-$0.55/bar (negative); relaxed path requires >5% improvement; knobs restored from best_knobs; next experiment: max_onesided_cost 5.0->2.0

@@ -167,3 +167,6 @@
 2026-03-22T20:01:10Z iter=117 pair=BTC_15m status=FROZEN param=none -
   eval: skipped (FREEZE directive)
   hypothesis: audit.md FREEZE directive active; all skip+compound onesided hypotheses exhausted; KEEP rate 0/8 in V7.3; both directions of compound change tested and failed; no remaining credible levers identified
+2026-03-22T20:26:26Z iter=121 pair=ETH_1h status=DISCARD param=pace_urgency_lo 0.35->0.30
+  eval: pair_cost=0.6768 profit=$-0.55 max_dd=17.91% bars=37
+  hypothesis: "pace_urgency_lo 0.35->0.30 based on XRP_15m 18% gain pattern; ETH_1h has 5.4% matched_ratio (moderate); earlier urgency timing expected to capture better pairs; result: pair_cost improved 4.1% but still negative avg_profit; relaxed KEEP requires >5% improvement (only 4.1%); DISCARD; next: max_onesided_cost 5.0->2.0"
