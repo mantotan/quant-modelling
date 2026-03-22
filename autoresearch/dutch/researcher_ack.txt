@@ -1,6 +1,6 @@
-iter=87 pair=XRP_15m timestamp=2026-03-23T10:45:00Z status=DISCARD
-risk_ceil 0.15->0.20: pair_cost 0.7780->0.7849 (+0.88% worse), avg_profit -0.19 (neg), max_dd 17.2%->16.9%.
-DISCARD: failed both KEEP criteria (cost worse, profit negative).
-Pattern confirmed: risk_ceil increases fail on XRP_15m (same as BTC_1h iter 80, ETH_1h iter 83).
-Next hypothesis: pace_urgency_lo 0.35->0.30 (earlier entry timing to improve fill prices on selective pair).
-XRP_15m matched_ratio only 2% — earlier urgency gate may qualify more fills at better prices.
+iter=88 pair=XRP_1h timestamp=2026-03-23T11:00:00Z
+Phase: BACKTEST MODE (replay_available)
+Status: Running experiment — risk_ceil 0.15->0.20 (positive avg_profit +$1.08/bar, 6% DD headroom)
+Hypothesis: XRP_1h is fundamentally different from failed risk_ceil tests (BTC_1h neg profit, ETH_1h neg profit).
+XRP_1h avg_profit=+$1.08/bar means more capital per bar should directly amplify returns.
+max_dd=6% provides enormous headroom. Both skip directions and bar_budget exhausted — risk_ceil is top lever.

@@ -46,3 +46,6 @@
 2026-03-23T10:45:00Z iter=87 pair=XRP_15m status=DISCARD param=risk_ceil 0.15->0.20
   eval: pair_cost=0.7849 profit=$-0.19 max_dd=16.9% bars=132
   hypothesis: "risk_ceil increase fails on XRP_15m — cost worsened 0.88%, profit turned negative; next: pace_urgency_lo 0.35->0.30 (earlier entry timing for selective pair with only 2% matched_ratio)"
+2026-03-23T11:00:00Z iter=88 pair=XRP_1h status=DISCARD param=risk_ceil 0.15->0.20
+  eval: pair_cost=0.7066 profit=$1.43 max_dd=6.9% bars=34
+  hypothesis: "XRP_1h has positive avg_profit +$1.08/bar and 6% DD — risk_ceil increase should amplify returns unlike failed tests on BTC_1h/ETH_1h (both negative profit). Strategy priority #1. Result: matched_ratio doubled 3.2%->6.2% but pair_cost worsened 4.9% (0.6738->0.7066). More capital forces buys at sub-optimal prices. risk_ceil=0.15 confirmed as optimum for XRP_1h."
