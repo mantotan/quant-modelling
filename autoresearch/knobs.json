@@ -116,7 +116,7 @@
   "hpo_search_space": {
     "n_estimators": [
       100,
-      400
+      600
     ],
     "learning_rate": [
       0.005,
@@ -127,8 +127,8 @@
       6
     ],
     "num_leaves": [
-      28,
-      68
+      32,
+      80
     ],
     "min_child_samples": [
       100,
