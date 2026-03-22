@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_15m",
+  "current_pair": "BTC_1h",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 1,
-  "last_updated": "2026-03-23T19:58:48Z",
+  "pair_index": 2,
+  "last_updated": "2026-03-22T20:01:10Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 107,
   "last_auditor_at": 95,
   "total_iterations": 117,
-  "last_exit_reason": "BTC_5m: DISCARD -- max_onesided_cost 2.0->1.5 collapsed matched_ratio to 0.0% -- zero pairs formed (same floor as SOL_5m iter 97); floor confirmed at onesided=2.0; next: pace_urgency_lo 0.35->0.30 [max_onesided_cost]"
+  "last_exit_reason": "BTC_15m: FROZEN -- audit.md directive active; all skip+compound onesided hypotheses exhausted; KEEP rate 0/8 in V7.3; advancing to BTC_1h"
 }

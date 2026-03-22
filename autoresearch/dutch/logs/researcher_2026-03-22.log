@@ -164,3 +164,6 @@
 2026-03-22T19:40:04Z iter=113 pair=SOL_1h status=DISCARD param=- -
   eval: pair_cost=0.6581 profit=+1.49/bar max_dd=5.66% bars=36
   hypothesis: Fix stale best_knobs (conviction_buy_skip 0.55->0.45 per iter-58 KEEP), then re-eval to verify corrected-knobs state. pair_cost 0.6581 vs best 0.6547 is +0.5% noise -- DISCARD on strict criterion. Dataset stable (same 36 bars). Next: bar_budget 300->400 (SOL pair budget scaling pattern; SOL_15m analog iter 73 KEEP; avg_profit=+1.49/bar and max_dd=5.7% both support capital scaling).
+2026-03-22T20:01:10Z iter=117 pair=BTC_15m status=FROZEN param=none -
+  eval: skipped (FREEZE directive)
+  hypothesis: audit.md FREEZE directive active; all skip+compound onesided hypotheses exhausted; KEEP rate 0/8 in V7.3; both directions of compound change tested and failed; no remaining credible levers identified
