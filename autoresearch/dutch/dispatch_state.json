@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 6,
-  "last_updated": "2026-03-23T15:10:00Z",
-  "last_role": "researcher",
+  "last_updated": "2026-03-23T15:35:00Z",
+  "last_role": "auditor",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 83,
-  "last_auditor_at": 71,
+  "last_auditor_at": 95,
   "total_iterations": 95,
-  "last_exit_reason": "researcher: ETH_1h DISCARD -- re-eval 35 bars: pair_cost 1.8% improvement (0.7058->0.6929) below KEEP RELAXED 5% threshold, avg_profit negative; next: bar_budget 200->250 [bar_budget]"
+  "last_exit_reason": "auditor: iter 95 -- FREEZE BTC_15m+ETH_15m+XRP_5m, CONTINUE 9 pairs, UNFREEZE ETH_5m; rotation 6 KEEP rate 20.8% (5/24); timing params now frontier"
 }
