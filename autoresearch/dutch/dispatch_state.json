@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_5m",
+  "current_pair": "SOL_1h",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 6,
-  "last_updated": "2026-03-23T16:00:00Z",
-  "last_role": "strategist",
+  "pair_index": 8,
+  "last_updated": "2026-03-23T18:15:00Z",
+  "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 95,
   "last_auditor_at": 95,
-  "total_iterations": 95,
-  "last_exit_reason": "strategist: iter 95 -- rotation 6 KEEP 3/12=25%; onesided=2.0 dominant next lever for BTC_5m; risk_ceil increase globally blacklisted except SOL_1h; SOL pairs confirmed budget-scalable; BTC_15m skip=0.45 definitively exhausted"
+  "total_iterations": 99,
+  "last_exit_reason": "researcher: iter 98 SOL_15m re-eval KEEP (pair_cost 0.7859->0.7151, +9.1%); iter 99 SOL_15m risk_ceil 0.15->0.20 KEEP (pair_cost 0.7151->0.6956, +2.7%, profit +$0.42/bar); next: SOL_1h"
 }

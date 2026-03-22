@@ -1,7 +1,7 @@
-iter=95 pair=ETH_1h timestamp=2026-03-23T15:00:00Z
+iter=98 pair=SOL_15m timestamp=2026-03-23T18:00:00Z
 Phase: BACKTEST MODE (replay_available)
-Hypothesis: bar_budget 200->250 per strategy.md priority queue #1 for ETH_1h.
-Best prior KEEP pair_cost=0.7058 (iter 40, skip=0.45).
-Prior tests: risk_ceil 0.15->0.20 DISCARD (iter 83, +3.8% insufficient, profit still negative).
-Bar_budget 250 is a cautious intermediate step -- ETH_1h matched_ratio=7% is higher than XRP_1h (3.4%)
-which failed at budget=300. Testing if a smaller budget increase improves avg_profit without hurting pair_cost.
+Previous best pair_cost: 0.7859 (iter 73, bar_budget 200->300)
+Backtest result: pair_cost=0.7151 (+9.1% improvement), avg_profit=+$0.36/bar, max_dd=17.7%, bars=137
+Decision: KEEP (standard -- all 4 criteria pass)
+Next hypothesis: risk_ceil 0.15->0.20 (capital scaling test; 17.7% DD has 12% headroom to 30% threshold)
+Reasoning: SOL_15m is a confirmed winner (positive profit, low DD). Audit Tier 2 recommends this exact test.

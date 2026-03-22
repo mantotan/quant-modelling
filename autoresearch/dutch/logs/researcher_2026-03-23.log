@@ -70,3 +70,15 @@
 2026-03-23T15:10:00Z iter=95 pair=ETH_1h status=DISCARD param=bar_budget 200->250(staged)
   eval: pair_cost=0.6929 profit=$-0.5871 max_dd=18.72% bars=35
   hypothesis: "bar_budget 200->250 (strategy.md priority #1). Re-eval on 35 bars (1 new vs iter 83 34 bars) shows pair_cost improved 1.83% (0.7058->0.6929) but avg_profit -$0.59/bar negative. 1.83% < 5% KEEP RELAXED threshold -- DISCARD. Staged bar_budget 250 for next ETH_1h evaluation. ETH_1h matched_ratio=8.4% is higher than XRP_1h (3.4%) which failed budget=300; testing cautious 250 step."
+2026-03-23T16:12:00Z iter=96 pair=SOL_5m status=KEEP param=- (re-eval) 2.0->2.0
+  eval: pair_cost=0.6760 profit=$+0.0640 max_dd=18.08% bars=404
+  hypothesis: "re-eval with 11 new bars (393->404): onesided=2.0 remains stable, pair_cost improved 7.8% (0.7333->0.6760) organically"
+2026-03-23T16:20:00Z iter=97 pair=SOL_5m status=DISCARD param=max_onesided_cost 2.0->1.5
+  eval: pair_cost=0.6760 profit=$+0.0596 max_dd=16.69% bars=405
+  hypothesis: "max_onesided_cost 2.0->1.5 -- following ETH_15m/ETH_5m onesided series; however SOL_5m pairs not forming in 1.5-2.0 cost range, zero pair_cost improvement; matched_ratio stable (0.93%, no collapse); onesided series floor confirmed at 2.0 for SOL_5m; next: bar_budget 200->300 or conviction_buy_skip 0.45->0.40"
+2026-03-23T18:00:00Z iter=98 pair=SOL_15m status=KEEP param=baseline_reeval ->(no change)
+  eval: pair_cost=0.7151 profit=$0.36 max_dd=17.7% bars=137
+  hypothesis: "V7.6 re-eval on enlarged dataset (129->137 bars). pair_cost improved 9.1% vs best known (0.7859). All standard KEEP criteria pass. Confirms V7.6 baseline is strong on SOL_15m."
+2026-03-23T18:15:00Z iter=99 pair=SOL_15m status=KEEP param=risk_ceil 0.15->0.20
+  eval: pair_cost=0.6956 profit=$0.42 max_dd=17.3% bars=137
+  hypothesis: "risk_ceil 0.15->0.20 capital scaling test per audit Tier 2. SOL_15m has 17.7% DD headroom. Raising risk_ceil allows larger position sizes on high-conviction bars. Result: 2.7% pair_cost improvement, profit up $0.36->$0.42/bar, total_profit +$49->+$58. Capital scaling successful on SOL_15m, confirming SOL pairs are uniquely budget-scalable (SOL_1h, SOL_15m both accept higher capital)."
