@@ -80,6 +80,7 @@ class LimitOrderSimulator:
         spread_offset: float = 0.01,
         cancel_distance: float = 0.05,
         sweep_threshold: float = 0.01,
+        resting_cancel_distance: float = 0.10,  # V7.4: wider for resting
     ) -> None:
         self._fill_ticks = fill_ticks
         self._chase_threshold = chase_threshold
@@ -87,6 +88,7 @@ class LimitOrderSimulator:
         self._spread_offset = spread_offset
         self._cancel_distance = cancel_distance
         self._sweep_threshold = sweep_threshold
+        self._resting_cancel_distance = resting_cancel_distance
         self._pending: list[_PendingOrder] = []
         self._stats = SimulatorStats()
 
@@ -113,6 +115,9 @@ class LimitOrderSimulator:
             # V5: skip chase for sell orders (they sit on ask side)
             if getattr(po.order, "action", "BUY") == "SELL":
                 continue
+            # V7.4: Never chase resting orders — they wait for price to come
+            if getattr(po.order, "order_mode", "reactive") == "resting":
+                continue
             book = book_up if po.order.side == "UP" else book_dn
             if book is None or book.best_bid <= 0:
                 continue
@@ -137,17 +142,25 @@ class LimitOrderSimulator:
                     time_pct=po.order.time_pct,
                     placed_at=po.order.placed_at,
                     reason=po.order.reason + f" chase#{po.chase_count + 1}",
+                    order_mode=getattr(po.order, "order_mode", "reactive"),
                 )
                 po.chase_count += 1
                 po.state = "PENDING"
                 po.consecutive_ticks_at_limit = 0
                 self._stats.chased += 1
                 self._stats.chase_cancelled += 1
-            elif distance >= self._cancel_distance:
-                # V3: >= (was >) — cancel at exact boundary too
-                po.state = "CANCELLED"
-                po.consecutive_ticks_at_limit = 0
-                self._stats.cancelled += 1
+            else:
+                # V7.4: wider cancel distance for resting orders
+                eff_cancel = (
+                    self._resting_cancel_distance
+                    if getattr(po.order, "order_mode", "reactive") == "resting"
+                    else self._cancel_distance
+                )
+                if distance >= eff_cancel:
+                    # V3: >= (was >) — cancel at exact boundary too
+                    po.state = "CANCELLED"
+                    po.consecutive_ticks_at_limit = 0
+                    self._stats.cancelled += 1
 
         # --- Fill-check pass ---
         fills: list[DutchFill] = []

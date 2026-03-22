@@ -104,6 +104,12 @@ class DutchConfig:
     # 0.0 = disabled.  5.0 = max $5 spent before first pair forms.
     max_onesided_cost: float = 0.0
 
+    # V7.4: Resting limit orders — place below bid to catch dips.
+    # 0.0 = disabled (reactive only, V7.3 behavior).
+    resting_discount: float = 0.0
+    # If no buy fills by this time_pct, switch to reactive for rest of bar.
+    resting_fallback_time: float = 0.40
+
     # V7: Sell phases
     sell_loss_start: float = 0.70           # allow conviction-gated loss sells
     sell_dump_start: float = 0.90           # sell at any price
@@ -136,6 +142,7 @@ class DutchOrder:
     placed_at: datetime
     reason: str
     action: str = "BUY"  # V5: "BUY" or "SELL"
+    order_mode: str = "reactive"  # V7.4: "reactive" or "resting"
 
 
 @dataclass
@@ -368,6 +375,9 @@ class DutchAccumulationEngine:
         self._on_event: Callable[[dict], None] | None = None
         self._last_gate_emitted: dict[str, float] = {}
 
+        # V7.4: Resting order tracking
+        self._first_buy_filled: bool = False
+
     def set_bar_info(
         self,
         bar_id: int,
@@ -454,6 +464,20 @@ class DutchAccumulationEngine:
         profit = 1.0 - pc
         margin = max(0.02, 0.05 - profit)
         return min(pc + margin, self._config.max_marginal_pair_cost)
+
+    def _is_resting_mode(self, time_pct: float) -> bool:
+        """Should orders be placed in resting mode (below bid)?
+
+        V7.4: Resting places at bid - discount to catch dips.
+        Fallback: if no fills by resting_fallback_time, switch to reactive.
+        """
+        if self._config.resting_discount <= 0:
+            return False
+        # After fallback time with no fills → reactive
+        return (
+            self._first_buy_filled
+            or time_pct < self._config.resting_fallback_time
+        )
 
     def on_tick(
         self,
@@ -636,10 +660,16 @@ class DutchAccumulationEngine:
                     )
                     continue
 
-            # -- Limit price: always maker --
-            limit_price = min(
-                bid + self._config.spread_offset, ask - 0.01,
-            )
+            # -- Limit price: resting (V7.4) or reactive --
+            if self._is_resting_mode(time_pct):
+                limit_price = max(bid - self._config.resting_discount, 0.01)
+                limit_price = min(limit_price, ask - 0.01)
+                order_mode = "resting"
+            else:
+                limit_price = min(
+                    bid + self._config.spread_offset, ask - 0.01,
+                )
+                order_mode = "reactive"
             if limit_price <= 0:
                 continue
 
@@ -806,6 +836,7 @@ class DutchAccumulationEngine:
                 time_pct=round(time_pct, 4),
                 placed_at=datetime.now(UTC),
                 reason=reason,
+                order_mode=order_mode,
             )
             orders.append(order)
             budget_remaining -= dollar_size
@@ -819,12 +850,12 @@ class DutchAccumulationEngine:
                 self._last_order_time_pct_dn = time_pct
 
             self._decision_log.append(
-                f"t={time_pct:.2f}: BUY {side} {reason} "
+                f"t={time_pct:.2f}: BUY {side} [{order_mode}] {reason} "
                 f"limit={limit_price:.4f} ${dollar_size:.2f}"
             )
             self._emit(
                 "order", time_pct=time_pct, side=side, reason=reason,
-                limit=limit_price, dollars=dollar_size,
+                limit=limit_price, dollars=dollar_size, mode=order_mode,
             )
             # NO break — both sides can buy per tick
 
@@ -999,6 +1030,9 @@ class DutchAccumulationEngine:
             else:
                 self._inventory.shares_dn += filled_shares
                 self._inventory.cost_dn += cost
+            # V7.4: Track first buy fill for resting fallback
+            if not self._first_buy_filled:
+                self._first_buy_filled = True
 
         self._orders.append({
             "side": order.side,
@@ -1129,6 +1163,9 @@ class DutchAccumulationEngine:
         # V6 state
         self._last_ask_up = 0.0
         self._last_ask_dn = 0.0
+
+        # V7.4 state
+        self._first_buy_filled = False
 
         # V6.1 state
         self._last_time_pct = 0.0
