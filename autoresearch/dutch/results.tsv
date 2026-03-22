@@ -11,3 +11,4 @@ iteration	pair	timestamp	status	avg_pair_cost	avg_profit	total_profit	matched_ra
 9	ETH_1h	2026-03-22T07:30:57Z	BASELINE	0.9626	-8.5025	-204.0596	0.5611	0.8322	0.0833	0.2632	0.0000	102.03	24	baseline observation — no changes	-
 10	SOL_5m	2026-03-22T07:39:19Z	BASELINE	0.9404	-5.1199	-1402.8700	0.4320	0.8270	0.1440	0.1310	0.0000	718.30	274	baseline observation — no changes	-
 11	SOL_15m	2026-03-22T08:00:00Z	BASELINE	0.9513	-3.6300	-334.16	0.5320	0.8690	0.2220	0.1760	0.0000	167.10	92	baseline observation — no changes	-
+12	SOL_1h	2026-03-22T08:10:00Z	BASELINE	0.9345	-8.8388	-212.1300	0.4570	0.8460	0.0420	0.2200	0.0000	106.10	24	baseline observation — no changes	-

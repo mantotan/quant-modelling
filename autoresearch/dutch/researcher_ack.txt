@@ -1,5 +1,5 @@
-iter=11 pair=SOL_15m timestamp=2026-03-22T08:00:00Z
-Status: BASELINE run — no knob changes. First iteration for SOL_15m.
+iter=12 pair=SOL_1h timestamp=2026-03-22T08:10:00Z
+Status: BASELINE run — no knob changes. First iteration for SOL_1h.
 Phase: BACKTEST MODE (replay_available)
 Strategy directive: collect baselines for all SOL/XRP pairs before any experiments.
-Next hypothesis (after baseline): unmatched_ratio 0.50->0.35 (cross-pair hypothesis, aligned with ETH pre-staging).
+Next hypothesis (after baseline): unmatched_ratio 0.50->0.35 (cross-pair hypothesis).

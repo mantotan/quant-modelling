@@ -23,3 +23,6 @@
 2026-03-22T08:00:00Z iter=11 pair=SOL_15m status=BASELINE param=- -
   eval: pair_cost=0.9513 profit=$-3.63 max_dd=167.1% bars=92
   hypothesis: "No prior data for SOL_15m. Running baseline to establish reference metrics. matched_ratio=53.2% is in expected mid-range. correct_side_pct=22.2% is the highest seen so far (vs 10-15% for BTC/ETH), indicating SOL Pulse model has slightly better directional accuracy. Pre-staged unmatched_ratio=0.35 for next SOL_15m experiment (cross-pair hypothesis aligned with ETH pre-staging)."
+2026-03-22T08:10:00Z iter=12 pair=SOL_1h status=BASELINE param=- no_change
+  eval: pair_cost=0.9345 profit=$-212.13 max_dd=106.1% bars=24
+  hypothesis: "BASELINE — first observation for SOL_1h. No knob changes."
