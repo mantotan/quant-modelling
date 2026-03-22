@@ -1,4 +1,10 @@
-iter=45 pair=XRP_15m timestamp=2026-03-22T22:35:00Z
-Mode: BACKTEST (replay_available)
-Action: V7.3 baseline re-eval on 121 bars (vs 97 baseline): pair_cost=0.9091 (4.88% improvement from 0.9558, just below 5% KEEP RELAXED threshold), avg_profit=-$0.28 (worsened from -$0.146), max_dd=35.6% (up from 20.91%). DISCARD — does not meet KEEP or KEEP RELAXED criteria.
-Next hypothesis: conviction_buy_skip 0.50->0.45 — 52% correct_side means more trades at 45-50% confidence are likely directionally correct. Expect throughput increase (matched_ratio from 13%); watch pair_cost stays below 0.9091.
+iter=47 pair=XRP_1h timestamp=2026-03-22T23:10:17Z
+Phase 0: BACKTEST MODE (sub_phase=replay_available)
+Status: Running experiment on XRP_1h
+Previous: iter 46 XRP_15m KEEP (conviction_buy_skip 0.50->0.45, pair_cost 0.9558->0.7780)
+Current pair: XRP_1h (pair_index=11)
+Audit directive: PRIORITIZE XRP_1h — best baseline pair_cost (0.7157), 0 experiments yet
+Strategy.md priority: conviction_buy_skip 0.50->0.45 (1h pattern confirmed on ETH_1h, XRP_15m)
+Hypothesis: Lower conviction_buy_skip 0.50->0.45 on XRP_1h. XRP_1h has 57% correct_side (best 1h),
+  pair_cost=0.716 (already beats 0.85 benchmark), avg_profit=+$0.51/bar. Analogous to ETH_1h (KEEP)
+  and XRP_15m (KEEP). Expect further cost improvement and potentially better throughput.
