@@ -1,5 +1,5 @@
 # Dutch Monitor Report
-Updated: 2026-03-21T23:54:09Z
+Updated: 2026-03-22T07:26:47Z
 
 ## Mode
 Backtest replay (`sub_phase=replay_available`). PM2 health check skipped per spec. Bar summaries read from `data/dutch_backtest/BTC_15m/`.
