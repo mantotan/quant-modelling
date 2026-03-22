@@ -1,3 +1,3 @@
-iter=57 pair=SOL_1h timestamp=2026-03-23T15:44:55Z
+iter=59 pair=XRP_5m timestamp=2026-03-23T16:15:00Z
 status=evaluating_prior_experiment
-hypothesis=evaluating conviction_buy_skip 0.50->0.35 (already staged in knobs_SOL_1h.json); if discard, next experiment will be conviction_buy_skip 0.50->0.45 per strategy.md priority queue
+hypothesis=evaluating fill_ticks 10->15 (already staged in knobs_XRP_5m.json); if discard, next is conviction_buy_skip 0.50->0.45 per strategy.md priority queue
