@@ -116,7 +116,7 @@
   "hpo_search_space": {
     "n_estimators": [
       100,
-      600
+      400
     ],
     "learning_rate": [
       0.005,
@@ -127,8 +127,8 @@
       6
     ],
     "num_leaves": [
-      32,
-      80
+      16,
+      32
     ],
     "min_child_samples": [
       100,
@@ -153,7 +153,7 @@
   },
   "walk_forward": {
     "n_splits": 8,
-    "train_bars": 10000,
+    "train_bars": 12000,
     "test_bars": 2000,
     "purge_period": 24,
     "embargo_period": 6
