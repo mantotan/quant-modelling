@@ -128,3 +128,6 @@
 2026-03-22T16:03:00Z iter=61 pair=XRP_1h status=DISCARD param=conviction_buy_skip 0.50->0.55
   eval: pair_cost=0.7932 profit=$0.65 max_dd=6.0% bars=33
   hypothesis: "Inverse direction test — skip=0.45 worsened XRP_1h (0.6738->0.7045), so try tighter filter 0.55 to leverage 57% correct_side. FAILED: correct_side dropped to 46.7% (below 50%), pair_cost worsened 17.7%. Both skip directions (0.45 and 0.55) fail XRP_1h. Skip=0.50 is the optimum. Try bar_budget or risk_ceil next."
+2026-03-22T16:15:00Z iter=62 pair=BTC_5m status=DISCARD param=cheap_threshold 0.10->0.12
+  eval: pair_cost=0.9444 profit=$0.21 max_dd=33.2% bars=374
+  hypothesis: "Loosening cheap_threshold 0.10->0.12 to increase pair formation volume on this profitable pair. Prior tightening to 0.07 failed. Loosening direction untested. Result: marginal pair_cost gain (0.38%) but max_dd 33.2% exceeds 30% hard threshold. DISCARD."

@@ -1,6 +1,7 @@
-iter=61 pair=XRP_1h timestamp=2026-03-22T16:00:00Z
+iter=62 pair=BTC_5m timestamp=2026-03-22T16:10:00Z
 Role: RESEARCHER (BACKTEST MODE)
-Hypothesis: conviction_buy_skip 0.50->0.55 — inverse direction test.
-XRP_1h is unique: skip=0.45 DISCARD (iter 48) worsened pair_cost 0.6738->0.7045.
-Best pair in system with 57% correct_side; tighter filter may improve pair quality further.
-Current best_knobs avg_pair_cost=0.6738 (iter 47 KEEP).
+Hypothesis: cheap_threshold 0.10->0.12 — loosening entry threshold.
+BTC_5m is profitable at baseline (+$0.055/bar, 56% correct_side) but conviction_buy_skip is exhausted (both 0.45 and 0.55 DISCARDs).
+Loosening cheap_threshold from 0.10->0.12 should increase pair formation volume slightly without disrupting cost discipline.
+Prior test tightened to 0.07 (iter 17, DISCARD); the loosening direction is completely untested.
+Current best_knobs avg_pair_cost=0.9480 (iter 21 BASELINE).
