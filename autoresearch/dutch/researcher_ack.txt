@@ -1,9 +1,6 @@
-iter=70 pair=SOL_5m timestamp=2026-03-23T16:35:00Z
+iter=72 pair=SOL_15m timestamp=2026-03-23T17:15:00Z
 Role: RESEARCHER (BACKTEST MODE)
-Status: Running backtest for SOL_5m, then testing conviction_buy_skip 0.50->0.45
-Hypothesis: conviction_buy_skip 0.50->0.45 -- lowering skip direction, untested on V7.3 for SOL_5m.
-  SOL_15m analog: 14.9% improvement at skip=0.45 (0.9348->0.7956, KEEP iter 56)
-  All 15m/1h pairs tested: 6/6 KEEP at skip=0.45 (universal pattern)
-  Note: audit FREEZE was for skip=0.55 raising direction -- strategy.md post-iter-58 explicitly approves skip=0.45
-  SOL_5m V7.3 baseline: pair_cost=0.9455, avg_profit=-$0.205, max_dd=31.56%
-  Warning: max_dd is already near 30% threshold -- monitor closely
+Status: Running backtest for SOL_15m, then testing bar_budget 200->300
+Hypothesis: bar_budget 200->300 on benchmark-beating pair (pair_cost=0.796, max_dd=14%)
+Following audit directive: skip=0.40 bypassed (XRP_15m collapse risk), test bar_budget scale-up
+Best known pair_cost for SOL_15m: 0.7956 (iter 56, KEEP)

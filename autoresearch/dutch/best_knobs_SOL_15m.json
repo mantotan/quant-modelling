@@ -1,7 +1,7 @@
 {
   "strategy": "dutch_accumulation",
   "version": "v7",
-  "bar_budget": 200.0,
+  "bar_budget": 300.0,
   "order_size": 5.0,
   "min_order_usd": 1.0,
   "cheap_threshold": 0.1,

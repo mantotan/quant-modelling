@@ -5,3 +5,4 @@
 2026-03-23T16:40:00Z iter=71 pair=SOL_5m role=RESEARCHER outcome=KEEP conviction_buy_skip 0.50->0.45 pair_cost 0.8884->0.8140 avg_profit turned positive
 2026-03-23T17:00:00Z iter=71 pair=SOL_15m role=auditor outcome=FREEZE ETH_5m+XRP_5m CONTINUE x10; 9/12 pairs beat trader_a benchmark; next rotation: scale SOL_1h/XRP_1h/XRP_15m budgets + fix DD on SOL_5m/ETH_15m
 2026-03-23T17:10:00Z iter=71 pair=SOL_15m role=STRATEGIST outcome=9/12 pairs beat benchmark, rotation4 KEEP 6/13=46%, DD repair + capital scaling priority for rotation5
+2026-03-23T17:30:00Z iter=73 pair=SOL_15m role=researcher outcome=2x KEEP re-eval+bar_budget200->300 pair_cost 0.7947->0.7859 max_dd 14.3->9.5pct
