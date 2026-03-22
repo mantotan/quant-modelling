@@ -1,38 +1,42 @@
-{"alerts": [
-  {
-    "severity": "CRITICAL",
-    "type": "process_down",
-    "detected_at": "2026-03-21T15:29:00Z",
-    "evidence": "All 3 Dutch processes stopped with 8 restarts each, exit_code=1. Auto-restarted by PM2 (44s uptime). Crash at bar boundary ~15:30 UTC.",
-    "resolved": true,
-    "resolved_at": "2026-03-21T16:03:44Z",
-    "resolution_note": "All 3 processes online and stable for 34m. Sell race fix (commit 4ac2d2c) addressed root crash cause."
-  },
-  {
-    "severity": "CRITICAL",
-    "type": "sell_race",
-    "detected_at": "2026-03-21T15:29:00Z",
-    "evidence": "5m: 647 sell_losing pairs within 0.005 time_pct gap (bar_id=1774084500, gap=0.00001). 15m: 282 pairs (bar_id=1774082700, gap=0.00000). Persistent despite prior fix.",
-    "resolved": true,
-    "resolved_at": "2026-03-21T16:03:44Z",
-    "resolution_note": "0 sell_losing events in last 100 events across all TFs. Fix confirmed active in current session."
-  },
-  {
-    "severity": "CRITICAL",
-    "type": "negative_shares",
-    "detected_at": "2026-03-21T15:29:00Z",
-    "evidence": "5m: 8 bars with negative share counts (bar_id=1774084800 dn_shares=-8.83). 15m: 2 bars (bar_id=1774084500 dn_shares=-7.10). Inventory accounting corrupted.",
-    "resolved": true,
-    "resolved_at": "2026-03-21T16:03:44Z",
-    "resolution_note": "All recent bars show valid positive inventory. Historical negatives from pre-fix bars only (bar_ids before ~1774086000)."
-  },
-  {
-    "severity": "WARNING",
-    "type": "pair_cost_stuck",
-    "detected_at": "2026-03-21T16:03:44Z",
-    "evidence": "5m avg_pair_cost=0.983 (7/10 bars >0.98), 15m avg_pair_cost=1.005 (8/10 bars >0.98). Cumulative PnL: 5m=-$1981.70 (73 bars), 15m=-$891.18 (29 bars). Structural issue — high pair cost driving sustained losses.",
-    "resolved": false,
-    "last_checked": "2026-03-22T07:26:47Z",
-    "check_note": "BTC_15m backtest (53 bars total, no new bars since last check): 28/53 bars >0.98 (52.8%), max consecutive = 5 (threshold = 5, trigger met in history). Last 10 bars improving: avg_pair_cost=0.9505, only 1 consecutive >0.98 at end. Cumulative PnL: 15m backtest=-$296.82 (53 bars). 5m and 1h backtest data not available in replay mode. Resolution requires 5 consecutive bars all <0.98 — not yet achieved. No sell_losing events, no kill_switch events, no negative shares."
-  }
-]}
+{
+  "alerts": [
+    {
+      "severity": "CRITICAL",
+      "type": "process_down",
+      "detected_at": "2026-03-21T15:29:00Z",
+      "evidence": "All 3 Dutch processes stopped with 8 restarts each, exit_code=1. Auto-restarted by PM2 (44s uptime). Crash at bar boundary ~15:30 UTC.",
+      "resolved": true,
+      "resolved_at": "2026-03-21T16:03:44Z",
+      "resolution_note": "All 3 processes online and stable for 34m. Sell race fix (commit 4ac2d2c) addressed root crash cause."
+    },
+    {
+      "severity": "CRITICAL",
+      "type": "sell_race",
+      "detected_at": "2026-03-21T15:29:00Z",
+      "evidence": "5m: 647 sell_losing pairs within 0.005 time_pct gap (bar_id=1774084500, gap=0.00001). 15m: 282 pairs (bar_id=1774082700, gap=0.00000). Persistent despite prior fix.",
+      "resolved": true,
+      "resolved_at": "2026-03-21T16:03:44Z",
+      "resolution_note": "0 sell_losing events in last 100 events across all TFs. Fix confirmed active in current session."
+    },
+    {
+      "severity": "CRITICAL",
+      "type": "negative_shares",
+      "detected_at": "2026-03-21T15:29:00Z",
+      "evidence": "5m: 8 bars with negative share counts (bar_id=1774084800 dn_shares=-8.83). 15m: 2 bars (bar_id=1774084500 dn_shares=-7.10). Inventory accounting corrupted.",
+      "resolved": true,
+      "resolved_at": "2026-03-21T16:03:44Z",
+      "resolution_note": "All recent bars show valid positive inventory. Historical negatives from pre-fix bars only (bar_ids before ~1774086000)."
+    },
+    {
+      "severity": "WARNING",
+      "type": "pair_cost_stuck",
+      "detected_at": "2026-03-21T16:03:44Z",
+      "evidence": "5m avg_pair_cost=0.983 (7/10 bars >0.98), 15m avg_pair_cost=1.005 (8/10 bars >0.98). Cumulative PnL: 5m=-$1981.70 (73 bars), 15m=-$891.18 (29 bars). Structural issue \u00e2\u20ac\u201d high pair cost driving sustained losses.",
+      "resolved": true,
+      "last_checked": "2026-03-22T07:26:47Z",
+      "check_note": "BTC_15m backtest (53 bars total, no new bars since last check): 28/53 bars >0.98 (52.8%), max consecutive = 5 (threshold = 5, trigger met in history). Last 10 bars improving: avg_pair_cost=0.9505, only 1 consecutive >0.98 at end. Cumulative PnL: 15m backtest=-$296.82 (53 bars). 5m and 1h backtest data not available in replay mode. Resolution requires 5 consecutive bars all <0.98 \u00e2\u20ac\u201d not yet achieved. No sell_losing events, no kill_switch events, no negative shares.",
+      "resolved_at": "2026-03-22T07:30:00Z",
+      "resolution_note": "Stale paper trading alert \u2014 not relevant in backtest mode. Resolved for autoresearch."
+    }
+  ]
+}
