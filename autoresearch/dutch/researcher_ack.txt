@@ -1,3 +1,6 @@
-iter=59 pair=XRP_5m timestamp=2026-03-23T16:15:00Z
-status=evaluating_prior_experiment
-hypothesis=evaluating fill_ticks 10->15 (already staged in knobs_XRP_5m.json); if discard, next is conviction_buy_skip 0.50->0.45 per strategy.md priority queue
+iter=61 pair=XRP_1h timestamp=2026-03-22T16:00:00Z
+Role: RESEARCHER (BACKTEST MODE)
+Hypothesis: conviction_buy_skip 0.50->0.55 — inverse direction test.
+XRP_1h is unique: skip=0.45 DISCARD (iter 48) worsened pair_cost 0.6738->0.7045.
+Best pair in system with 57% correct_side; tighter filter may improve pair quality further.
+Current best_knobs avg_pair_cost=0.6738 (iter 47 KEEP).

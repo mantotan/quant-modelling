@@ -122,3 +122,9 @@
 2026-03-22T23:40:00Z iter=56 pair=SOL_15m status=KEEP param=conviction_buy_skip 0.50→0.45
   eval: pair_cost=0.7956 profit=$-0.0778 max_dd=14.30% bars=124
   hypothesis: "conviction_buy_skip 0.50->0.45 — XRP_15m analog (KEEP iter46, 18.6% cost drop). SOL_15m has 50% correct_side and low DD (15%). Strategy priority #1 for this pair. Confirmed KEEP RELAXED: 14.9% pair_cost improvement (0.9348->0.7956), avg_profit -$0.08 above -2.0 threshold; correct_side dropped 50%->38.4%, matched_ratio 6.5%->4.8%; pattern confirmed for 15m TFs."
+2026-03-22T15:57:11Z iter=60 pair=XRP_15m status=DISCARD param=conviction_buy_skip 0.45->0.40
+  eval: pair_cost=0.0000 profit=$+0.1124 max_dd=9.14% bars=125
+  hypothesis: "conviction_buy_skip 0.45->0.40 — strategy priority #1 for XRP_15m (continue series). Prior KEEP at 0.45 showed 18.6% cost improvement. Tested 0.40 to see if further reduction helps. Result: pair formation collapsed to 0% matched_ratio (zero pairs formed) — identical pattern to SOL_1h skip=0.35 (iter 57). Skip=0.40 is below XRP_15m minimum viable threshold. XRP_15m skip floor confirmed at 0.45. Next experiment: bar_budget 200->300 (strategy priority #2 — scale capital on benchmark-beating pair with positive avg_profit and safe 17% max_dd)."
+2026-03-22T16:03:00Z iter=61 pair=XRP_1h status=DISCARD param=conviction_buy_skip 0.50->0.55
+  eval: pair_cost=0.7932 profit=$0.65 max_dd=6.0% bars=33
+  hypothesis: "Inverse direction test — skip=0.45 worsened XRP_1h (0.6738->0.7045), so try tighter filter 0.55 to leverage 57% correct_side. FAILED: correct_side dropped to 46.7% (below 50%), pair_cost worsened 17.7%. Both skip directions (0.45 and 0.55) fail XRP_1h. Skip=0.50 is the optimum. Try bar_budget or risk_ceil next."

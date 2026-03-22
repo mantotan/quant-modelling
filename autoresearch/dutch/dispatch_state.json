@@ -1,5 +1,5 @@
 {
-  "current_pair": "XRP_15m",
+  "current_pair": "BTC_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 10,
-  "last_updated": "2026-03-23T16:15:00Z",
+  "pair_index": 0,
+  "last_updated": "2026-03-22T16:03:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 58,
   "last_auditor_at": 46,
-  "total_iterations": 59,
-  "last_exit_reason": "XRP_5m_discard_fill_ticks_10to15"
+  "total_iterations": 61,
+  "last_exit_reason": "XRP_1h_discard_conviction_buy_skip_0.50to0.55_worsened_pair_cost"
 }
