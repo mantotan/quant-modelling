@@ -103,7 +103,7 @@
   hypothesis: "strategy.md priority #1 for BTC_5m: since 0.45 failed (iter33), try tighter skip=0.55; 56% correct_side suggests high-confidence signals may be better; RESULT: worsened all metrics — higher matched_ratio at worse prices; both skip directions fail for BTC_5m"
 2026-03-22T22:22:00Z iter=51 pair=BTC_15m status=DISCARD param=conviction_buy_skip 0.50->0.45
   eval: pair_cost=0.9201 profit=-$0.09 max_dd=37.9% bars=123
-  hypothesis: "conviction_buy_skip 0.50->0.45 � strategy.md #1 priority for BTC_15m (63% correct_side, untested on V7.3). Lower threshold expected to add net-positive trades given high correct_side. Result: only 1.4% pair_cost improvement (below 5% KEEP RELAXED threshold), max_dd exceeded 30% at 37.9%, avg_profit negative. Next: bar_budget 200->300"
+  hypothesis: "conviction_buy_skip 0.50->0.45 � strategy.md #1 priority for BTC_15m (63% correct_side, untested on V7.3). Lower threshold expected to add net-positive trades given high correct_side. Result: only 1.4% pair_cost improvement (below 5% KEEP RELAXED threshold), max_dd exceeded 30% at 37.9%, avg_profit negative. Next: bar_budget 200->300"
 2026-03-22T23:55:00Z iter=52 pair=BTC_1h status=KEEP param=conviction_buy_skip 0.50->0.45
   eval: pair_cost=0.8707 profit=$0.36 max_dd=9.26% bars=32
   hypothesis: "ETH_1h analog — lower skip threshold allows more selective pair formation at 1h resolution. BTC_1h has 52% correct_side; expect similar improvement to ETH_1h (0.9528->0.7058). Pair_cost improved 5.8% (0.9244->0.8707), avg_profit positive +$0.36/bar. Pattern confirmed."
@@ -116,3 +116,6 @@
 2026-03-22T22:53:00Z iter=54 pair=ETH_15m status=KEEP param=conviction_buy_skip 0.50→0.45
   eval: pair_cost=0.7506 profit=$-0.6982 total_profit=$-86.18 matched=0.0360 fill=0.5610 correct=0.3410 max_dd=53.00% bars=124
   hypothesis: "conviction_buy_skip 0.50->0.45: ETH_1h and XRP_15m both KEEPed with lower skip. ETH_15m had 46% correct_side at skip=0.50 which seemed near an inflection point. Result: pair_cost improved 9.1% (0.8255->0.7506), avg_profit improved -$0.84->-$0.70. KEEP RELAXED. Concern: correct_side dropped 40.9%->34.1% and matched_ratio halved (8.4%->3.6%) — pattern consistent with anti-predictive signal being amplified by lower skip. Next rotation should test max_onesided_cost 5.0->3.0 to reduce DD rather than further skip reduction."
+2026-03-22T23:25:00Z iter=55 pair=ETH_1h status=DISCARD param=max_onesided_cost 5.0→7.0
+  eval: pair_cost=0.7076 profit=$-0.55 max_dd=18.1% bars=32
+  hypothesis: "Auditor Tier 1 directive: ETH_1h profit negative (-$0.49/bar) despite benchmark-beating pair_cost (0.706). max_onesided_cost 5->7 intended to allow larger directional exposure on correct-side bets (43% correct_side). Result: zero effect — pair_cost unchanged (0.7076), profit marginally improved -$0.57->-$0.55 but trivial. Conclusion: $5 onesided cap not being hit at 1h resolution; this lever is inert for ETH_1h. Next: try conviction_buy_skip 0.45->0.40 per strategy.md queue item 1."
