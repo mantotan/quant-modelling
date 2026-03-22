@@ -120,15 +120,15 @@
     ],
     "learning_rate": [
       0.005,
-      0.1
+      0.05
     ],
     "max_depth": [
       2,
       6
     ],
     "num_leaves": [
-      16,
-      64
+      20,
+      40
     ],
     "min_child_samples": [
       100,
