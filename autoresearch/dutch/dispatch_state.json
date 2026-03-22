@@ -1,5 +1,5 @@
 {
-  "current_pair": "ETH_1h",
+  "current_pair": "SOL_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 5,
-  "last_updated": "2026-03-22T19:20:04Z",
+  "pair_index": 6,
+  "last_updated": "2026-03-22T19:22:57Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 107,
   "last_auditor_at": 95,
-  "total_iterations": 107,
-  "last_exit_reason": "researcher: iter=108 ETH_15m FROZEN (audit directive) — onesided series exhausted, pair_cost=0.560 beats trader_a by 34%; advanced rotation to ETH_1h"
+  "total_iterations": 108,
+  "last_exit_reason": "researcher: iter=108 ETH_1h DISCARD -- bar_budget 200->250 worsened pair_cost 0.6% (0.7058->0.7099); next conviction_market_start 0.30->0.25; advanced rotation to SOL_5m"
 }

@@ -1,3 +1,3 @@
-iter=108 pair=ETH_15m timestamp=2026-03-22T19:20:04Z
-Paused — FREEZE directive active for ETH_15m (audit.md: onesided series exhausted, pair_cost=0.560 beats target by 34%, bar_budget risk too high on 0.3% matched_ratio).
-Advancing pair rotation to ETH_1h.
+iter=108 pair=ETH_1h timestamp=2026-03-22T19:21:57Z mode=BACKTEST
+Testing bar_budget 200->250 per strategy.md priority queue item 1 and audit directive.
+knobs_ETH_1h.json already has bar_budget=250 (set last rotation). Running backtest now.
