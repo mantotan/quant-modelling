@@ -10,3 +10,4 @@
 2026-03-23T23:54:35Z iter=75 pair=XRP_15m role=researcher outcome=DISCARD bar_budget 200->300 worsened pair_cost 0.7pct; next risk_ceil 0.15->0.20 on XRP_15m
 2026-03-23T00:20:00Z iter=77 pair=BTC_5m role=researcher outcome=DISCARD baseline re-eval max_dd=33.2%, next: max_onesided_cost 5.0->3.0
 2026-03-23T05:02:00Z iter=78 pair=BTC_15m role=researcher outcome=DISCARD compound skip=0.45+onesided=3.0 pair_cost=0.8964(-3.97%) max_dd=27.8% near-miss
+2026-03-23T08:20:00Z iter=80 pair=BTC_1h role=researcher outcome=DISCARD(x2): re-eval variance + risk_ceil 0.15->0.20 failed to beat best KEEP 0.7988

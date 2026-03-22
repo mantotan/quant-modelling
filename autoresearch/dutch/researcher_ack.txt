@@ -1,4 +1,5 @@
-iter=78 pair=BTC_15m timestamp=2026-03-23T05:00:00Z status=running
-hypothesis: compound change conviction_buy_skip 0.50->0.45 + max_onesided_cost 5.0->3.0
-rationale: skip=0.45 alone caused DD=37.9% (iter 51 DISCARD); adding onesided_cap=3.0 should contain DD
-while preserving the 1.4% pair_cost gain. Audit directive confirmed.
+iter=79 pair=BTC_1h timestamp=2026-03-23T08:15:00Z status=running
+hypothesis: risk_ceil 0.15->0.20 -- more capital per bar on directionally strong pair (61% correct_side, 9% max_dd)
+rationale: skip=0.40 confirmed at pair_cost=0.7988. Re-eval shows 0.8476 (slight variance). avg_profit
+negative at -$0.42. Audit Tier 3 recommends risk_ceil increase to improve avg_profit. Low DD (8.7%)
+provides headroom. 61% correct_side is strongest directional signal in BTC pairs.

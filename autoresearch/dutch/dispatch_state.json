@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_1h",
+  "current_pair": "ETH_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 2,
-  "last_updated": "2026-03-23T05:02:00Z",
+  "pair_index": 3,
+  "last_updated": "2026-03-23T08:20:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 71,
   "last_auditor_at": 71,
-  "total_iterations": 78,
-  "last_exit_reason": "researcher: BTC_15m DISCARD -- compound skip=0.45+onesided=3.0 improved pair_cost 3.97% (0.9334->0.8964) and max_dd=27.8%, but avg_profit=-$0.01 fails strict KEEP and 3.97%<5% fails KEEP RELAXED [conviction_buy_skip+max_onesided_cost]"
+  "total_iterations": 80,
+  "last_exit_reason": "researcher: BTC_1h DISCARD (x2) -- re-eval 0.7988->0.8476 dataset variance; risk_ceil 0.15->0.20 improved correct_side 61.3% and max_dd 7.9% but pair_cost 0.8100 did not beat best KEEP 0.7988 [risk_ceil]"
 }
