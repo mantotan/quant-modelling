@@ -1,7 +1,6 @@
-iter=101 pair=SOL_1h timestamp=2026-03-23T18:40:00Z
+iter=102 pair=XRP_5m timestamp=2026-03-23T19:10:00Z
 Phase: BACKTEST MODE (replay_available)
-Previous best pair_cost: 0.6547 (iter 86, bar_budget 300)
-Re-eval result: pair_cost=0.8224 (2 new expensive bars since iter 86) -> DISCARD
-risk_ceil test (0.15->0.20): pair_cost=0.8170 (0.7% improvement vs re-eval, still above best 0.6547) -> DISCARD
-Note: avg_profit=+$1.43/bar, max_dd=6.2% -- fundamentals strong, pair_cost driven by dataset variance
-Next: XRP_5m (pair_index=9)
+Status: FROZEN per audit.md directive (iter 95)
+Reason: structural fill_rate=54% floor confirmed (fill_ticks=15 zero effect), max_dd=69%, no profitable pathway
+Audit note: "Do not unfreeze unless fill mechanism change (fill_ticks=20 final test)" — skipping this iteration
+Action: Advancing pair rotation to XRP_15m

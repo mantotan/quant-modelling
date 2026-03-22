@@ -88,3 +88,4 @@
 2026-03-23T18:40:00Z iter=101 pair=SOL_1h status=DISCARD param=risk_ceil 0.15->0.20
   eval: pair_cost=0.8170 profit=$1.43 max_dd=6.16% bars=36
   hypothesis: "risk_ceil 0.15->0.20 per strategy priority #1; SOL_1h has 5.8% DD with exceptional headroom; SOL_15m analog (iter 99) confirmed KEEP; pair_cost 0.8170 still above best 0.6547 -- 2 new expensive bars dominate signal"
+2026-03-23T19:10:00Z iter=101 pair=XRP_5m role=researcher outcome=FROZEN(audit-directive) — structural fill_rate=54% floor, max_dd=69%, pair skipped; advanced to XRP_15m

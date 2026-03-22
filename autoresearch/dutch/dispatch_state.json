@@ -1,5 +1,5 @@
 {
-  "current_pair": "XRP_5m",
+  "current_pair": "XRP_15m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 9,
-  "last_updated": "2026-03-23T18:40:00Z",
+  "pair_index": 10,
+  "last_updated": "2026-03-23T19:10:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 95,
   "last_auditor_at": 95,
   "total_iterations": 101,
-  "last_exit_reason": "researcher: iter 100 SOL_1h re-eval DISCARD (pair_cost 0.6547->0.8224, +25.6% regression on 2 new bars); iter 101 SOL_1h risk_ceil 0.15->0.20 DISCARD (0.8170 still above best 0.6547); both results driven by 2 new expensive bars; next: XRP_5m"
+  "last_exit_reason": "researcher: iter 102 XRP_5m FROZEN per audit.md directive (structural fill_rate=54% floor, max_dd=69%); pair skipped, advancing to XRP_15m"
 }
