@@ -1,4 +1,3 @@
-iter=18 pair=BTC_1h timestamp=2026-03-22T15:14:22Z
+iter=19 pair=ETH_5m timestamp=2026-03-22T15:30:00Z
 Role: RESEARCHER (backtest mode)
-DISCARD sell_loss_start 0.70->0.60: pair_cost worsened 0.9382->1.0023, max_dd doubled 27.3->52.6%
-Next hypothesis: unmatched_ratio 0.50->0.40 (strategy priority #1 for BTC_1h)
+Evaluating pre-staged unmatched_ratio 0.50->0.35 experiment via backtest.
