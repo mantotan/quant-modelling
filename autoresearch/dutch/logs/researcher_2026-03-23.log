@@ -117,3 +117,10 @@
 2026-03-23T12:00:00Z iter=115 pair=XRP_15m status=DISCARD param=conviction_market_start 0.30->0.25
   eval: pair_cost=0.6378 profit=-$0.09 max_dd=13.0% bars=141
   hypothesis: "conviction_market_start 0.30->0.25 to ease market entry bar and expand low matched_ratio (0.3%) prediction pool; BTC_1h (iter 106) showed worsening pattern but XRP_15m has different profile; no pair_cost improvement confirmed — BTC_1h analog applies to XRP_15m as well; easing entry bar does not expand pair formation at 0.3% matched_ratio; next: pace_urgency_lo 0.30->0.25"
+2026-03-23T12:30:00Z iter=116 pair=XRP_1h status=DISCARD param=conviction_market_start 0.30->0.25
+  eval: pair_cost=0.6996 profit=$1.08 max_dd=5.2% bars=36
+  hypothesis: "Lower conviction_market_start from 0.30 to 0.25 to qualify more predictions; XRP_1h matched_ratio=3.4% critically low; easing threshold may expand prediction pool. BTC_1h analog risk acknowledged. Result: matched_ratio improved 3.4->8.6% but weaker predictions degraded pair_cost 0.6738->0.6996 (+3.8%). BTC_1h analog confirmed. DISCARD."
+  next: max_onesided_cost 5.0->2.0 -- cap one-sided accumulation cost; DD=6% gives ample headroom; cross-pair evidence strong
+2026-03-23T19:58:48Z iter=117 pair=BTC_5m status=DISCARD param=max_onesided_cost 2.0->1.5
+  eval: pair_cost=0.0000 (degenerate-no-pairs) profit=+$0.18 max_dd=12.5% bars=420
+  hypothesis: "max_onesided_cost 2.0->1.5 — ETH_5m confirmed KEEP (iter 107) but SOL_5m DISCARD (iter 97) with 0.0% improvement. BTC_5m matched_ratio=0.1% is extremely thin (same as SOL_5m). Cap at 1.5 blocked all pair formation entirely — degenerate result. Floor confirmed at onesided=2.0 for BTC_5m. Same floor pattern as SOL_5m."

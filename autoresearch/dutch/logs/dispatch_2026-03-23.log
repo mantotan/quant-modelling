@@ -33,3 +33,4 @@
 2026-03-23T19:50:00Z iter=112 pair=SOL_15m role=researcher outcome=DISCARD x3: re-eval regression on 140 bars, onesided_cost=2.0 collapsed pairs to 0%, bar_budget=400 neutral; advanced to SOL_1h
 2026-03-23T00:00:00Z iter=114 pair=XRP_5m role=researcher outcome=FREEZE -- audit directive, structural dead-end, advanced to XRP_15m
 2026-03-23T12:00:00Z iter=115 pair=XRP_15m role=researcher outcome=DISCARD conviction_market_start 0.30->0.25 no pair_cost improvement (0.6378=0.6378)
+2026-03-23T12:30:00Z iter=116 pair=XRP_1h role=researcher outcome=DISCARD conviction_market_start 0.30->0.25 worsened pair_cost; next max_onesided_cost 5.0->2.0

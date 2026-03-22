@@ -1,7 +1,1 @@
-iter=115 pair=XRP_15m timestamp=2026-03-23T12:00:00Z mode=BACKTEST
-Action: Running experiment — conviction_market_start 0.30->0.25
-Hypothesis: Lower market entry bar from 0.30 to 0.25 to qualify more predictions.
-matched_ratio=0.3% is critically low; easing conviction_market_start may expand prediction pool
-without the collapse risk seen with conviction_buy_skip changes (which filter at a different stage).
-BTC_1h (iter 106) showed conviction_market_start worsened pair_cost — risk acknowledged.
-Audit directive for XRP_15m: CONTINUE, timing experiments are the remaining frontier.
+iter=117 pair=BTC_5m timestamp=2026-03-23T19:58:48Z status=DISCARD param=max_onesided_cost 2.0->1.5 — matched_ratio collapsed to 0.0%, floor confirmed at 2.0

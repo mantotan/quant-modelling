@@ -1,5 +1,5 @@
 {
-  "current_pair": "XRP_1h",
+  "current_pair": "BTC_15m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 11,
-  "last_updated": "2026-03-23T12:00:00Z",
+  "pair_index": 1,
+  "last_updated": "2026-03-23T19:58:48Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 107,
   "last_auditor_at": 95,
-  "total_iterations": 115,
-  "last_exit_reason": "XRP_15m: DISCARD -- conviction_market_start 0.30->0.25 no pair_cost improvement (0.6378=0.6378); matched_ratio unchanged at 0.3%; BTC_1h analog confirmed; next pace_urgency_lo 0.30->0.25"
+  "total_iterations": 117,
+  "last_exit_reason": "BTC_5m: DISCARD -- max_onesided_cost 2.0->1.5 collapsed matched_ratio to 0.0% -- zero pairs formed (same floor as SOL_5m iter 97); floor confirmed at onesided=2.0; next: pace_urgency_lo 0.35->0.30 [max_onesided_cost]"
 }
