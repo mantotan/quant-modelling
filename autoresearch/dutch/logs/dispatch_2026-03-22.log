@@ -9,3 +9,5 @@
 2026-03-22T07:26:47Z iter=9 role=monitor outcome=healthy 0/0 live processes (replay mode), pair_cost_stuck WARNING active, no new bars since last check (53 bars total BTC_15m), PnL=-96.82 cumulative
 2026-03-22T07:31:10Z iter=10 role=researcher outcome=ETH_1h BASELINE pair_cost=0.9626 avg_profit=$-8.50 max_dd=102.03% bars=24 next=unmatched_ratio_0.50->0.35 pair_rotated_to=SOL_5m(pair_index=6)
 2026-03-22T07:45:00Z iter=10 role=strategist outcome=KEEP_rate=0/4=0% best_pair=ETH_5m(0.9236) worst_pair=BTC_5m(0.9676) new_blacklist=BTC_1h(risk_ceil,pace_urgency_hi) unmatched_ratio_staged_ETH
+2026-03-22T07:39:19Z iter=11 role=researcher outcome=SOL_5m BASELINE pair_cost=0.9404 matched_ratio=43.2% max_dd=718.3% bars=274 next_pair=SOL_15m
+2026-03-22T07:40:49Z iter=11 EXIT reason=no_active_experiment alerts=0 iters_since_strategist=1 iters_since_auditor=11 next=researcher(SOL_15m)
