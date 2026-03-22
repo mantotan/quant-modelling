@@ -1,5 +1,5 @@
 {
-  "current_pair": "XRP_1h",
+  "current_pair": "BTC_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 11,
-  "last_updated": "2026-03-23T23:54:35Z",
+  "pair_index": 0,
+  "last_updated": "2026-03-24T00:02:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 71,
   "last_auditor_at": 71,
-  "total_iterations": 75,
-  "last_exit_reason": "researcher: XRP_15m DISCARD -- bar_budget 200->300 worsened pair_cost 0.7pct (0.7780->0.7832), avg_profit turned negative -0.10 (was +0.01); next: risk_ceil 0.15->0.20 [bar_budget]"
+  "total_iterations": 76,
+  "last_exit_reason": "researcher: XRP_1h DISCARD -- bar_budget 200->300 worsened pair_cost 10.3% (0.6738->0.7434), avg_profit collapsed 77% ($1.12->$0.26); XRP_1h optimum capital allocation is 200; next: risk_ceil 0.15->0.20 [bar_budget]"
 }
