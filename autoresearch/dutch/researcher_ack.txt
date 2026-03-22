@@ -1,4 +1,7 @@
-iter=114 pair=XRP_5m timestamp=2026-03-23T00:00:00Z mode=BACKTEST
-Action: Paused — FREEZE directive in audit.md for XRP_5m.
-Reason: audit.md FREEZE XRP_5m — structural fill_rate=54% floor confirmed, max_dd=69%, no profitable pathway; skip=0.45 untested but onesided repair blocked by fill microstructure — structural dead-end confirmed.
-Advancing pair rotation to XRP_15m.
+iter=115 pair=XRP_15m timestamp=2026-03-23T12:00:00Z mode=BACKTEST
+Action: Running experiment — conviction_market_start 0.30->0.25
+Hypothesis: Lower market entry bar from 0.30 to 0.25 to qualify more predictions.
+matched_ratio=0.3% is critically low; easing conviction_market_start may expand prediction pool
+without the collapse risk seen with conviction_buy_skip changes (which filter at a different stage).
+BTC_1h (iter 106) showed conviction_market_start worsened pair_cost — risk acknowledged.
+Audit directive for XRP_15m: CONTINUE, timing experiments are the remaining frontier.
