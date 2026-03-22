@@ -155,3 +155,6 @@
 2026-03-22T17:36:41Z iter=85 pair=SOL_15m status=DISCARD param=conviction_buy_skip 0.45->0.40
   eval: pair_cost=0.0000 (0 matched pairs) profit=$-0.02/bar max_dd=11.4% bars=133
   hypothesis: "Test skip=0.40 per strategy.md priority #1 for SOL_15m. Safe DD (9.5%), positive avg_profit (+$0.17/bar), correct_side=44.6% (above 38% floor) — borderline but worth testing. XRP_15m collapsed at skip=0.40 (iter 60) due to low matched_ratio (2%); SOL_15m was higher at 4.8% but still too thin. Result: full collapse to 0% matched_ratio. XRP_15m pattern confirmed. skip=0.45 is structural floor for SOL_15m."
+2026-03-22T19:20:04Z iter=108 pair=ETH_15m status=FROZEN param=none -  ->-
+  eval: pair_cost=0.560 profit=-$0.21 max_dd=26.8% bars=131
+  hypothesis: "FROZEN per audit directive — onesided series exhausted at 1.5 floor; pair_cost=0.560 already beats trader_a by 34%; advancing rotation to ETH_1h"

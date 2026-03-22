@@ -1,1 +1,3 @@
-iter=107 pair=ETH_5m timestamp=2026-03-23T19:09:40Z status=active
+iter=108 pair=ETH_15m timestamp=2026-03-22T19:20:04Z
+Paused — FREEZE directive active for ETH_15m (audit.md: onesided series exhausted, pair_cost=0.560 beats target by 34%, bar_budget risk too high on 0.3% matched_ratio).
+Advancing pair rotation to ETH_1h.
