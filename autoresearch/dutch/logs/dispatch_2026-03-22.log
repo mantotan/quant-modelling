@@ -13,3 +13,4 @@
 2026-03-22T07:40:49Z iter=11 EXIT reason=no_active_experiment alerts=0 iters_since_strategist=1 iters_since_auditor=11 next=researcher(SOL_15m)
 2026-03-22T08:00:00Z iter=12 role=researcher outcome=SOL_15m BASELINE pair_cost=0.9513 profit=$-3.63 max_dd=167.1% bars=92 next_pair=SOL_1h
 2026-03-22T07:47:03Z iter=12 EXIT reason=no_role_matched elapsed=1216s alerts=0
+2026-03-22T07:48:51Z iter=12 EXIT reason=incubating elapsed=21m alerts=0
