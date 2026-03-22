@@ -173,3 +173,6 @@
 2026-03-22T20:34:13Z iter=123 pair=SOL_15m status=DISCARD param=pace_urgency_lo 0.35->0.30
   eval: pair_cost=0.7148 profit=+$0.31 max_dd=16.8% bars=144
   hypothesis: "pace_urgency_lo 0.35->0.30 — XRP_15m 18% gain pattern, first pace test on SOL_15m; result: negligible pair_cost change (0.7148 vs last 0.7150), fails to beat best KEEP 0.6956; pace timing has minimal effect on SOL_15m matching quality"
+2026-03-22T20:36:36Z iter=124 pair=SOL_1h status=DISCARD param=- (re-eval only, bar_budget reset 400->300 then staged 300->400)
+  eval: pair_cost=0.6581 profit=$1.7187 max_dd=5.66% bars=37
+  hypothesis: "Re-eval with corrected best_knobs (bar_budget=300): pair_cost=0.6581 vs best 0.6547 (+0.5%). Audit condition met (pair_cost <0.70). Staged bar_budget=400 for next experiment per strategy queue priority #2 and audit tier 2 recommendation. avg_profit=+$1.72/bar is system-best. Dataset stable at 37 bars."
