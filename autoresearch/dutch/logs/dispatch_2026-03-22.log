@@ -47,3 +47,4 @@
 2026-03-22T23:40:00Z iter=56 pair=SOL_15m role=researcher outcome=KEEP conviction_buy_skip 0.50->0.45 pair_cost=0.7956(14.9% improvement) max_dd=14.3% KEEP_RELAXED next=SOL_1h
 2026-03-22T16:03:00Z iter=61 pair=XRP_1h role=researcher outcome=DISCARD conviction_buy_skip 0.50->0.55 worsened pair_cost 0.6738->0.7932, correct_side 60%->46.7%
 2026-03-22T16:15:00Z iter=62 pair=BTC_5m role=researcher outcome=DISCARD cheap_threshold 0.10->0.12 max_dd=33.2% exceeds 30% threshold pair_cost=0.9444 avg_profit=+0.21
+2026-03-22T16:22:00Z iter=63 pair=BTC_15m role=researcher outcome=DISCARD bar_budget 200->300 pair_cost_regression 0.9334->0.9429; next cheap_threshold 0.10->0.12
