@@ -1,7 +1,5 @@
-iter=82 pair=ETH_15m timestamp=2026-03-22T17:19:01Z status=KEEP
-hypothesis: max_onesided_cost 2.0->1.5 -- reduce max_dd below 30% threshold
-rationale: ETH_15m at max_dd=32.5% after iter 68 KEEP (max_onesided_cost=5.0->2.0). Strategy priority #1
-and audit Tier 2 both call for further cap reduction. ETH_15m analog: 2.0->1.5 step targets DD below 30%.
-Matched_ratio already very thin at 1.4% -- cap reduction reduces directional exposure further.
-Result: pair_cost improved 20.4% (0.7032->0.5600), max_dd 32.5%->26.8% (below 30% threshold). KEEP RELAXED.
-ETH_15m now meets all benchmark criteria (pair_cost=0.56 vs 0.85 target, max_dd=26.8% vs 30% limit).
+iter=83 pair=ETH_1h timestamp=2026-03-23T00:00:00Z status=pending
+hypothesis: risk_ceil 0.15->0.20 -- increase per-bar capital allocation on ETH_1h
+rationale: ETH_1h skip series exhausted at 0.45. pair_cost=0.706 beats benchmark (0.85), max_dd=17% provides
+safe headroom. Strategy priority #1 and audit Tier 3 both direct risk_ceil increase. With 43% correct_side
+and -$0.49/bar avg_profit, more capital per bar may improve total_profit. max_dd=17% is far below 30% limit.
