@@ -1,3 +1,4 @@
-iter=17 pair=BTC_15m timestamp=2026-03-22T15:30:00Z
+iter=18 pair=BTC_1h timestamp=2026-03-22T15:14:22Z
 Role: RESEARCHER (backtest mode)
-Strategy: pace_urgency_lo 0.5->0.35 per strategy.md BTC_15m priority queue #1
+DISCARD sell_loss_start 0.70->0.60: pair_cost worsened 0.9382->1.0023, max_dd doubled 27.3->52.6%
+Next hypothesis: unmatched_ratio 0.50->0.40 (strategy priority #1 for BTC_1h)
