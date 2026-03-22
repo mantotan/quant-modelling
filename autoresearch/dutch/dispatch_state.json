@@ -1,5 +1,5 @@
 {
-  "current_pair": "XRP_1h",
+  "current_pair": "BTC_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 11,
-  "last_updated": "2026-03-23T20:00:00Z",
+  "pair_index": 0,
+  "last_updated": "2026-03-23T20:15:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 95,
   "last_auditor_at": 95,
-  "total_iterations": 102,
-  "last_exit_reason": "researcher: iter 102 XRP_15m KEEP -- pace_urgency_lo 0.35->0.30 major pair_cost improvement 18.0% (0.7780->0.6378), max_dd 17.2%->11.0%; KEEP RELAXED; next: conviction_market_start 0.30->0.25"
+  "total_iterations": 103,
+  "last_exit_reason": "researcher: iter 103 XRP_1h DISCARD -- pace_urgency_lo 0.35->0.45 zero effect (identical results 0.6979 vs best 0.6738); 1h bars too long for urgency gates; next: conviction_market_start 0.30->0.25 [pace_urgency_lo]"
 }

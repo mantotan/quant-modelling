@@ -1,10 +1,11 @@
-iter=102 pair=XRP_15m timestamp=2026-03-23T20:00:00Z
+iter=103 pair=XRP_1h timestamp=2026-03-23T20:15:00Z
 Phase: BACKTEST MODE (replay_available)
-Status: KEEP
-param: pace_urgency_lo 0.35->0.30
-pair_cost: 0.6378 (best was 0.7780, improved 18.0%)
-avg_profit: -$0.01/bar (KEEP RELAXED: >5% cost gain + profit > -2.0)
-max_dd: 11.0% (improved from 17.2%)
-bars_evaluated: 137
-Next hypothesis: conviction_market_start 0.30->0.25 applied to knobs_XRP_15m.json
-Next pair: XRP_1h (pair_index=11)
+Status: DISCARD
+param: pace_urgency_lo 0.35->0.45
+pair_cost: 0.6979 (best was 0.6738, WORSE)
+avg_profit: $1.15/bar
+max_dd: 5.2%
+bars_evaluated: 35
+Note: zero effect -- 1h bars too long for urgency gates (identical results pre/post change)
+Next hypothesis: conviction_market_start 0.30->0.25 applied to knobs_XRP_1h.json
+Next pair: BTC_5m (pair_index=0)

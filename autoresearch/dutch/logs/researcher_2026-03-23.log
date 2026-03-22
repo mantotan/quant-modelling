@@ -92,3 +92,6 @@
 2026-03-23T20:00:00Z iter=102 pair=XRP_15m status=KEEP param=pace_urgency_lo 0.35->0.30
   eval: pair_cost=0.6378 profit=-$0.01 max_dd=11.0% bars=137
   hypothesis: "Earlier urgency timing (pace_urgency_lo 0.35->0.30) captures pairs before price moves; XRP_15m matched_ratio=2% too selective; earlier gate entry improves pair quality"
+2026-03-23T20:15:00Z iter=103 pair=XRP_1h status=DISCARD param=pace_urgency_lo 0.35->0.45
+  eval: pair_cost=0.6979 profit=$1.15 max_dd=5.2% bars=35
+  hypothesis: "pace_urgency_lo 0.35->0.45 -- delayed entry to improve fill quality; 1h bars too long for urgency gates -- identical metrics; zero effect on 1h TF; next: conviction_market_start 0.30->0.25"

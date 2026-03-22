@@ -22,7 +22,7 @@
   "risk_t_start": 0.1,
   "risk_t_end": 0.8,
   "risk_exponent": 2.0,
-  "conviction_market_start": 0.3,
+  "conviction_market_start": 0.25,
   "conviction_market_full": 1.0,
   "conviction_buy_skip": 0.5,
   "conviction_size_floor": 0.3,
