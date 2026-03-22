@@ -95,3 +95,7 @@
 2026-03-23T20:15:00Z iter=103 pair=XRP_1h status=DISCARD param=pace_urgency_lo 0.35->0.45
   eval: pair_cost=0.6979 profit=$1.15 max_dd=5.2% bars=35
   hypothesis: "pace_urgency_lo 0.35->0.45 -- delayed entry to improve fill quality; 1h bars too long for urgency gates -- identical metrics; zero effect on 1h TF; next: conviction_market_start 0.30->0.25"
+2026-03-23T20:22:00Z iter=104 pair=BTC_5m status=KEEP param=max_onesided_cost 5.0->2.0
+  eval: pair_cost=0.9220 profit=$0.19/bar max_dd=15.3% bars=408
+  hypothesis: "max_onesided_cost 5.0->2.0 — strategy priority #1 confirmed. ETH_5m iter 92 and SOL_5m iter 84 both KEEP at 2.0; iter 89 proved 3.0 fixed DD but not pair_cost. At 2.0 cap, pair_cost improved 2.74% to 0.9220, max_dd halved to 15.3%, avg_profit positive at $0.19/bar. First KEEP for BTC_5m since V7.3 reset."
+  next: risk_ceil 0.15->0.10

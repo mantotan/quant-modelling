@@ -1,11 +1,11 @@
-iter=103 pair=XRP_1h timestamp=2026-03-23T20:15:00Z
+iter=104 pair=BTC_5m timestamp=2026-03-23T20:22:00Z
 Phase: BACKTEST MODE (replay_available)
-Status: DISCARD
-param: pace_urgency_lo 0.35->0.45
-pair_cost: 0.6979 (best was 0.6738, WORSE)
-avg_profit: $1.15/bar
-max_dd: 5.2%
-bars_evaluated: 35
-Note: zero effect -- 1h bars too long for urgency gates (identical results pre/post change)
-Next hypothesis: conviction_market_start 0.30->0.25 applied to knobs_XRP_1h.json
-Next pair: BTC_5m (pair_index=0)
+Status: KEEP
+param: max_onesided_cost 5.0->2.0
+pair_cost: 0.9220 (best was 0.9480, improved 2.74%)
+avg_profit: $0.19/bar
+max_dd: 15.3%
+bars_evaluated: 408
+Note: First KEEP for BTC_5m since V7.3 reset. Matches ETH_5m/SOL_5m pattern.
+Next hypothesis: risk_ceil 0.15->0.10 applied to knobs_BTC_5m.json
+Next pair: BTC_15m (pair_index=1)
