@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_15m",
+  "current_pair": "SOL_1h",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 7,
-  "last_updated": "2026-03-22T23:30:00Z",
+  "pair_index": 8,
+  "last_updated": "2026-03-22T23:40:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 46,
   "last_auditor_at": 46,
-  "total_iterations": 55,
+  "total_iterations": 56,
   "last_exit_reason": "SOL_5m_frozen_per_audit_structurally_challenged"
 }
