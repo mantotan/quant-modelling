@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_15m",
+  "current_pair": "ETH_15m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 1,
-  "last_updated": "2026-03-23T20:22:00Z",
+  "pair_index": 4,
+  "last_updated": "2026-03-23T19:12:21Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 95,
   "last_auditor_at": 95,
-  "total_iterations": 104,
-  "last_exit_reason": "researcher: iter 104 BTC_5m KEEP -- max_onesided_cost 5.0->2.0 first KEEP since V7.3 reset, pair_cost 0.9480->0.9220 (-2.74%), max_dd 15.3%; next: risk_ceil 0.15->0.10 [max_onesided_cost]"
+  "total_iterations": 107,
+  "last_exit_reason": "researcher: iter 107 ETH_5m KEEP -- max_onesided_cost 2.0->1.5 improved pair_cost 0.96% (0.6390->0.6329), max_dd 16.4%->13.8%; avg_profit +$0.01; onesided series all KEEP; next: ETH_15m [max_onesided_cost]"
 }
