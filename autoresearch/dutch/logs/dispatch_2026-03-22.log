@@ -24,3 +24,4 @@
 2026-03-22T15:35:00Z iter=19 pair=ETH_5m role=researcher outcome=DISCARD unmatched_ratio 0.50->0.35 pair_cost worsened 0.9236->0.9300
 2026-03-22T16:22:00Z iter=21 pair=ETH_15m role=researcher outcome=DISCARD_unmatched_ratio(pair_cost=0.9580,next=pace_urgency_lo)
 2026-03-22T17:15:00Z iter=33 pair=BTC_5m role=STRATEGIST outcome=per-pair analysis: 6/12 profitable, throughput constraint identified, priority queues written for all 12 pairs, 4 global blacklists confirmed
+2026-03-22T17:22:47Z iter=34 pair=BTC_5m role=RESEARCHER outcome=DISCARD conviction_buy_skip 0.50->0.45 pair_cost=0.9285 max_dd=54.3%
