@@ -39,3 +39,7 @@
   eval: pair_cost=0.9759 profit=$-6.40 total_profit=$-1772.33 matched=0.6920 fill=0.8900 correct=0.1300 max_dd=907.0% bars=277
   reason: pair_cost worsened (0.9676->0.9759), avg_profit worsened (-5.63->-6.40), max_dd nearly doubled (482->907%). Matched_ratio improved marginally (67.9->69.2%) but at worse prices — forced pair completions at unfavorable costs.
   hypothesis: "unmatched_ratio tightening counterproductive for BTC_5m — forcing pair completions at high cost. Next: try pace_urgency_lo 0.5->0.35 (strategy priority #2) to open orders earlier when prices are more favorable in the tight 5m window."
+2026-03-22T15:30:00Z iter=17 pair=BTC_15m status=DISCARD param=cheap_threshold 0.10->0.07
+  eval: pair_cost=0.9608 profit=$-5.80 total_profit=$-545.06 matched=0.6347 fill=0.8479 correct=0.1170 max_dd=272.75% bars=94
+  reason: cheap_threshold 0.10->0.07 produced marginal pair_cost improvement (0.9631->0.9608, +0.24%) but avg_profit still negative, max_dd 272.75%. No KEEP criteria met, relaxed criteria not met (improvement <5%).
+  hypothesis: "pace_urgency_lo 0.5->0.35 is strategy.md BTC_15m priority #1 and untested on any pair. Lower base pacing threshold opens orders earlier in the 900s bar window when prices are more favorable. Should improve fill price distribution and reduce avg_pair_cost structurally."

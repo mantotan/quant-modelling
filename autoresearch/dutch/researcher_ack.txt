@@ -1,4 +1,3 @@
-iter=16 pair=BTC_5m timestamp=2026-03-22T15:10:00Z
+iter=17 pair=BTC_15m timestamp=2026-03-22T15:30:00Z
 Role: RESEARCHER (backtest mode)
-Strategy: unmatched_ratio 0.50->0.35 per strategy.md BTC_5m priority queue #1
-All 12 baselines complete. Beginning experiment phase.
+Strategy: pace_urgency_lo 0.5->0.35 per strategy.md BTC_15m priority queue #1
