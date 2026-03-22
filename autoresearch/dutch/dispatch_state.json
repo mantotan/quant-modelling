@@ -1,5 +1,5 @@
 {
-  "current_pair": "ETH_1h",
+  "current_pair": "SOL_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 5,
-  "last_updated": "2026-03-23T14:45:00Z",
+  "pair_index": 6,
+  "last_updated": "2026-03-23T15:10:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 83,
   "last_auditor_at": 71,
-  "total_iterations": 94,
-  "last_exit_reason": "researcher: ETH_15m DISCARD -- max_onesided_cost 1.5->1.0 collapsed pair formation (matched_ratio 1%->0%), onesided series floor confirmed at 1.5; next: bar_budget 200->300 [max_onesided_cost]"
+  "total_iterations": 95,
+  "last_exit_reason": "researcher: ETH_1h DISCARD -- re-eval 35 bars: pair_cost 1.8% improvement (0.7058->0.6929) below KEEP RELAXED 5% threshold, avg_profit negative; next: bar_budget 200->250 [bar_budget]"
 }

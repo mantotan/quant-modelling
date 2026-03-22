@@ -1,6 +1,7 @@
-iter=93 pair=ETH_15m timestamp=2026-03-23T14:30:00Z
+iter=95 pair=ETH_1h timestamp=2026-03-23T15:00:00Z
 Phase: BACKTEST MODE (replay_available)
-Hypothesis: max_onesided_cost 1.5->1.0 per strategy.md priority queue #1 for ETH_15m.
-Best prior KEEP pair_cost=0.5600 (iter 82, onesided=1.5). Onesided series: 5->2->1.5 each improved.
-Next logical step: 1.5->1.0. Risk: cap too tight may starve pair formation (matched_ratio=0.3%).
-Watch for matched_ratio collapse. If collapse, DISCARD and move to bar_budget test next.
+Hypothesis: bar_budget 200->250 per strategy.md priority queue #1 for ETH_1h.
+Best prior KEEP pair_cost=0.7058 (iter 40, skip=0.45).
+Prior tests: risk_ceil 0.15->0.20 DISCARD (iter 83, +3.8% insufficient, profit still negative).
+Bar_budget 250 is a cautious intermediate step -- ETH_1h matched_ratio=7% is higher than XRP_1h (3.4%)
+which failed at budget=300. Testing if a smaller budget increase improves avg_profit without hurting pair_cost.

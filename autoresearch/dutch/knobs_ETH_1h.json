@@ -1,7 +1,7 @@
 {
   "strategy": "dutch_accumulation",
   "version": "v7",
-  "bar_budget": 200.0,
+  "bar_budget": 250.0,
   "order_size": 5.0,
   "min_order_usd": 1.0,
   "cheap_threshold": 0.1,
@@ -33,7 +33,7 @@
   "sell_loss_start": 0.7,
   "sell_dump_start": 0.9,
   "fill_simulator": {
-    "fill_ticks": 10,
+    "fill_ticks": 1,
     "chase_threshold": 0.03,
     "max_chase": 2,
     "spread_offset": 0.01,
