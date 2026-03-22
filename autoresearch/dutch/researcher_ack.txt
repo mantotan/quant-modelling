@@ -1,3 +1,3 @@
-iter=56 pair=SOL_15m timestamp=2026-03-22T23:35:00Z
-status=active
-hypothesis=conviction_buy_skip 0.50->0.45 — XRP_15m analog (KEEP iter46, 18.6% cost drop). SOL_15m 50% correct_side, low DD (15%), near-breakeven. Strategy priority #1 for this pair.
+iter=57 pair=SOL_1h timestamp=2026-03-23T15:44:55Z
+status=evaluating_prior_experiment
+hypothesis=evaluating conviction_buy_skip 0.50->0.35 (already staged in knobs_SOL_1h.json); if discard, next experiment will be conviction_buy_skip 0.50->0.45 per strategy.md priority queue
