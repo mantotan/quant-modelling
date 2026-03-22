@@ -28,11 +28,11 @@ import polars as pl
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from qm.core.types import Asset, Timeframe  # noqa: E402
+from qm.core.types import Asset, PartialBar, Timeframe  # noqa: E402
 from qm.data.connectors.polymarket_ws import TokenBook  # noqa: E402
 from qm.data.ingestion.bar_builder import BarBuilder  # noqa: E402
 from qm.data.storage.parquet import ParquetStore  # noqa: E402
-from qm.features.live_cache import LiveFeatureCache  # noqa: E402
+from qm.features.live_cache import CrossAssetLiveFeatureCache, LiveFeatureCache  # noqa: E402
 from qm.features.pipeline import FeaturePipeline  # noqa: E402
 from qm.model.calibration.calibrator import TimeAwareCalibrator  # noqa: E402
 from qm.strategy.dutch.engine import (  # noqa: E402
@@ -338,6 +338,26 @@ def run_backtest(
     )
     warm_up_cache(feat_cache, asset_enum, tf_enum)
 
+    # -- BTC cross-asset context (non-BTC models only) --
+    btc_bars_dict: dict = {}
+    if isinstance(feat_cache, CrossAssetLiveFeatureCache):
+        store = ParquetStore(base_dir=Path("data/raw/ohlcv"))
+        btc_bars_df = store.read_bars(Asset.BTC, tf_enum)
+        if not btc_bars_df.is_empty():
+            for row in btc_bars_df.iter_rows(named=True):
+                btc_bars_dict[row["time"]] = row
+            logger.info("Loaded %d BTC bars for cross-asset context", len(btc_bars_dict))
+            # Warm up BTC historical features
+            btc_pipeline = FeaturePipeline()
+            btc_featured = btc_pipeline.compute(btc_bars_df.tail(500))
+            btc_last = btc_featured.row(-1, named=True)
+            btc_hist = {
+                n: float(v) for n in btc_pipeline.feature_names
+                if (v := btc_last.get(n)) is not None
+            }
+            feat_cache.update_btc_history(btc_hist)
+            logger.info("BTC warm-up: cached %d features", len(btc_hist))
+
     # -- BarBuilder --
     bar_builder = BarBuilder(assets=[asset_enum], timeframes=[tf_enum])
 
@@ -458,6 +478,24 @@ def run_backtest(
                 last_inference_ts is None
                 or (ts - last_inference_ts).total_seconds() >= inference_interval
             ):
+                # Inject BTC context for cross-asset models
+                if btc_bars_dict and isinstance(feat_cache, CrossAssetLiveFeatureCache):
+                    btc_bar = btc_bars_dict.get(window_start)
+                    if btc_bar is not None:
+                        elapsed_sec = (ts - window_start).total_seconds()
+                        feat_cache.set_btc_partial(PartialBar(
+                            window_start=window_start, window_end=window_end,
+                            asset=Asset.BTC, timeframe=tf_enum,
+                            open=btc_bar["open"],
+                            high_so_far=btc_bar["high"],
+                            low_so_far=btc_bar["low"],
+                            current_price=btc_bar["close"],
+                            volume_so_far=btc_bar["volume"],
+                            trade_count=btc_bar.get("trade_count", 0),
+                            elapsed_seconds=elapsed_sec,
+                            remaining_seconds=max(0.0, bar_secs - elapsed_sec),
+                        ))
+
                 partial = bar_builder.get_partial_bar(
                     asset_enum, tf_enum, now=ts,
                 )

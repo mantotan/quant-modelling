@@ -48,7 +48,7 @@ from qm.data.connectors.polymarket_ws import PolymarketWSFeed
 from qm.data.ingestion.bar_builder import BarBuilder
 from qm.data.storage.parquet import ParquetStore
 from qm.execution.polymarket.market_scanner import MarketScanner
-from qm.features.live_cache import LiveFeatureCache
+from qm.features.live_cache import CrossAssetLiveFeatureCache, LiveFeatureCache
 from qm.features.pipeline import FeaturePipeline
 from qm.model.calibration.calibrator import TimeAwareCalibrator
 from qm.strategy.dutch.engine import DutchAccumulationEngine, DutchConfig
@@ -195,6 +195,24 @@ def warm_up_cache(
 
     cache.update_history(cache_dict)
     logger.info("Warm-up %s/%s: cached %d features from %d bars", asset.value, TF_LABELS[tf], len(cache_dict), n)
+
+
+def warm_up_btc(cache: CrossAssetLiveFeatureCache, tf: Timeframe) -> None:
+    """Warm up BTC historical features for cross-asset cache."""
+    store = ParquetStore(base_dir=Path("data/raw/ohlcv"))
+    pipeline = FeaturePipeline()
+    btc_bars = store.read_bars(Asset.BTC, tf)
+    if btc_bars.is_empty():
+        logger.warning("No BTC OHLCV data for cross-asset warm-up")
+        return
+    featured = pipeline.compute(btc_bars.tail(500))
+    last_row = featured.row(-1, named=True)
+    btc_cache = {
+        n: float(v) for n in pipeline.feature_names
+        if (v := last_row.get(n)) is not None
+    }
+    cache.update_btc_history(btc_cache)
+    logger.info("BTC warm-up: cached %d features for cross-asset", len(btc_cache))
 
 
 # -- TradingView WSS -------------------------------------------------
@@ -786,6 +804,14 @@ async def main_loop(args: argparse.Namespace) -> None:
     # -- Warm-up --------------------------------------------------
     warm_up_cache(feat_cache, asset_enum, tf)
 
+    # -- BTC cross-asset feed (non-BTC models only) ---------------
+    btc_bar_builder: BarBuilder | None = None
+    btc_completed_bars: asyncio.Queue | None = None
+    if isinstance(feat_cache, CrossAssetLiveFeatureCache):
+        warm_up_btc(feat_cache, tf)
+        btc_bar_builder = BarBuilder(assets=[Asset.BTC], timeframes=[tf])
+        btc_completed_bars = asyncio.Queue()
+
     # -- BarBuilder (single TF) -----------------------------------
     bar_builder = BarBuilder(assets=[asset_enum], timeframes=[tf])
     completed_bars: asyncio.Queue = asyncio.Queue()
@@ -852,6 +878,13 @@ async def main_loop(args: argparse.Namespace) -> None:
     running_flag = [True]
 
     asyncio.create_task(price_feed(asset_enum, tv_symbol, bar_builder, completed_bars, running_flag))
+
+    if btc_bar_builder is not None and btc_completed_bars is not None:
+        asyncio.create_task(price_feed(
+            Asset.BTC, "BINANCE:BTCUSDT", btc_bar_builder,
+            btc_completed_bars, running_flag,
+        ))
+        logger.info("BTC cross-asset price feed started")
 
     if not args.no_polymarket:
         asyncio.create_task(
@@ -1003,6 +1036,12 @@ async def main_loop(args: argparse.Namespace) -> None:
         # -- Model inference at 1Hz (expensive ~1ms) ---------------
         now = time.time()
         if now - last_model_time >= MODEL_INTERVAL:
+            # Inject BTC context from parallel BarBuilder (cross-asset)
+            if btc_bar_builder is not None and isinstance(feat_cache, CrossAssetLiveFeatureCache):
+                btc_partial = btc_bar_builder.get_partial_bar(Asset.BTC, tf)
+                if btc_partial is not None:
+                    feat_cache.set_btc_partial(btc_partial)
+
             t0 = time.perf_counter_ns()
             features = feat_cache.get_features(partial)
             raw_prob = float(model.predict(features.reshape(1, -1))[0])
