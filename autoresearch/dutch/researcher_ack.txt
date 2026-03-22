@@ -1,4 +1,4 @@
-iter=41 pair=SOL_5m timestamp=2026-03-22T22:10:00Z
+iter=42 pair=SOL_15m timestamp=2026-03-22T21:50:00Z
 Mode: BACKTEST (replay_available)
-Action: Running SOL_5m experiment — conviction_buy_skip 0.50->0.55
-Hypothesis: SOL_5m correct_side=45.5% is near anti-predictive. Raising skip threshold from 0.50 to 0.55 filters out low-confidence bets where the model is most wrong. Following strategy.md priority queue item 1 for SOL_5m. Expect pair_cost improvement vs V7.3 baseline (0.9455); watching avg_profit doesn't worsen significantly.
+Action: Running SOL_15m experiment — min_unmatched_shares 10->5
+Hypothesis: SOL_15m has matched_ratio=6% (very low throughput). Reducing min_unmatched_shares from 10 to 5 allows pairs to form with fewer accumulated shares, potentially improving throughput. However, result showed pair_cost worsened (0.9133->0.9234) and avg_profit still negative (-$0.41). DISCARD: pair_cost improved vs stored baseline (0.9348) but not enough for KEEP RELAXED (1.2% < 5%).

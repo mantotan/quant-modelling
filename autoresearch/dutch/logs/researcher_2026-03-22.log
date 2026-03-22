@@ -77,3 +77,6 @@
 2026-03-22T22:15:00Z iter=41 pair=SOL_5m status=DISCARD param=conviction_buy_skip 0.50->0.55
   eval: pair_cost=0.9628 profit=$-0.57 max_dd=108.0% bars=360
   hypothesis: "SOL_5m correct_side=45.5% is near anti-predictive. Raising skip to 0.55 should filter low-confidence losing bets. Result: counterintuitively worsened all metrics — matched_ratio doubled (9%->21%) while correct_side dropped further (45.5%->39.6%), suggesting the parameter acts differently than expected on SOL_5m market structure."
+2026-03-22T21:50:00Z iter=42 pair=SOL_15m status=DISCARD param=min_unmatched_shares 10->5
+  eval: pair_cost=0.9234 profit=$-0.41 max_dd=35.5% bars=121
+  hypothesis: "Reducing min_unmatched_shares 10->5 should lower pair formation threshold and increase throughput on SOL_15m (matched_ratio=6% on baseline). Result: matched_ratio improved 10.3%->13.4% but pair_cost worsened 0.9133->0.9234 vs fresh run; only 1.2% improvement vs stored best (0.9348), below 5% KEEP RELAXED threshold."
