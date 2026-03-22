@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 4,
-  "last_updated": "2026-03-23T19:12:21Z",
-  "last_role": "researcher",
+  "last_updated": "2026-03-23T20:50:00Z",
+  "last_role": "strategist",
   "last_monitor_at": "2026-03-22T07:26:47Z",
-  "last_strategist_at": 95,
+  "last_strategist_at": 107,
   "last_auditor_at": 95,
   "total_iterations": 107,
-  "last_exit_reason": "researcher: iter 107 ETH_5m KEEP -- max_onesided_cost 2.0->1.5 improved pair_cost 0.96% (0.6390->0.6329), max_dd 16.4%->13.8%; avg_profit +$0.01; onesided series all KEEP; next: ETH_15m [max_onesided_cost]"
+  "last_exit_reason": "strategist: iter 107 analysis — rotation 7 KEEP rate 50% (6/12), pace_urgency_lo=0.30 breakthrough (+18% XRP_15m), BTC_5m first KEEP (onesided=2.0), ETH_5m onesided series advancing (1.5 KEEP), SOL_15m risk_ceil KEEP, best_pair=ETH_15m (cost=0.560), worst_pair=XRP_5m (cost=0.909, DD=68.7%)"
 }
