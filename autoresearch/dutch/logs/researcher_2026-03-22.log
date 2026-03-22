@@ -137,3 +137,9 @@
 2026-03-22T23:16:16Z iter=64 pair=BTC_1h role=researcher outcome=KEEP_RELAXED param=conviction_buy_skip 0.45->0.40 pair_cost=0.7988 max_dd=8.70%
   eval: pair_cost=0.7988 profit=$-0.33 max_dd=8.70% bars=33
   hypothesis: "conviction_buy_skip 0.45->0.40 -- continue series. Improved pair_cost 8.3% (0.8707->0.7988), correct_side 59%->61%, matched_ratio collapsed 7%->1.2%. KEEP RELAXED (>5% cost improvement, profit>-2.0)."
+2026-03-22T23:40:00Z iter=65 pair=ETH_5m status=KEEP param=- -→-
+  eval: pair_cost=0.8469 profit=$-0.3155 max_dd=71.23% bars=377
+  hypothesis: "V7.3 baseline re-eval on 377 bars (vs 288 at iter 24). Dataset growth natural improvement: pair_cost improved 6.8% (0.9087->0.8469). KEEP RELAXED. Preceding skip=0.45 experiment next."
+2026-03-22T23:50:00Z iter=66 pair=ETH_5m status=KEEP param=conviction_buy_skip 0.50->0.45
+  eval: pair_cost=0.7819 profit=$-0.2101 max_dd=47.30% bars=378
+  hypothesis: "conviction_buy_skip 0.50->0.45 tested per strategy.md priority #1 for ETH_5m (untested on V7.3). Cost improved 7.7% (0.8469->0.7819), avg_profit improved -$0.32->-$0.21, max_dd improved 71%->47%. KEEP RELAXED. WARNING: correct_side dropped 44.6%->37.3% below 38% flag threshold. Strategy.md FLAG condition nearly triggered -- if next experiment worsens correct_side below 35%, consider DISABLE."

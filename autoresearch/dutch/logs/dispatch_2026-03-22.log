@@ -49,3 +49,4 @@
 2026-03-22T16:15:00Z iter=62 pair=BTC_5m role=researcher outcome=DISCARD cheap_threshold 0.10->0.12 max_dd=33.2% exceeds 30% threshold pair_cost=0.9444 avg_profit=+0.21
 2026-03-22T16:22:00Z iter=63 pair=BTC_15m role=researcher outcome=DISCARD bar_budget 200->300 pair_cost_regression 0.9334->0.9429; next cheap_threshold 0.10->0.12
 2026-03-22T23:16:16Z iter=64 pair=BTC_1h role=researcher outcome=KEEP_RELAXED conviction_buy_skip 0.45->0.40 pair_cost=0.7988 max_dd=8.70%
+2026-03-22T23:50:00Z iter=66 pair=ETH_5m role=researcher outcome=KEEP_RELAXED conviction_buy_skip_0.50to0.45_pair_cost_0.8469to0.7819

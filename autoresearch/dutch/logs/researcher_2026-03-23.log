@@ -7,3 +7,6 @@
 2026-03-23T16:15:00Z iter=59 pair=XRP_5m status=DISCARD param=fill_ticks 10->15
   eval: pair_cost=0.8998 profit=$-0.3041 max_dd=66.97% bars=373
   hypothesis: "fill_ticks 10->15 — audit.md recommended for XRP_5m 54% fill_rate (worst in system). Strategy priority #3. Result: pair_cost only 0.96% improvement (0.9085->0.8998), fill_rate unchanged at 54% — structural microstructure limit. Does not meet 5% KEEP RELAXED threshold. DISCARD. Next: conviction_buy_skip 0.50->0.45 (strategy priority #1, XRP_15m analog showed 18.6% improvement)."
+2026-03-23T00:18:00Z iter=68 pair=ETH_15m status=KEEP param=max_onesided_cost 5.0->2.0
+  eval: pair_cost=0.7032 profit=$-0.32 max_dd=32.5% bars=127
+  hypothesis: "max_onesided_cost 5.0->2.0 -- strategy.md PRIORITY #1 for ETH_15m. At 54.5% max_dd on current knobs (conviction_buy_skip=0.45), capping per-event directional exposure from $5 to $2 directly limits one-sided cost accumulation. Result: pair_cost improved 6.3% (0.7506->0.7032), avg_profit improved -$0.70->-$0.32, max_dd halved 54.5%->32.5%. KEEP RELAXED."

@@ -1,8 +1,8 @@
-iter=64 pair=BTC_1h timestamp=2026-03-22T17:00:00Z
+iter=67 pair=ETH_15m timestamp=2026-03-22T23:55:00Z
 Role: RESEARCHER (BACKTEST MODE)
-Status: Running backtest, then testing conviction_buy_skip 0.45->0.40
-Hypothesis: conviction_buy_skip 0.45->0.40 — continue the series.
-BTC_1h at skip=0.45: pair_cost=0.8707, avg_profit=+$0.36/bar, max_dd=9.26%, correct_side=58%.
-Strategy.md priority #1 for BTC_1h. Test whether 0.40 further improves cost.
-Watch: if correct_side drops below 50%, halt skip reduction series.
-Best known pair_cost for BTC_1h: 0.8707 (iter 52 KEEP).
+Status: Running backtest for ETH_15m, then testing max_onesided_cost 5.0->2.0
+Note: strategy.md PRIORITY #1 for ETH_15m is max_onesided_cost 5.0->2.0 (max_dd=70% critical).
+Best known pair_cost for ETH_15m: 0.7506 (iter 54, conviction_buy_skip=0.45 KEEP RELAXED).
+Current knobs already have conviction_buy_skip=0.45 (best state).
+Hypothesis: max_onesided_cost 5.0->2.0 -- reduce max_dd from 70% by capping per-event directional exposure.
+Warning: correct_side=34% is below 38% flag threshold, approaching anti-predictive zone.
