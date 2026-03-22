@@ -1,5 +1,5 @@
 {
-  "current_pair": "ETH_1h",
+  "current_pair": "BTC_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 5,
-  "last_updated": "2026-03-22T16:22:00Z",
-  "last_role": "researcher",
+  "pair_index": 0,
+  "last_updated": "2026-03-22T17:00:00Z",
+  "last_role": "manual_experiment",
   "last_monitor_at": "2026-03-22T07:26:47Z",
-  "last_strategist_at": 10,
-  "last_auditor_at": 0,
+  "last_strategist_at": 21,
+  "last_auditor_at": 21,
   "total_iterations": 21,
-  "last_exit_reason": "discard_unmatched_ratio"
+  "last_exit_reason": "v7.3_baseline_reset"
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""BTC 15m Dutch Scalping Alpha Monitor.
+"""Dutch Accumulation Paper Trader.
 
-Streams BTC ticks + Polymarket orderbook, runs Pulse model, and displays
+Streams asset ticks + Polymarket orderbook, runs Pulse model, and displays
 a real-time alpha panel for dutch book scalping (buy both UP + DOWN sides
 via limit orders, hold to resolution, profit if total cost < $1).
 
@@ -64,7 +64,15 @@ logger = logging.getLogger("monitor")
 
 # TradingView WSS
 TV_WSS_URL = "wss://data.tradingview.com/socket.io/websocket"
-TV_SYMBOL = "BINANCE:BTCUSDT"
+TV_SYMBOLS = {
+    "BTC": "BINANCE:BTCUSDT",
+    "ETH": "BINANCE:ETHUSDT",
+    "SOL": "BINANCE:SOLUSDT",
+    "XRP": "BINANCE:XRPUSDT",
+}
+
+# Asset mapping
+ASSET_MAP = {"BTC": Asset.BTC, "ETH": Asset.ETH, "SOL": Asset.SOL, "XRP": Asset.XRP}
 
 # Poll interval (seconds)
 POLL_INTERVAL = 1.0
@@ -90,7 +98,11 @@ MID_HISTORY_SECS = 30.0
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="BTC Dutch Scalping Alpha Monitor")
+    p = argparse.ArgumentParser(description="Dutch Accumulation Paper Trader")
+    p.add_argument(
+        "--asset", default="BTC", choices=["BTC", "ETH", "SOL", "XRP"],
+        help="Asset to trade (default: BTC)",
+    )
     p.add_argument(
         "--no-polymarket", action="store_true",
         help="Skip Polymarket odds polling",
@@ -120,8 +132,8 @@ def parse_args() -> argparse.Namespace:
         help="Enable per-tick JSONL logging (verbose)",
     )
     p.add_argument(
-        "--dutch-max-side-frac", type=float, default=0.65,
-        help="Max fraction of budget per side (default: 0.65)",
+        "--dutch-max-side-frac", type=float, default=0.55,
+        help="Max fraction of budget per side (default: 0.55)",
     )
     p.add_argument(
         "--dutch-max-per-prediction", type=float, default=100.0,
@@ -138,11 +150,11 @@ def parse_args() -> argparse.Namespace:
 # -- Model loading ----------------------------------------------------
 
 def load_model(
-    model_dir: Path, tf_label: str,
+    model_dir: Path, asset_label: str, tf_label: str,
 ) -> tuple[lgb.Booster, TimeAwareCalibrator | None]:
     """Load Pulse LightGBM model + calibrator."""
-    model_path = model_dir / f"BTC_{tf_label}" / "model.lgb"
-    cal_path = model_dir / f"BTC_{tf_label}" / "calibrator.pkl"
+    model_path = model_dir / f"{asset_label}_{tf_label}" / "model.lgb"
+    cal_path = model_dir / f"{asset_label}_{tf_label}" / "calibrator.pkl"
 
     if not model_path.exists():
         logger.error("No model at %s -- exiting", model_path)
@@ -154,23 +166,23 @@ def load_model(
         calibrator = TimeAwareCalibrator()
         calibrator.load(cal_path)
     else:
-        logger.warning("No calibrator for BTC_%s", tf_label)
+        logger.warning("No calibrator for %s_%s", asset_label, tf_label)
 
-    logger.info("Loaded BTC_%s model (%d trees)", tf_label, model.num_trees())
+    logger.info("Loaded %s_%s model (%d trees)", asset_label, tf_label, model.num_trees())
     return model, calibrator
 
 
 # -- Feature warm-up --------------------------------------------------
 
 def warm_up_cache(
-    cache: LiveFeatureCache, tf: Timeframe,
+    cache: LiveFeatureCache, asset: Asset, tf: Timeframe,
 ) -> None:
     """Populate feature cache from historical bars."""
     store = ParquetStore(base_dir=Path("data/raw/ohlcv"))
     pipeline = FeaturePipeline()
-    bars_df = store.read_bars(Asset.BTC, tf)
+    bars_df = store.read_bars(asset, tf)
     if bars_df.is_empty():
-        logger.warning("No OHLCV data for BTC_%s warm-up", TF_LABELS[tf])
+        logger.warning("No OHLCV data for %s/%s warm-up", asset.value, TF_LABELS[tf])
         return
 
     n = min(500, len(bars_df))
@@ -183,7 +195,7 @@ def warm_up_cache(
             cache_dict[name] = float(val)
 
     cache.update_history(cache_dict)
-    logger.info("Warm-up BTC_%s: cached %d features from %d bars", TF_LABELS[tf], len(cache_dict), n)
+    logger.info("Warm-up %s/%s: cached %d features from %d bars", asset.value, TF_LABELS[tf], len(cache_dict), n)
 
 
 # -- TradingView WSS -------------------------------------------------
@@ -209,15 +221,17 @@ def _tv_decode(raw: str) -> list[str]:
 
 
 async def price_feed(
+    asset_enum: Asset,
+    tv_symbol: str,
     bar_builder: BarBuilder,
     completed_bars: asyncio.Queue,
     running_flag: list[bool],
 ) -> None:
-    """Stream BTC ticks from TradingView WSS into BarBuilder."""
+    """Stream asset ticks from TradingView WSS into BarBuilder."""
     import random
     import string
 
-    logger.info("Price feed starting: %s", TV_SYMBOL)
+    logger.info("Price feed starting: %s", tv_symbol)
 
     while running_flag[0]:
         try:
@@ -239,10 +253,10 @@ async def price_feed(
                     {"m": "quote_set_fields", "p": [qs, "lp", "volume"]},
                 )))
                 await ws.send_str(_tv_encode(json.dumps(
-                    {"m": "quote_add_symbols", "p": [qs, TV_SYMBOL]},
+                    {"m": "quote_add_symbols", "p": [qs, tv_symbol]},
                 )))
 
-                logger.info("Price feed connected: %s", TV_SYMBOL)
+                logger.info("Price feed connected: %s", tv_symbol)
                 tick_count = 0
 
                 async for msg in ws:
@@ -267,13 +281,13 @@ async def price_feed(
                         vol = v.get("volume", 0)
                         now = datetime.now(UTC)
                         bars = bar_builder.on_trade(
-                            Asset.BTC, float(lp), float(vol) * 0.0001, now,
+                            asset_enum, float(lp), float(vol) * 0.0001, now,
                         )
                         for bar in bars:
                             await completed_bars.put(bar)
                         tick_count += 1
                         if tick_count == 1:
-                            logger.info("First tick: BTC $%.2f", lp)
+                            logger.info("First tick: %s $%.2f", asset_enum.value, lp)
 
                 await ws.close()
         except Exception:
@@ -284,6 +298,7 @@ async def price_feed(
 # -- Polymarket feed --------------------------------------------------
 
 async def polymarket_feed(
+    asset_enum: Asset,
     tf: Timeframe,
     scanner: MarketScanner,
     ws_feeds: dict[Timeframe, PolymarketWSFeed],
@@ -319,7 +334,7 @@ async def polymarket_feed(
 
     while running_flag[0]:
         try:
-            market = await scanner.get_active_market(Asset.BTC)
+            market = await scanner.get_active_market(asset_enum)
 
             if market:
                 pm_markets[tf] = market
@@ -393,6 +408,7 @@ def format_bar(pct: float, width: int = 20) -> str:
 
 
 def print_alpha_panel(
+    asset_label: str,
     price: float,
     partial,
     tf_label: str,
@@ -414,7 +430,7 @@ def print_alpha_panel(
     # Header
     print(f"\033[2J\033[H", end="")  # clear screen
     print(f"{'=' * 78}")
-    print(f"  BTC DUTCH SCALPING MONITOR | ${format_price(price)} | {now_str}")
+    print(f"  {asset_label} DUTCH SCALPING MONITOR | ${format_price(price)} | {now_str}")
     print(f"  {tf_label} Window: {w_start}-{w_end}  |  "
           f"Time left: {remaining:.0f}s  |  Bar: {elapsed_pct*100:.0f}% {format_bar(elapsed_pct*100)}")
     print(f"{'=' * 78}")
@@ -555,6 +571,7 @@ def print_bar_complete(bar) -> None:
 
 
 def print_dutch_panel(
+    asset_label: str,
     price: float,
     partial,
     tf_label: str,
@@ -576,7 +593,7 @@ def print_dutch_panel(
 
     print(f"\033[2J\033[H", end="")
     print(f"{'=' * 78}")
-    print(f"  BTC DUTCH ACCUMULATION | ${format_price(price)} | {now_str}")
+    print(f"  {asset_label} DUTCH ACCUMULATION | ${format_price(price)} | {now_str}")
     print(f"  {tf_label} {w_start}-{w_end}  |  {remaining:.0f}s left  |  "
           f"{elapsed_pct*100:.0f}% {format_bar(elapsed_pct*100)}")
     print(f"{'=' * 78}")
@@ -670,14 +687,23 @@ def print_dutch_panel(
 
 # -- State persistence ------------------------------------------------
 
-DUTCH_KNOBS_FILE = Path("autoresearch/dutch/knobs.json")
+DUTCH_KNOBS_DIR = Path("autoresearch/dutch")
+
+
+def _resolve_dutch_knobs(asset_label: str, tf_label: str) -> Path:
+    """Per-pair knobs first, then shared fallback."""
+    pair_path = DUTCH_KNOBS_DIR / f"knobs_{asset_label}_{tf_label}.json"
+    if pair_path.exists():
+        return pair_path
+    return DUTCH_KNOBS_DIR / "knobs.json"
 
 
 def load_dutch_config(
-    args: argparse.Namespace, tf: Timeframe,
+    args: argparse.Namespace, asset_label: str, tf_label: str, tf: Timeframe,
 ) -> tuple[DutchConfig, dict]:
-    """Load DutchConfig from knobs.json (if exists), CLI args as fallback.
+    """Load DutchConfig from per-pair knobs (if exists), CLI args as fallback.
 
+    Resolution order: knobs_{ASSET}_{TF}.json → knobs.json → CLI defaults.
     Returns (config, sim_kwargs) where sim_kwargs are for LimitOrderSimulator.
     """
     kwargs: dict = {
@@ -690,8 +716,9 @@ def load_dutch_config(
     }
     sim_kwargs: dict = {}
 
-    if DUTCH_KNOBS_FILE.exists():
-        with open(DUTCH_KNOBS_FILE) as f:
+    knobs_path = _resolve_dutch_knobs(asset_label, tf_label)
+    if knobs_path.exists():
+        with open(knobs_path) as f:
             knobs = json.load(f)
         for key, val in knobs.items():
             if key.startswith("_") or key == "fill_simulator":
@@ -699,7 +726,7 @@ def load_dutch_config(
             if key in DutchConfig.__dataclass_fields__ and key != "bar_seconds":
                 kwargs[key] = val
         sim_kwargs = knobs.get("fill_simulator", {})
-        logger.info("Dutch config loaded from %s", DUTCH_KNOBS_FILE)
+        logger.info("Dutch config loaded from %s", knobs_path)
 
     return DutchConfig(**kwargs), sim_kwargs
 
@@ -726,14 +753,20 @@ async def main_loop(args: argparse.Namespace) -> None:
     tf = TF_MAP[args.timeframe]
     tf_label = args.timeframe
 
+    # -- Asset resolution -----------------------------------------
+    asset_label = args.asset
+    asset_enum = ASSET_MAP[asset_label]
+    tv_symbol = TV_SYMBOLS[asset_label]
+
     dutch_mode = getattr(args, "dutch", False)
 
     print("=" * 60)
     if dutch_mode:
-        print("  BTC Dutch Accumulation Paper Trader")
+        print(f"  {asset_label} Dutch Accumulation Paper Trader")
     else:
-        print("  BTC Dutch Scalping Alpha Monitor")
+        print(f"  {asset_label} Dutch Scalping Alpha Monitor")
     print("=" * 60)
+    print(f"  Asset:       {asset_label}")
     print(f"  Timeframe:   {tf_label}")
     print(f"  Polymarket:  {'OFF' if args.no_polymarket else 'ON (WSS orderbook)'}")
     if dutch_mode:
@@ -743,19 +776,19 @@ async def main_loop(args: argparse.Namespace) -> None:
     print("=" * 60)
 
     # -- Load model -----------------------------------------------
-    model, calibrator = load_model(model_dir, tf_label)
+    model, calibrator = load_model(model_dir, asset_label, tf_label)
 
     # -- Feature cache (reordered to model) -----------------------
-    cache_dir = model_dir / f"BTC_{tf_label}"
+    cache_dir = model_dir / f"{asset_label}_{tf_label}"
     feat_cache = LiveFeatureCache.from_model_dir(
-        cache_dir, asset=Asset.BTC, timeframe=tf,
+        cache_dir, asset=asset_enum, timeframe=tf,
     )
 
     # -- Warm-up --------------------------------------------------
-    warm_up_cache(feat_cache, tf)
+    warm_up_cache(feat_cache, asset_enum, tf)
 
     # -- BarBuilder (single TF) -----------------------------------
-    bar_builder = BarBuilder(assets=[Asset.BTC], timeframes=[tf])
+    bar_builder = BarBuilder(assets=[asset_enum], timeframes=[tf])
     completed_bars: asyncio.Queue = asyncio.Queue()
 
     # -- Polymarket feed ------------------------------------------
@@ -764,7 +797,7 @@ async def main_loop(args: argparse.Namespace) -> None:
 
     if not args.no_polymarket:
         scanner = MarketScanner(
-            assets={Asset.BTC}, timeframe=tf,
+            assets={asset_enum}, timeframe=tf,
             connector_factory=create_connector,
             min_time_remaining_sec=5.0,
         )
@@ -782,21 +815,26 @@ async def main_loop(args: argparse.Namespace) -> None:
     dutch_bar_condition_id: str = ""
 
     if dutch_mode:
-        dutch_config, sim_kwargs = load_dutch_config(args, tf)
+        dutch_config, sim_kwargs = load_dutch_config(args, asset_label, tf_label, tf)
         dutch_engine = DutchAccumulationEngine(dutch_config)
         dutch_sim = LimitOrderSimulator(**sim_kwargs) if sim_kwargs else LimitOrderSimulator()
-        logger.info("Dutch V7 config: budget=$%.0f, order=$%.0f, pair_cost<%.2f, risk=%.0f%%->%.0f%%",
-                     dutch_config.bar_budget, dutch_config.order_size,
-                     dutch_config.max_marginal_pair_cost,
-                     dutch_config.risk_floor * 100, dutch_config.risk_ceil * 100)
+        logger.info(
+            "Dutch V7.3 config: budget=$%.0f, order=$%.0f, pair_cost<%.2f, "
+            "conv_skip=%.2f, conv_size=%.2f, onesided_cap=$%.0f",
+            dutch_config.bar_budget, dutch_config.order_size,
+            dutch_config.max_marginal_pair_cost,
+            dutch_config.conviction_buy_skip,
+            dutch_config.conviction_size_floor,
+            dutch_config.max_onesided_cost,
+        )
         dutch_logger = DutchSummaryLogger(
             base_dir=Path("data/dutch_paper"),
-            asset="BTC",
+            asset=asset_label,
             timeframe=tf_label,
         )
         dutch_engine.set_event_callback(dutch_logger.log_event)
-        # Load persisted session state (per-TF to avoid cross-TF overwrites)
-        dutch_state_file = Path(f"data/dutch_paper/state_{tf_label}.json")
+        # Load persisted session state (per-asset-TF to avoid collision)
+        dutch_state_file = Path(f"data/dutch_paper/state_{asset_label}_{tf_label}.json")
         if dutch_state_file.exists():
             try:
                 with open(dutch_state_file) as f:
@@ -814,12 +852,12 @@ async def main_loop(args: argparse.Namespace) -> None:
     # -- Start background tasks -----------------------------------
     running_flag = [True]
 
-    asyncio.create_task(price_feed(bar_builder, completed_bars, running_flag))
+    asyncio.create_task(price_feed(asset_enum, tv_symbol, bar_builder, completed_bars, running_flag))
 
     if not args.no_polymarket:
         asyncio.create_task(
             polymarket_feed(
-                tf, scanner, ws_feeds, pm_markets, running_flag,
+                asset_enum, tf, scanner, ws_feeds, pm_markets, running_flag,
             ),
         )
 
@@ -902,7 +940,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                     logger.warning("Feature cache update failed: %s", e)
 
         # -- Get partial bar --------------------------------------
-        partial = bar_builder.get_partial_bar(Asset.BTC, tf)
+        partial = bar_builder.get_partial_bar(asset_enum, tf)
         if partial is None:
             continue
 
@@ -1060,7 +1098,7 @@ async def main_loop(args: argparse.Namespace) -> None:
             for item in dutch_pending_resolutions[:]:
                 try:
                     status = await scanner.get_market_status(
-                        item["condition_id"], asset=Asset.BTC,
+                        item["condition_id"], asset=asset_enum,
                     )
                     if status and status.get("resolved", False):
                         outcome_str = status.get("outcome", "")
@@ -1103,6 +1141,7 @@ async def main_loop(args: argparse.Namespace) -> None:
             last_display_time = now_disp
             if dutch_mode and dutch_engine:
                 print_dutch_panel(
+                    asset_label=asset_label,
                     price=last_price,
                     partial=partial,
                     tf_label=tf_label,
@@ -1117,6 +1156,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                 )
             else:
                 print_alpha_panel(
+                    asset_label=asset_label,
                     price=last_price,
                     partial=partial,
                     tf_label=tf_label,

@@ -88,6 +88,22 @@ class DutchConfig:
     min_unmatched_shares: float = 20.0      # allow this many before cap
     unmatched_ratio: float = 0.50           # max unmatched = max(min, matched × ratio)
 
+    # V7.1: Conviction-gated buy skip — don't buy the side the model thinks
+    # will lose when conviction is strong.  0.0 = disabled (pure bilateral).
+    # 0.60 = skip unfavored side when model says < 40% chance of winning.
+    conviction_buy_skip: float = 0.0
+
+    # V7.2: Conviction-aware buy sizing — scale order size by model confidence.
+    # size_mult = conviction_size_floor + (1 - conviction_size_floor) * model_p_side
+    # At P(UP)=0.70: UP gets 0.79x, DN gets 0.51x → biases toward favored side.
+    # 0.0 = disabled (equal sizing). 0.3 = recommended (range 0.3x–1.0x).
+    conviction_size_floor: float = 0.0
+
+    # V7.3: One-sided cost cap — limit total spend when no matched pairs exist.
+    # Prevents $8-9 tail losses on directional bets that go wrong.
+    # 0.0 = disabled.  5.0 = max $5 spent before first pair forms.
+    max_onesided_cost: float = 0.0
+
     # V7: Sell phases
     sell_loss_start: float = 0.70           # allow conviction-gated loss sells
     sell_dump_start: float = 0.90           # sell at any price
@@ -505,6 +521,20 @@ class DutchAccumulationEngine:
         if budget_remaining < self._config.min_order_usd:
             return []
 
+        # -- V7.3: One-sided cost cap --
+        if (
+            self._config.max_onesided_cost > 0
+            and self._inventory.matched <= 0
+            and self._inventory.total_cost + self._committed_spend
+                >= self._config.max_onesided_cost
+        ):
+            self._emit(
+                "gate_onesided_cap", time_pct=time_pct,
+                cost=round(self._inventory.total_cost + self._committed_spend, 2),
+                cap=self._config.max_onesided_cost,
+            )
+            return self._sell_pass(time_pct, cal_prob, book_up, book_dn, [])
+
         # -- R4b: Per-prediction spend cap --
         if self._prediction_spend >= self._config.max_per_prediction:
             self._emit(
@@ -589,6 +619,23 @@ class DutchAccumulationEngine:
             ask = book.best_ask
             bid = book.best_bid
 
+            # -- V7.1: Conviction-gated buy skip --
+            # Skip buying the unfavored side when model is confident enough.
+            # This prevents accumulating losing-side inventory that becomes
+            # worthless unmatched waste.
+            if self._config.conviction_buy_skip > 0:
+                side_conv = (
+                    self._conviction_up if side == "UP"
+                    else self._conviction_dn
+                )
+                if side_conv < (1.0 - self._config.conviction_buy_skip):
+                    self._emit(
+                        "gate_conviction_skip", time_pct=time_pct,
+                        side=side, conviction=round(side_conv, 3),
+                        threshold=round(1.0 - self._config.conviction_buy_skip, 3),
+                    )
+                    continue
+
             # -- Limit price: always maker --
             limit_price = min(
                 bid + self._config.spread_offset, ask - 0.01,
@@ -629,6 +676,16 @@ class DutchAccumulationEngine:
             # -- Sizing: share-based (expensive side sets pace) --
             max_ask = max(book_up.best_ask, book_dn.best_ask, 0.01)
             base_shares = self._config.order_size / max_ask
+
+            # -- V7.2: Conviction-aware sizing --
+            # Scale order size by model confidence for this side.
+            # Biases accumulation toward the model-favored side.
+            if self._config.conviction_size_floor > 0:
+                model_p_side = cal_prob if side == "UP" else (1.0 - cal_prob)
+                floor = self._config.conviction_size_floor
+                size_mult = floor + (1.0 - floor) * model_p_side
+                base_shares *= size_mult
+
             dollar_size = base_shares * limit_price
 
             dollar_size = min(dollar_size, budget_remaining)
