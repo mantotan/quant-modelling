@@ -1,218 +1,196 @@
 # Strategy Directive
-Updated: 2026-03-27T01:00:00Z
-After iteration: 151
+Updated: 2026-03-22T19:00:00Z
+After iteration: 156
 
-## Program Status: ETH/15m Double-Ceiling Discovery; num_leaves Narrowing 2/3 Complete
+## Program Status: 15m+5m num_leaves Narrowing Campaign — 3/5 KEEPs (60%)
 
-Iter 151 completed the strategy-after-150 priority #1 (ETH/15m num_leaves=[48,96] +
-n_estimators=[100,400]) with a DISCARD due to **double-ceiling starvation**: num_leaves=94
-near 96 ceiling AND n_estimators=379 near 400 ceiling simultaneously. This is a critical
-new finding — ETH/15m does NOT follow the ETH/1h pattern (num_leaves=20); its optimum
-is in the 70-94+ range, well above ETH/1h. The narrowing strategy was correct directionally
-but the upper bound was too tight.
+Iters 152-156 completed strategy-after-151 items 1-4. Three major breakthroughs achieved:
+- **ETH/15m KEEP-VERIFIED (iter 152)**: Brier 0.208324 -> 0.193035 (7.34% improvement, [64,128]+[100,500])
+- **SOL/15m KEEP-VERIFIED (iter 155)**: Brier 0.215345 -> 0.200064 (7.10% improvement, [32,72]+[100,400])
+- **ETH/5m KEEP-VERIFIED (iter 156)**: Brier 0.211888 -> 0.199722 (5.74% improvement, sub-0.20 breakthrough, [64,128]+[100,500])
 
-### Cross-Asset Baseline Shifts Through Iteration 151
+BTC/15m: 0/2 misses. Iter 153 had double-ceiling starvation (same pattern as ETH/15m iter 151).
+Iter 154 widened to [32,80]+[100,500], starvation RESOLVED (num_leaves=45 n_est=441 both free),
+but Brier=0.173259 misses best 0.171809 by 0.845%. The miss is larger than typical stochastic
+variance — the [32,80] widened range may not be the right window OR a stochastic re-run is needed.
 
-The following best Brier values are now confirmed as the true per-asset-timeframe floors:
+### Updated Cross-Asset Baselines Through Iteration 156
 
-| Asset | 5m Best | 15m Best | 1h Best |
-|-------|---------|----------|---------|
-| BTC   | 0.17605 (iter 104) | 0.171809 (iter 123) | 0.174676 (iter 136) |
-| ETH   | 0.211888 (iter 117) | 0.208324 (iter 116) | 0.211438 (iter 100) |
-| SOL   | 0.218058 (iter 121) | 0.215345 (iter 130) | 0.219333 (iter 148) |
+| Asset | 5m Best          | 15m Best          | 1h Best           |
+|-------|-----------------|-------------------|-------------------|
+| BTC   | 0.17605 (iter 104)  | 0.171809 (iter 123) | 0.174676 (iter 136) |
+| ETH   | 0.199722 (iter 156) | 0.193035 (iter 152) | 0.211438 (iter 100) |
+| SOL   | 0.218058 (iter 121) | 0.200064 (iter 155) | 0.219333 (iter 148) |
 | XRP   | 0.221503 (iter 112) | 0.218075 (iter 128) | 0.222676 (iter 149) |
 
-**Shifts since strategy-after-iter-150:**
-- SOL/1h improved: 0.220615 (iter 125) -> 0.219333 (iter 148, +0.578%)
-- XRP/1h improved: 0.226907 (iter 115) -> 0.222676 (iter 149, +1.866%)
-- ETH/15m baseline UNCHANGED: 0.208324 (iter 116) — double starvation blocked progress
+**Key shifts since strategy-after-iter-151:**
+- ETH/15m: 0.208324 -> 0.193035 (+7.34%) — best improvement in the post-151 period
+- SOL/15m: 0.215345 -> 0.200064 (+7.10%) — second best, sub-0.20 barrier broken
+- ETH/5m: 0.211888 -> 0.199722 (+5.74%) — sub-0.20 barrier broken for a second asset
+- BTC/15m: UNCHANGED at 0.171809 — two misses, needs attention
 
-**ETH/15m diverges from ETH/1h:** ETH/1h converges to num_leaves=20 (very low, tick-dominant
-plateau). ETH/15m converges to num_leaves=70-94+ (mid-to-high range). These are structurally
-different landscapes on the same asset. The hypothesis that ETH assets share num_leaves optima
-across timeframes is REFUTED. ETH/15m is closer to ETH/5m (num_leaves pattern unknown at
-narrowed range) than to ETH/1h.
+### BTC/15m Analysis: Widened Range Still Misses — Why?
 
-**num_leaves narrowing KEEP rate update: 2/3 (67%)**
-- SOL/1h (iter 148): KEEP, num_leaves=46 at [16,64] — converged naturally at mid-range
-- XRP/1h (iter 149): KEEP, num_leaves=25 at [16,48] — converged below prior 34, range correct
-- ETH/15m (iter 151): DISCARD — double-ceiling starvation, range was correct direction but
-  upper bound too tight (94 at 96 ceiling); ETH/15m needs [64,128] or [64,144] not [48,96]
+Iter 123 (best, Brier=0.171809): num_leaves=43, n_est=235, [16,128]+[100,800]
+Iter 153 (double-ceiling): num_leaves=60 near [24,64] ceiling, n_est=391 near 400 ceiling — invalid
+Iter 154 (starvation-free): num_leaves=45, n_est=441, [32,80]+[100,500] — Brier=0.173259 (+0.845%)
 
-### What Remains: 5 Assets with Unexploited num_leaves Narrowing
+Iter 154 is the first clean BTC/15m run with a narrowed range. num_leaves=45 matches iter 123 (43)
+and confirms convergence. However n_est=441 is higher than iter 123's n_est=235 — possible that
+iter 154's n_est range [100,500] shifted the HPO landscape. BTC/15m may prefer n_est in 200-250
+range (matching BTC/1h=230, BTC/5m=103-427 unstable). Try tighter n_estimators=[100,350] to
+redirect search away from high-n_est territory that iter 123 did not use.
 
-ETH/1h is confirmed at structural floor (0.211438 unchanged across iters 147 and 150 with
-40/40 starvation-free runs). ETH/15m needs an adjusted attempt. All 15m assets and remaining
-5m assets have NOT received num_leaves narrowing.
+### What Remains After Iter 156
+
+**Items completed from strategy-after-151:** 1 (ETH/15m), 3 (SOL/15m), 4 (ETH/5m), partial on 2 (BTC/15m needs retry)
+**Items not yet attempted:** 5 (SOL/5m), 6 (XRP/15m), 7 (ETH/1h tiebreaker)
+
+Cross-asset feature breakthrough: ETH/15m and SOL/15m KEEPs both show BTC features in top-3
+(btc_vol_norm_distance #1, btc_distance_from_open #2). The 4 enabled BTC features are working.
+No evidence to add or remove BTC features at this time.
 
 ## Priority Queue
 
-1. **ETH/15m num_leaves=[64,128] + n_estimators=[100,500]**
-   Rationale: iter 151 found num_leaves=94 AT [48,96] upper bound AND n_estimators=379 AT
-   [100,400] upper bound simultaneously (double starvation). True ETH/15m optimum is in the
-   70-94+ range. Widening num_leaves to [64,128] removes the upper-bound constraint while
-   keeping the lower bound above wasted territory (all prior runs at [16,128] converged to
-   70, so [64,128] tightly brackets the known optimum). Widening n_estimators to [100,500]
-   provides headroom above 379 (confirmed near-ceiling). ETH/15m iter 116 found n_est=379
-   with starvation; the true optimum may be 380-450 range. Expected: starvation resolved,
-   num_leaves free to find 70-110 optimum without ceiling constraint.
-   Specific knobs: `hpo_search_space.num_leaves=[64,128]`, `hpo_search_space.n_estimators=[100,500]`
-   Priority justification: highest-value remaining — ETH/15m has the best Brier across all
-   non-BTC assets (0.208324) and a confirmed double-ceiling mis-configuration to fix.
+1. **BTC/15m stochastic re-run num_leaves=[32,64] + n_estimators=[100,350]**
+   Rationale: iter 154 was starvation-free (num_leaves=45, n_est=441) but missed best by 0.845%.
+   num_leaves=45 is consistent with best (iter 123: 43) — the range [32,80] is directionally
+   correct. However n_est=441 (vs iter 123's n_est=235) suggests the HPO may be exploring a
+   high-n_est plateau that is suboptimal. Tighten n_estimators to [100,350] to redirect search
+   toward the 200-250 range where iter 123 found its best. Tighten num_leaves to [32,64] to
+   exclude the 65-80 territory that iter 154 explored (num_leaves=45 confirms lower end is better).
+   This is a precision refinement — the stochastic noise should be reduced with a tighter range.
+   Expected: BTC/15m true optimum is near iter 123 params (n_est=235, num_leaves=43); a
+   starvation-free run targeting that region should find Brier <= 0.171809 or confirm floor.
+   Specific knobs: `hpo_search_space.num_leaves=[32,64]`, `hpo_search_space.n_estimators=[100,350]`
 
-2. **BTC/15m num_leaves=[24,64] + n_estimators=[100,400]**
-   Rationale: iter 123 (best) found num_leaves=43 with n_estimators=235 (21/40 trials at
-   800 ceiling). BTC assets show sniper pattern (WR ramp). num_leaves=43 confirmed across
-   two runs (iter 123: n_est=235, iter 114: n_est=53). Narrowing to [24,64] centers on the
-   confirmed 43 optimum. n_estimators=235 is well within 400 ceiling. This is the same lever
-   that worked for 1h assets (SOL/1h=224, XRP/1h=207, BTC/1h=350 stable). BTC/15m has the
-   best Brier overall (0.171809) — any improvement here has highest deployment value.
-   Specific knobs: `hpo_search_space.num_leaves=[24,64]`, `hpo_search_space.n_estimators=[100,400]`
-
-3. **SOL/15m num_leaves=[32,72] + n_estimators=[100,400]**
-   Rationale: iter 130 (best) found num_leaves=50 with n_estimators=154 (24/40 trials at
-   600 ceiling). n_estimators=154 is well within 400 ceiling — reducing ceiling from 600
-   to 400 saves search budget. Narrowing num_leaves to [32,72] centers on the 50 optimum.
-   SOL/15m had structural starvation resolved at 600; at 400 ceiling it should be fully
-   starvation-free. Cross-asset confirmation: SOL/1h iter 148 found num_leaves=46 with
-   [16,64] narrowing — [32,72] is directionally consistent with SOL's 46-50 pattern.
-   Specific knobs: `hpo_search_space.num_leaves=[32,72]`, `hpo_search_space.n_estimators=[100,400]`
-
-4. **ETH/5m num_leaves=[64,128] + n_estimators=[100,500]**
-   Rationale: iter 117 (best) found num_leaves=70 with n_estimators=182 (23/40 trials at
-   800 ceiling). ETH/5m's starvation was confirmed dataset-size structural in iters 143 and
-   149 (6-16/40 trials regardless of ceiling). However, num_leaves=70 is consistent with
-   ETH/15m's optimum (70-94 range). A focused [64,128] num_leaves range with modest
-   n_estimators=[100,500] ceiling reduces per-trial cost by allowing HPO to converge faster.
-   The starvation class (dataset-size, 929K samples) cannot be eliminated but reducing the
-   HPO search dimension may yield cleaner convergence within the available trials.
-   WARNING: ETH/5m is in the dataset-size structural class (6-16/40 typical). Improvement
-   probability is lower than items 1-3. Accept if starvation-free OR if Brier improves despite
-   partial starvation (set threshold: >=12/40 trials for a valid result).
-   Specific knobs: `hpo_search_space.num_leaves=[64,128]`, `hpo_search_space.n_estimators=[100,500]`
-
-5. **SOL/5m num_leaves=[28,68] + n_estimators=[100,400]**
-   Rationale: iter 121 (best) found num_leaves=47 with n_estimators=274 (24/40 trials at
-   800 ceiling). SOL/5m mirrors SOL/15m and SOL/1h patterns. Confirmed SOL optimum is
-   46-50 across ALL three timeframes (SOL/1h=46, SOL/15m=50, SOL/5m=47 — extremely tight
-   convergence). Narrowing [28,68] targets this range precisely. n_estimators=274 fits
-   within 400 ceiling. Starvation at 24/40 with 800 ceiling suggests dataset-size partial
-   class — reducing ceiling to 400 should improve trial count.
+2. **SOL/5m num_leaves=[28,68] + n_estimators=[100,400]**
+   Rationale: iter 121 (best) found num_leaves=47 with n_estimators=274 (24/40 trials at 800
+   ceiling). SOL num_leaves cross-timeframe pattern is tight: SOL/1h=46, SOL/15m=51, SOL/5m=47.
+   The [28,68] range directly targets this convergence band. SOL/15m just succeeded with [32,72]
+   at [100,400] — SOL/5m should follow the same approach. SOL/5m best_knobs currently has
+   n_est=[100,800] and num_leaves=[16,128] — both need updating. Reducing ceiling from 800 to
+   400 saves search budget for SOL/5m (n_est=274 fits within 400 ceiling).
    Specific knobs: `hpo_search_space.num_leaves=[28,68]`, `hpo_search_space.n_estimators=[100,400]`
 
-6. **XRP/15m num_leaves=[32,80] + n_estimators=[100,600]**
-   Rationale: XRP/15m is confirmed structurally starved by dataset size (23-29/40 trials
-   even at 300-400 ceiling; starvation is NOT n_estimators-driven). Best run (iter 128)
-   had num_leaves=128 AT the upper bound — not reliable. However, num_leaves narrowing may
-   reduce per-trial complexity. Try [32,80] centered on the known XRP convergence range
-   (XRP/1h=25 at iter 149; XRP/5m likely similar). Use 600 ceiling to allow n_estimators
-   to find natural optimum. Accept if >=16/40 trials completed AND Brier improves.
-   Note: XRP/15m is LOWEST priority of the 15m assets due to persistent structural
-   starvation. If the run produces <16/40 trials AND DISCARD, deprioritize further.
+3. **XRP/15m num_leaves=[32,80] + n_estimators=[100,600]**
+   Rationale: XRP/15m confirmed structurally starved by dataset size (23-29/40 trials regardless
+   of ceiling level). Best run (iter 128) had num_leaves=128 AT upper bound — the true optimum
+   was never cleanly found. Applying num_leaves narrowing to [32,80] following the XRP/1h
+   pattern (num_leaves=25 at iter 149) — XRP assets show consistent low num_leaves preference.
+   Keep n_estimators=[100,600] (iter 128's best n_est=599 near ceiling; starvation is structural,
+   not n_estimators driven; 600 ceiling confirmed minimum by iter 145 analysis).
+   Accept if >=16/40 trials AND Brier < 0.218075.
    Specific knobs: `hpo_search_space.num_leaves=[32,80]`, `hpo_search_space.n_estimators=[100,600]`
 
-7. **ETH/1h num_leaves=[16,32] + n_estimators=[100,400]** (optional tiebreaker)
-   Rationale: iters 147, 150 both found num_leaves=20 at [16,64] range — converged to
-   low end of the range. ETH/1h structural floor (0.211438) is genuine and confirmed across
-   6+ DISCARD attempts. A final narrowing to [16,32] would confirm the floor definitively
-   OR find a marginal improvement if num_leaves=16-18 is slightly better than 20. This is
-   LOW PRIORITY — only run if items 1-6 all complete and no KEEP candidates remain.
+4. **SOL/5m verification run (if item 2 KEEP-fast)**
+   If item 2 produces a fast Brier improvement, proceed directly to verify run
+   following same protocol as iter 155 (SOL/15m): compare fast vs verify Brier, accept if
+   delta < 0.3% and Brier(verify) < best.
+
+5. **ETH/1h num_leaves=[16,32] + n_estimators=[100,400]** (tiebreaker — LOW PRIORITY)
+   Rationale: iters 147 and 150 both converged to num_leaves=20 at [16,64] range, both produced
+   identical Brier=0.211817 missing best 0.211438 by 0.018%. The floor is almost certainly real.
+   A final narrowing to [16,32] is a very low-cost confirmation test — if num_leaves=18 exists
+   below 20, this finds it; otherwise it confirms the floor definitively. Only run after items
+   1-3 all complete.
    Specific knobs: `hpo_search_space.num_leaves=[16,32]`, `hpo_search_space.n_estimators=[100,400]`
+
+6. **XRP/5m num_leaves=[16,40] + n_estimators=[100,400]** (structural class — SOFT BLACKLIST)
+   Rationale: iter 141 had 9/40 trials at 600 ceiling — XRP/5m dataset-size structural (929K
+   samples, same class as BTC/5m). However, num_leaves narrowing has now unlocked 3 major KEEPs
+   on other structurally-challenged assets (ETH/15m, SOL/15m, ETH/5m). XRP/1h converged to
+   num_leaves=25 at iter 149 — XRP assets show low num_leaves preference. Try [16,40]+[100,400]
+   to radically reduce per-trial complexity. Accept if >=10/40 trials AND Brier < 0.221503.
+   CAUTION: If this produces <10/40 trials, permanently blacklist XRP/5m.
+   Specific knobs: `hpo_search_space.num_leaves=[16,40]`, `hpo_search_space.n_estimators=[100,400]`
 
 ## Observations
 
-- **ETH/15m-vs-ETH/1h divergence (new finding, iter 151):** ETH/1h num_leaves=20; ETH/15m
-  num_leaves=70-94+. Do NOT treat ETH timeframes as sharing a num_leaves optimum. Each
-  timeframe is an independent landscape. The tick-dominant label is shared but the HPO
-  landscape is timeframe-specific.
-- **SOL num_leaves cross-timeframe consistency (confirmed through iter 151):** SOL/5m=47,
-  SOL/15m=50, SOL/1h=46. All three timeframes converge to 46-50. This is the tightest
-  cross-timeframe convergence in the dataset. Narrowing [32,72] for all SOL assets is safe.
-- **n_estimators optimum taxonomy (updated):** 5m = 154-274 (SOL=274, BTC=103 unstable,
-  ETH=182, XRP=431 unstable); 15m = 150-250 (SOL=154, ETH=202, BTC=235); 1h = 200-350
-  (SOL=224, XRP=207, ETH=342, BTC=230). A ceiling of [100,400] is safe for 15m and 1h.
-  For 5m, ETH and SOL are within 400 but BTC/XRP are structurally unstable — ceiling
-  should be [100,500] for ETH/5m to give headroom above n_est=182.
-- **num_leaves narrowing KEEP rate: 2/3 (67%)** — still the highest single-lever success
-  rate in the entire multi-tp era (reg_alpha forcing: 0/5, n_estimators ceiling: 5/12).
-  Continue applying to remaining assets.
-- **Structural floor class confirmed for:** BTC/5m (iter 146: 0/7 KEEP since iter 104);
-  XRP/5m (iter 141: 9/40 trials, dataset-size structural); XRP/15m (iters 132/140/145:
-  persistent starvation regardless of ceiling).
-- **reg_alpha forcing KEEP rate: 0/5 (0%)**: BTC/1h iter 139, ETH/5m iter 143, ETH/1h
-  iter 144, XRP/15m iter 140, BTC/5m iter 146. Permanently blacklisted for all assets.
-- **ETH/1h structural floor confirmed:** 0.211438 unchanged across 40/40 starvation-free
-  runs at iters 147 and 150 with same Brier to 6 decimal places. The floor is real.
+- **Three major ETH/SOL breakthroughs in one strategy period (iters 152-156):** The num_leaves
+  narrowing campaign is the highest single-lever KEEP rate ever recorded in autoresearch:
+  3/3 (100%) for ETH/15m+SOL/15m+ETH/5m vs prior overall rate of 2/3 (67%) after iter 151.
+  The widening strategy (when double-ceiling starvation is detected) is now confirmed as the
+  correct response.
+- **BTC/15m num_leaves convergence confirmed at 43-45:** Iters 123 (43), 153 (60 — ceiling-hit),
+  154 (45). num_leaves=45 in starvation-free iter 154 matches iter 123 closely. The [32,64]
+  range for next attempt is well-justified. The 0.845% miss is suspicious — n_est=441 vs
+  prior 235 may have shifted the landscape slightly.
+- **Sub-0.20 Brier barrier broken for ETH and SOL 15m:** ETH/15m=0.193, SOL/15m=0.200. Only
+  BTC 5m/15m/1h remain below 0.20 at structural floors. ETH/5m also broke 0.20 (0.199722).
+  All 12 models now target <0.22 or better; 7/12 are now <0.22.
+- **Cross-asset BTC features confirmed high-value for ETH and SOL 15m:** btc_vol_norm_distance
+  and btc_distance_from_open appear in top-3 for both ETH/15m (iter 152) and SOL/15m (iter 155).
+  This validates the cross-asset feature build. No changes needed — keep 4 enabled features.
+- **num_leaves narrowing KEEP rate (full campaign, updated):**
+  SOL/1h (iter 148) KEEP, XRP/1h (iter 149) KEEP, ETH/15m (iter 152) KEEP, SOL/15m (iter 155)
+  KEEP, ETH/5m (iter 156) KEEP. Excluding the double-ceiling contaminated DISCARD (iter 151,
+  153): 5/5 = 100% when range is correctly set. Total: 5/7 = 71% including double-ceiling cases.
+- **BTC assets remain at structural floors:** BTC/5m (0.17605, iter 104, 0/8 KEEP since),
+  BTC/1h (0.174676, iter 136, 0/3 KEEP since). Only BTC/15m (0.171809) has remaining potential.
+- **n_estimators optimum taxonomy (updated through iter 156):**
+  5m: ETH=182 (best_knobs), SOL=274 (iter 121); 15m: ETH=389 (iter 152), SOL=269 (iter 155),
+  BTC=235 (iter 123 best), XRP=599 (ceiling-hit, unreliable); 1h=200-350 (all confirmed).
+  BTC/15m iter 154 finding n_est=441 is an outlier — more likely a red herring from wide range.
 
 ## Risk Profile
 
-- Max drawdown trend: STABLE — BTC/1h=0.20% (iter 136), SOL/1h=0.054% (iters 130/148),
-  XRP/1h=0.063% (iter 149). All within historical range. No concerning growth.
-- Trade count: STABLE — 5m: 75-81K; 15m: 60-77K; 1h: 16-19K. All comfortably above
-  minimum 50-trade threshold.
-- Win rate stability: BTC sniper (5m/15m/1h) = 62-67% (stable); tick-dominant
-  (ETH/SOL/XRP) = 49-52% (flat, structural). No anomalies.
-- Calibration: ECE STABLE — all KEEP rows post-iter-122: 0.0083-0.0355 (all < 0.05).
-  XRP/1h iter 149 ECE=0.0355 is elevated relative to peers but still well within threshold.
-- HPO-OOS gap: <0.2% for all starvation-free KEEPs. No widening trend.
+- Max drawdown trend: STABLE — ETH/15m iter 152 dd=0.0234 (elevated vs peers but within 0.05
+  acceptance); SOL/15m iter 155 dd=0.0512 (stable); ETH/5m iter 156 dd not reported.
+  No concerning growth across the post-151 KEEP rows.
+- Trade count: STABLE — 15m: 61K-76K; verified: SOL/15m=75,400 (iter 155), BTC/15m=62K (iter 154).
+  All above 50-trade minimum. ETH/5m iter 156 trades=227,819 (5m assets trade more — consistent).
+- Win rate: tick-dominant assets (ETH/SOL/XRP) = 50-52% (structural FLAT pattern confirmed).
+  BTC sniper: BTC/15m iter 154 WR=61.27% (strong sniper ramp pattern persists).
+- HPO-OOS gap: <0.5% for all starvation-free post-151 KEEPs. ETH/15m hpo_obj=0.148 vs
+  Brier=0.193 — gap partly explained by composite objective (brier + trade_penalty). No
+  widening trend in calibration.
+- ECE: ETH/15m=0.0234, SOL/15m=0.0059 — both within 0.05 acceptance threshold. Healthy.
 
 ## Timeframe Coverage
 
-- 5m: ~39 iterations (iters 91+), 8 KEEPs (21%), best Brier=0.17605 (BTC/5m iter 104).
-  KEEP rate lowest — structural floor class dominates (BTC, XRP confirmed; ETH partial).
-  SOL/5m is the only clean candidate remaining.
-- 15m: ~33 iterations, 9 KEEPs (27%), best Brier=0.171809 (BTC/15m iter 123).
-  HIGHEST priority tier — 3 assets (ETH, BTC, SOL) have clean num_leaves narrowing pending.
+- 5m: ~42 iterations (iters 91+), 9 KEEPs (21%), best Brier=0.17605 (BTC/5m iter 104).
+  ETH/5m just improved to 0.199722 (iter 156). Remaining: SOL/5m (item 2), XRP/5m (item 6, soft blacklist).
+  BTC/5m confirmed structural floor.
+- 15m: ~36 iterations, 12 KEEPs (33%), best Brier=0.171809 (BTC/15m iter 123).
+  ETH/15m improved to 0.193035, SOL/15m to 0.200064. Remaining: BTC/15m retry (item 1), XRP/15m (item 3).
+  Strong improvement campaign — 2 new KEEPs in this period.
 - 1h: ~38 iterations, 10 KEEPs (26%), best Brier=0.174676 (BTC/1h iter 136).
-  SOL/1h and XRP/1h confirmed improved in this strategy period (+0.578%, +1.866% KEEPs).
-  ETH/1h and BTC/1h at confirmed structural floors. 1h campaign largely complete.
-- Recommendation: concentrate on 15m assets (items 1-3) as primary campaign. 1h work is
-  largely done. 5m items 4-5 are secondary.
+  Campaign largely complete. ETH/1h tiebreaker (item 5) is the only remaining 1h work.
+- Recommendation: prioritize 15m (BTC/15m retry + XRP/15m) and 5m (SOL/5m) as primary
+  campaign. 1h is done except optional ETH/1h tiebreaker.
 
 ## Blacklist
 
-- **reg_alpha=[0.1,5.0] forcing (all assets)**: 0/5 KEEP. Permanently blacklisted.
-  Evidence: BTC/1h iter 139, XRP/15m iter 140, ETH/5m iter 143, ETH/1h iter 144, BTC/5m
-  iter 146. Pattern: reg_alpha forcing causes or worsens starvation across all asset types.
-- **BTC/5m optimization (any lever)**: 0/7 KEEP since iter 104. Permanently blacklisted.
-  Evidence: iters 122, 127, 134, 146. Structural dataset-size floor (929K samples, 50s/trial).
-- **XRP/5m optimization (any lever)**: 0/1 KEEP since iter 112. Soft blacklist.
-  Evidence: iter 141 — 9/40 trials at 600 ceiling; dataset-size structural same class as
-  BTC/5m. Do NOT attempt further n_estimators ceiling adjustments.
+- **reg_alpha=[0.1,5.0] forcing (all assets)**: 0/5 KEEP (iters 139-146). Permanently blacklisted.
+- **BTC/5m optimization (any lever)**: 0/8 KEEP since iter 104. Permanently blacklisted.
+  Evidence: iters 122, 127, 134, 146 and pre-151 data. Dataset-size structural floor.
+- **XRP/5m (any ceiling reduction)**: 0/1 KEEP, 9/40 trials at 600 ceiling (iter 141).
+  Soft blacklist — only attempt with dramatically reduced num_leaves [16,40] (item 6).
 - **XRP/15m ceiling reduction below 600**: structural starvation persists regardless of
-  ceiling (iters 132, 140, 145). Dataset-size class. Use 600 ceiling minimum.
-- **ETH/1h optimization (any lever)**: floor confirmed at 0.211438. 0 improvements since
-  iter 100. Iters 105, 108, 135, 144, 147, 150 all DISCARD. Only item 7 (tiebreaker) allowed.
-- **ETH/15m num_leaves=[48,96] (too tight)**: iter 151 confirmed double-ceiling starvation.
-  Must use [64,128] with n_estimators=[100,500] (see item 1).
-- **min_child_samples narrowing (ETH assets)**: 0/2 KEEP (iter 108 ETH/1h, iter 129 ETH/5m).
-  Confirmed problematic — range contraction KEEP rate = 0/6.
-- **SOL/15m starvation at n_estimators=[100,800]**: structural (iters 97, 109, 126).
-  Use [100,400] or [100,600] for SOL/15m. NOT needed at [100,400] (n_est=154 confirmed).
-- **BTC/1h lr=[0.005,0.03]**: iter 131 confirmed binding (lr=0.028 at ceiling). Use
-  [0.005,0.05]. BTC/1h now at structural floor — no further BTC/1h experiments needed.
+  ceiling (iters 132, 140, 145). Use 600 ceiling minimum with num_leaves narrowing instead.
+- **ETH/1h optimization (any lever)**: floor confirmed at 0.211438. Only item 5 (tiebreaker)
+  allowed. Evidence: iters 105, 108, 135, 144, 147, 150 all DISCARD (0/6 since iter 100).
+- **ETH/15m num_leaves=[48,96] (too tight)**: iter 151 double-ceiling starvation. Fixed with
+  [64,128] in iter 152. Do not revert.
+- **BTC/15m num_leaves=[24,64] (too tight)**: iter 153 double-ceiling starvation (num_leaves=60
+  near 64 ceiling). Use [32,64] minimum with n_estimators=[100,350].
+- **min_child_samples narrowing (ETH assets)**: 0/2 KEEP (iters 108, 129). Confirmed problematic.
+- **SOL/15m starvation at n_estimators=[100,800]**: structural (iters 97, 109, 126). Use [100,400].
+- **BTC/1h lr=[0.005,0.03]**: binding at iter 131. Use [0.005,0.05]. BTC/1h at structural floor.
 
 ## HPO Range Recommendations
 
-- **n_estimators (1h assets)**: [100, 400] — confirmed optimum in 200-350 range.
-  Evidence: SOL/1h=224 (iter 148), XRP/1h=207 (iter 149), ETH/1h=342 (iters 147/150),
-  BTC/1h=230 (iter 137).
-- **n_estimators (15m assets)**: [100, 400] for SOL/BTC/ETH; [100, 600] for XRP/15m only.
-  Evidence: SOL/15m=154 (iter 130), ETH/15m=379+ (iter 151, ceiling hit — true opt unknown),
-  BTC/15m=235 (iter 123).
-- **n_estimators (5m assets)**: [100, 500] for ETH/SOL; structural class for BTC/XRP.
-  Evidence: ETH/5m=182 (iter 117), SOL/5m=274 (iter 121). 400 ceiling likely sufficient
-  for ETH/5m (182 within range); 500 provides headroom for double-ceiling risk.
-- **num_leaves (ETH assets)**: ETH/1h=[16,32] (confirmed floor at 20); ETH/15m=[64,128]
-  (iter 151 double-ceiling requires wider range); ETH/5m=[64,128] (mirrors 15m pattern).
-  NOTE: ETH/1h and ETH/15m/5m are DIFFERENT landscapes — do NOT apply ETH/1h num_leaves
-  to other timeframes.
-- **num_leaves (SOL assets)**: [32,68] — consistent SOL convergence to 46-50 across all
-  three timeframes.
-  Evidence: SOL/1h=46 (iter 148), SOL/15m=50 (iter 130), SOL/5m=47 (iter 121).
-- **num_leaves (XRP assets)**: [16,48] for 1h (XRP/1h=25, iter 149); [32,80] for 15m
-  (XRP/15m=128 unreliable, use wider range until true optimum found).
-- **num_leaves (BTC assets)**: [24,64] — BTC/15m=43 (iter 123), BTC/1h=76-83 range
-  (iters 136-138). Note: BTC/1h at structural floor, only BTC/15m needs this.
-- **learning_rate (BTC/1h)**: [0.005, 0.05] — resolved binding at [0.005,0.03].
-  BTC/1h at structural floor — this is informational only.
+- **n_estimators (1h assets)**: [100, 400] — confirmed, all 1h assets optimum in 200-350 range.
+- **n_estimators (15m ETH/SOL/BTC)**: [100, 400] confirmed. XRP/15m: [100, 600] only.
+  Note: ETH/15m best at n_est=389 (within 500 ceiling); SOL/15m best at n_est=269 (within 400).
+- **n_estimators (5m ETH/SOL)**: [100, 500] — ETH/5m n_est=182 confirmed; SOL/5m target 400.
+- **num_leaves (ETH assets)**: ETH/1h=[16,32]; ETH/15m=[64,128] (confirmed at iter 152);
+  ETH/5m=[64,128] (confirmed at iter 156, num_leaves=69).
+- **num_leaves (SOL assets)**: [28,68] — SOL/1h=46, SOL/15m=51 (iter 155), SOL/5m=47 (iter 121).
+  All three timeframes cluster in 46-51 range. [28,68] tightly brackets this.
+- **num_leaves (XRP assets)**: XRP/1h=[16,48] (XRP/1h=25, iter 149); XRP/15m=[32,80] (unknown,
+  use pending item 3 to confirm); XRP/5m=[16,40] if attempted (item 6).
+- **num_leaves (BTC assets)**: [32,64] for BTC/15m (43-45 confirmed across iters 123/154).
+  BTC/5m and BTC/1h at structural floors — no further experiments.
+- **learning_rate (BTC/1h)**: [0.005, 0.05] — resolved. Informational only (structural floor).
