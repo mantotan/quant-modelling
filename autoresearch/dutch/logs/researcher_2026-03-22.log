@@ -80,3 +80,6 @@
 2026-03-22T21:50:00Z iter=42 pair=SOL_15m status=DISCARD param=min_unmatched_shares 10->5
   eval: pair_cost=0.9234 profit=$-0.41 max_dd=35.5% bars=121
   hypothesis: "Reducing min_unmatched_shares 10->5 should lower pair formation threshold and increase throughput on SOL_15m (matched_ratio=6% on baseline). Result: matched_ratio improved 10.3%->13.4% but pair_cost worsened 0.9133->0.9234 vs fresh run; only 1.2% improvement vs stored best (0.9348), below 5% KEEP RELAXED threshold."
+2026-03-22T22:20:00Z iter=43 pair=SOL_1h status=KEEP param=- -→-
+  eval: pair_cost=0.6967 profit=$0.8168 total_profit=$26.14 matched=0.0546 fill=0.8398 correct=0.5667 max_dd=9.07% bars=32
+  hypothesis: "V7.3 baseline re-eval: pair_cost improved 10.3% (0.7766->0.6967), avg_profit $0.084->$0.817/bar. KEEP. Next: conviction_buy_skip 0.50->0.35 — SOL_1h has best pair_cost in system (0.697) but matched_ratio only 5.5%. Strategy priority queue item 1: aggressively lower skip threshold to deploy more capital while monitoring pair_cost stays under 0.85."
