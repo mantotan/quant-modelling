@@ -1,6 +1,7 @@
-iter=37 pair=ETH_5m timestamp=2026-03-22T21:35:00Z
-Role: RESEARCHER (backtest mode)
-Hypothesis: conviction_buy_skip 0.50->0.60 to filter anti-predictive ETH_5m model (correct_side=41%)
-V7.3 baseline (iter 24): pair_cost=0.9087, avg_profit=-$0.517/bar, max_dd=84.38%, correct_side=40.46%
-Strategy priority queue item #1 for ETH_5m.
-Only high-confidence signals (>=60%) should survive; expect fewer trades but improved directional quality.
+iter=38 pair=ETH_15m timestamp=2026-03-22T21:40:00Z
+Mode: BACKTEST
+Status: Starting experiment — conviction_buy_skip 0.50->0.55
+ETH_15m V7.3 baseline: pair_cost=0.9220, avg_profit=-$0.803, max_dd=48%, correct_side=45.7%
+Hypothesis: ETH_15m model is near anti-predictive (45.7% correct). Raising conviction_buy_skip
+from 0.50 to 0.55 will filter out low-confidence bets in the 50-55% range where model accuracy
+is worst, potentially improving pair quality at the cost of fewer total trades.
