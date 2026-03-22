@@ -62,3 +62,6 @@
 2026-03-22T21:29:45Z iter=36 pair=BTC_1h status=DISCARD param=bar_budget 200->400 pair_cost=0.9335(worse vs pre-edit 0.9244) max_dd=4.6%
   eval: pair_cost=0.9335 profit=$0.53 total_profit=$16.30 matched=0.115 fill=0.771 correct=0.552 max_dd=4.6% bars=31
   hypothesis: "bar_budget 200->400 — BTC_1h lowest max_dd (6%) and best profit/bar. Hypothesis: doubling budget scales total profit. Disproved: pair_cost worsened 0.9244->0.9335, avg_profit dropped 38% (/usr/bin/bash.85->/usr/bin/bash.53), fill rate fell 80.5%->77.1%, budget_util fell 3.3%->2.0%. Pacing efficiency degrades at higher budget. Restored baseline knobs."
+2026-03-22T21:35:00Z iter=37 pair=ETH_5m status=DISCARD param=conviction_buy_skip 0.50->0.60
+  eval: pair_cost=0.9217 profit=$-0.91 max_dd=172.1% bars=356
+  hypothesis: "ETH_5m correct_side=41% is anti-predictive; raising skip threshold to 0.60 should retain only high-confidence directional signals. Result: counter-productive — correct_side fell further to 33.6%, pair_cost worsened 0.9087->0.9217, max_dd nearly doubled 84->172%. Higher skip did not improve signal quality on this pair."

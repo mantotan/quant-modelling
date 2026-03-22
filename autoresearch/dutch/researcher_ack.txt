@@ -1,5 +1,6 @@
-iter=36 pair=BTC_1h timestamp=2026-03-22T21:29:30Z
+iter=37 pair=ETH_5m timestamp=2026-03-22T21:35:00Z
 Role: RESEARCHER (backtest mode)
-Hypothesis: bar_budget 200->400 to scale capital on BTC_1h (lowest max_dd=6%, best profit/bar=$0.85)
-V7.3 baseline: pair_cost=0.9378, avg_profit=+$0.827/bar, max_dd=6.02%
-Strategy priority queue item #1 for BTC_1h.
+Hypothesis: conviction_buy_skip 0.50->0.60 to filter anti-predictive ETH_5m model (correct_side=41%)
+V7.3 baseline (iter 24): pair_cost=0.9087, avg_profit=-$0.517/bar, max_dd=84.38%, correct_side=40.46%
+Strategy priority queue item #1 for ETH_5m.
+Only high-confidence signals (>=60%) should survive; expect fewer trades but improved directional quality.
