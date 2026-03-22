@@ -1,3 +1,3 @@
 asset	timeframe	avg_pair_cost	avg_profit	total_profit	matched_ratio	fill_rate	correct_side_pct	budget_util	sell_ratio	max_dd_pct	bars_evaluated
-BTC	1h	1.0023	-4.1513	-103.7815	0.7557	0.8292	0.3750	0.2921	0.0000	52.58	25
-ALL	ALL	1.0023	-4.1513	-103.7815	0.7557	0.8292	0.3750	0.2921	0.0000	52.58	25
+ETH	15m	0.9580	-6.3118	-599.6172	0.5691	0.8290	0.0426	0.1999	0.0000	299.81	95
+ALL	ALL	0.9580	-6.3118	-599.6172	0.5691	0.8290	0.0426	0.1999	0.0000	299.81	95

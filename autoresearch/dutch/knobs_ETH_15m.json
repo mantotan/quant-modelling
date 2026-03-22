@@ -8,7 +8,7 @@
   "min_time_remaining": 30.0,
   "emergency_balance_time": 120.0,
   "spread_offset": 0.01,
-  "pace_urgency_lo": 0.5,
+  "pace_urgency_lo": 0.35,
   "pace_urgency_hi": 2.0,
   "max_side_fraction": 0.55,
   "max_per_prediction": 100.0,
@@ -26,7 +26,7 @@
   "conviction_market_full": 1.00,
   "profit_protect_min_pairs": 5,
   "min_unmatched_shares": 20.0,
-  "unmatched_ratio": 0.35,
+  "unmatched_ratio": 0.50,
   "sell_loss_start": 0.70,
   "sell_dump_start": 0.90,
   "fill_simulator": {

@@ -1,3 +1,4 @@
-iter=19 pair=ETH_5m timestamp=2026-03-22T15:30:00Z
+iter=20 pair=ETH_15m timestamp=2026-03-22T16:22:00Z
 Role: RESEARCHER (backtest mode)
-Evaluating pre-staged unmatched_ratio 0.50->0.35 experiment via backtest.
+DISCARD: unmatched_ratio 0.50->0.35 (pair_cost 0.9569->0.9580, max_dd 284->300%)
+Next hypothesis: pace_urgency_lo 0.50->0.35 staged for ETH_15m
