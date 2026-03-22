@@ -68,3 +68,12 @@
 2026-03-22T21:42:00Z iter=38 pair=ETH_15m status=DISCARD param=conviction_buy_skip 0.50->0.55
   eval: pair_cost=0.8968 profit=$-0.84 max_dd=57.5% bars=120
   hypothesis: "ETH_15m model near anti-predictive (45.7% correct). Raise conviction_buy_skip 0.50->0.55 to filter 50-55% confidence bets where model is weakest. Pair_cost improved (0.9220->0.8968) but correct_side degraded from 45.7% to 34.7% — conviction filter eliminated more correct-side trades than wrong-side trades. max_dd rose 48->57.5%, avg_profit stayed negative. DISCARD: same pattern as ETH_5m (iter 37) where higher skip threshold chose worse pairs."
+2026-03-22T22:00:00Z iter=39 pair=ETH_1h status=KEEP param=- (baseline re-eval)
+  eval: pair_cost=0.7649 profit=$-0.033 max_dd=14.82% bars=31
+  hypothesis: "V7.3 baseline re-eval on 31 bars (up from 25). pair_cost dramatically improved from 0.9528->0.7649 (19.7% relative). avg_profit near-zero. KEEP RELAXED (>5% cost improvement, profit>-2.0). Updated best_knobs to reflect current benchmark."
+2026-03-22T22:05:00Z iter=40 pair=ETH_1h status=KEEP param=conviction_buy_skip 0.50->0.45
+  eval: pair_cost=0.7058 profit=$-0.49 max_dd=17.14% bars=31
+  hypothesis: "ETH_1h has 54% correct_side and highest matched_ratio (17%). Lower conviction_buy_skip from 0.50 to 0.45 to capture 45-50% confidence bets. pair_cost improved further 7.7% (0.7649->0.7058), matched_ratio increased 6.1%->7.0%, fill_rate up 84%->88%. KEEP RELAXED. Concern: correct_side dropped 46.7%->43.3% — lower skip let in anti-predictive trades. Next: test max_onesided_cost 5.0->7.0 (strategy priority #2) given DD is only 17% and pair_cost is now excellent at 0.706."
+2026-03-22T22:15:00Z iter=41 pair=SOL_5m status=DISCARD param=conviction_buy_skip 0.50->0.55
+  eval: pair_cost=0.9628 profit=$-0.57 max_dd=108.0% bars=360
+  hypothesis: "SOL_5m correct_side=45.5% is near anti-predictive. Raising skip to 0.55 should filter low-confidence losing bets. Result: counterintuitively worsened all metrics — matched_ratio doubled (9%->21%) while correct_side dropped further (45.5%->39.6%), suggesting the parameter acts differently than expected on SOL_5m market structure."
