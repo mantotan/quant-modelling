@@ -134,3 +134,6 @@
 2026-03-22T16:22:00Z iter=63 pair=BTC_15m status=DISCARD param=bar_budget 200->300
   eval: pair_cost=0.9429 profit=$0.44 max_dd=19.3% bars=126
   hypothesis: "bar_budget 200->300 worsened pair_cost (0.9334->0.9429); reverting. Next: cheap_threshold 0.10->0.12 — only tightening direction tested on V7.3; loosening is untested on this profitable pair"
+2026-03-22T23:16:16Z iter=64 pair=BTC_1h role=researcher outcome=KEEP_RELAXED param=conviction_buy_skip 0.45->0.40 pair_cost=0.7988 max_dd=8.70%
+  eval: pair_cost=0.7988 profit=$-0.33 max_dd=8.70% bars=33
+  hypothesis: "conviction_buy_skip 0.45->0.40 -- continue series. Improved pair_cost 8.3% (0.8707->0.7988), correct_side 59%->61%, matched_ratio collapsed 7%->1.2%. KEEP RELAXED (>5% cost improvement, profit>-2.0)."

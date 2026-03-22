@@ -1,9 +1,8 @@
-iter=63 pair=BTC_15m timestamp=2026-03-22T16:22:00Z
+iter=64 pair=BTC_1h timestamp=2026-03-22T17:00:00Z
 Role: RESEARCHER (BACKTEST MODE)
-Evaluated: bar_budget 200->300 — DISCARD (pair_cost 0.9334->0.9429, cost regression)
-Hypothesis: cheap_threshold 0.10->0.12 — loosening entry threshold.
-BTC_15m is profitable at baseline (+$0.498/bar, 63% correct_side, matched_ratio=12%).
-Only tightening direction tested (0.07, DISCARD iter 17). Loosening to 0.12 is untested on V7.3.
-Slightly more liberal entry may increase matched_ratio and avg_profit without disrupting cost discipline.
-Next iteration will run backtest and evaluate.
-Current best_knobs avg_pair_cost=0.9334 (V7.3 baseline, no KEEP yet for BTC_15m).
+Status: Running backtest, then testing conviction_buy_skip 0.45->0.40
+Hypothesis: conviction_buy_skip 0.45->0.40 — continue the series.
+BTC_1h at skip=0.45: pair_cost=0.8707, avg_profit=+$0.36/bar, max_dd=9.26%, correct_side=58%.
+Strategy.md priority #1 for BTC_1h. Test whether 0.40 further improves cost.
+Watch: if correct_side drops below 50%, halt skip reduction series.
+Best known pair_cost for BTC_1h: 0.8707 (iter 52 KEEP).
