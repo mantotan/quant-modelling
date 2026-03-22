@@ -299,11 +299,13 @@ class LiveFeatureCache:
         asset: Asset,
         timeframe: Timeframe,
         tick_buffer_capacity: int = 10_000,
-    ) -> LiveFeatureCache:
+    ) -> "LiveFeatureCache | CrossAssetLiveFeatureCache":
         """Create a LiveFeatureCache using feature order from a saved model.
 
-        This is the recommended constructor. It reads the model's
-        feature_names_ to ensure exact feature ordering.
+        Auto-detects cross-asset models: if the model's feature_names_
+        contain ``btc_*`` features and asset is not BTC, returns a
+        ``CrossAssetLiveFeatureCache`` that manages a parallel BTC
+        feature calculator.
 
         Args:
             model_dir: Directory containing model.lgb (and optionally model.treelite).
@@ -312,6 +314,26 @@ class LiveFeatureCache:
             tick_buffer_capacity: Max ticks to buffer per bar window.
         """
         feature_order = _load_model_feature_order(model_dir)
+        btc_features = [f for f in feature_order if f.startswith("btc_")]
+
+        if btc_features and asset != Asset.BTC:
+            # Cross-asset model: build primary cache without btc_* features,
+            # then wrap with CrossAssetLiveFeatureCache
+            non_btc_order = [f for f in feature_order if not f.startswith("btc_")]
+            primary = cls(
+                asset=asset, timeframe=timeframe,
+                model_feature_order=non_btc_order,
+                tick_buffer_capacity=tick_buffer_capacity,
+            )
+            from qm.features.intrabar import IntraBarFeatureCalculator
+            btc_calc = IntraBarFeatureCalculator()
+            return CrossAssetLiveFeatureCache(
+                primary_cache=primary,
+                btc_calculator=btc_calc,
+                cross_feature_names=btc_features,
+                model_feature_order=feature_order,
+            )
+
         return cls(
             asset=asset,
             timeframe=timeframe,
@@ -472,4 +494,226 @@ class LiveFeatureCache:
             f"features={self._n_features}, "
             f"ready={self.is_ready}, "
             f"ticks={self.tick_count})"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Cross-asset live feature cache (BTC context for non-BTC models)
+# ---------------------------------------------------------------------------
+
+
+class CrossAssetLiveFeatureCache:
+    """Wraps a primary LiveFeatureCache + BTC context calculator.
+
+    For models trained with cross-asset BTC features, this cache computes
+    the primary asset's features AND BTC tick features, concatenates them,
+    and reorders to match the saved model's feature_names_.
+
+    Two usage modes:
+
+    **Live** (trade.py): Feed BTC ticks via ``on_context_tick()``. BTC
+    features are computed from the parallel tick buffer.
+
+    **Backtest** (dutch_backtest.py): Inject a prebuilt BTC PartialBar
+    via ``set_btc_partial()``. No tick buffer needed.
+    """
+
+    def __init__(
+        self,
+        primary_cache: LiveFeatureCache,
+        btc_calculator: object,
+        cross_feature_names: list[str],
+        model_feature_order: list[str],
+    ) -> None:
+        self._primary = primary_cache
+        self._btc_calc = btc_calculator
+        self._btc_tick_buffer = TickRingBuffer(capacity=5_000)
+        self._cross_names = cross_feature_names
+
+        # Map btc_* names to indices in BTC calculator output
+        from qm.features.cross_asset_intrabar import CROSS_ASSET_TICK_MAP
+        from qm.features.intrabar import TICK_FEATURE_NAMES
+
+        self._btc_source_indices: list[int] = []
+        for name in cross_feature_names:
+            source = CROSS_ASSET_TICK_MAP[name]
+            self._btc_source_indices.append(TICK_FEATURE_NAMES.index(source))
+
+        # Build reorder: [primary_calc_features + btc_features] → model order
+        calc_names = primary_cache._calculator.feature_names
+        if callable(calc_names):
+            calc_names = calc_names()
+        combined = list(calc_names) + list(cross_feature_names)
+        self._reorder_idx = _build_reorder_indices(combined, model_feature_order)
+        self._n_features = len(model_feature_order)
+        self._model_feature_order = list(model_feature_order)
+
+        # BTC bar state (live path)
+        self._btc_open: float | None = None
+        self._btc_bar_start: datetime | None = None
+        self._btc_bar_end: datetime | None = None
+        self._btc_last_tick_time: float = 0.0
+
+        # BTC partial override (backtest path)
+        self._btc_partial_override: PartialBar | None = None
+
+        logger.info(
+            "CrossAssetLiveFeatureCache: %s/%s + %d BTC features, %d total",
+            primary_cache._asset.value,
+            primary_cache._timeframe.value,
+            len(cross_feature_names),
+            self._n_features,
+        )
+
+    # ----- BTC tick ingestion (live path) -----
+
+    def on_context_tick(
+        self, price: float, size: float, timestamp: float
+    ) -> None:
+        """Feed BTC ticks from parallel price stream."""
+        self._btc_tick_buffer.push(price, size, timestamp)
+        self._btc_last_tick_time = timestamp
+
+    def new_btc_bar(
+        self, open_price: float, start: datetime, end: datetime
+    ) -> None:
+        """Signal start of a new BTC bar window."""
+        self._btc_tick_buffer.clear()
+        self._btc_open = open_price
+        self._btc_bar_start = start
+        self._btc_bar_end = end
+
+    def update_btc_history(self, features: dict[str, float]) -> None:
+        """Update BTC historical features on BTC bar completion."""
+        self._btc_calc.update_cache(Asset.BTC, features)
+
+    # ----- BTC partial override (backtest path) -----
+
+    def set_btc_partial(self, btc_partial: PartialBar | None) -> None:
+        """Inject BTC PartialBar directly (backtest replay path).
+
+        When set, ``get_features()`` uses this instead of the tick buffer.
+        Set to ``None`` to revert to tick buffer mode.
+        """
+        self._btc_partial_override = btc_partial
+
+    # ----- Feature computation -----
+
+    def _build_btc_partial(self) -> PartialBar | None:
+        """Build BTC PartialBar from tick buffer (live path)."""
+        snapshot = self._btc_tick_buffer.ohlcv_snapshot()
+        if snapshot is None or self._btc_open is None:
+            return None
+
+        import time as _time
+
+        now = _time.time()
+        start_ts = (
+            self._btc_bar_start.timestamp()
+            if self._btc_bar_start
+            else now
+        )
+        end_ts = (
+            self._btc_bar_end.timestamp()
+            if self._btc_bar_end
+            else start_ts + 300
+        )
+
+        return PartialBar(
+            window_start=self._btc_bar_start,
+            window_end=self._btc_bar_end,
+            asset=Asset.BTC,
+            timeframe=self._primary._timeframe,
+            open=self._btc_open,
+            high_so_far=snapshot["high"],
+            low_so_far=snapshot["low"],
+            current_price=snapshot["close"],
+            volume_so_far=snapshot["volume"],
+            trade_count=int(snapshot["trade_count"]),
+            elapsed_seconds=max(0.0, now - start_ts),
+            remaining_seconds=max(0.0, end_ts - now),
+        )
+
+    def get_features(self, partial_bar: PartialBar) -> np.ndarray:
+        """Compute primary + BTC cross-asset features, reorder to model order.
+
+        Uses ``set_btc_partial()`` override if set (backtest), otherwise
+        builds BTC PartialBar from tick buffer (live).
+        """
+        primary_raw = self._primary._compute_raw(partial_bar)
+
+        # Get BTC partial: override (backtest) or tick buffer (live)
+        btc_partial = self._btc_partial_override or self._build_btc_partial()
+        if btc_partial is not None:
+            btc_raw = self._btc_calc.compute(btc_partial)
+            btc_feats = np.asarray(btc_raw)[self._btc_source_indices]
+        else:
+            btc_feats = np.zeros(len(self._btc_source_indices))
+            # Staleness check (live path only)
+            if self._btc_last_tick_time > 0:
+                import time as _time
+
+                stale = _time.time() - self._btc_last_tick_time
+                if stale > 30:
+                    logger.warning("BTC context stale: %.0fs since last tick", stale)
+
+        combined = np.concatenate([primary_raw, btc_feats])
+        return combined[self._reorder_idx]
+
+    def get_features_2d(self, partial_bar: PartialBar) -> np.ndarray:
+        """Compute features as (1, n_features) array for model.predict()."""
+        return self.get_features(partial_bar).reshape(1, -1)
+
+    # ----- Delegate primary-asset interface -----
+
+    def on_tick(self, price: float, size: float, timestamp: float) -> None:
+        self._primary.on_tick(price, size, timestamp)
+
+    def new_bar_window(
+        self, window_start: datetime, window_end: datetime, open_price: float
+    ) -> None:
+        self._primary.new_bar_window(window_start, window_end, open_price)
+
+    def update_history(self, features: dict[str, float]) -> None:
+        self._primary.update_history(features)
+
+    def build_partial_bar(self) -> PartialBar | None:
+        return self._primary.build_partial_bar()
+
+    @property
+    def is_ready(self) -> bool:
+        return self._primary.is_ready
+
+    @property
+    def asset(self) -> Asset:
+        return self._primary.asset
+
+    @property
+    def timeframe(self) -> Timeframe:
+        return self._primary.timeframe
+
+    @property
+    def n_features(self) -> int:
+        return self._n_features
+
+    @property
+    def model_feature_order(self) -> list[str]:
+        return list(self._model_feature_order)
+
+    @property
+    def tick_count(self) -> int:
+        return self._primary.tick_count
+
+    @property
+    def tick_volume(self) -> float:
+        return self._primary.tick_volume
+
+    def __repr__(self) -> str:
+        return (
+            f"CrossAssetLiveFeatureCache("
+            f"asset={self._primary._asset.value}, "
+            f"timeframe={self._primary._timeframe.value}, "
+            f"features={self._n_features}, "
+            f"btc_features={len(self._cross_names)}, "
+            f"ready={self.is_ready})"
         )

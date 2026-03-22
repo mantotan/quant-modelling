@@ -32,7 +32,7 @@ from qm.backtest.intrabar_backtest import IntraBarBacktester
 from qm.backtest.metrics.calibration import brier_score, expected_calibration_error
 from qm.backtest.validation.walk_forward import WalkForwardSplitter
 from qm.core.types import Timeframe
-from qm.features.cross_asset_intrabar import augment_cross_asset
+from qm.features.cross_asset_intrabar import load_and_augment
 from qm.model.calibration.calibrator import TimeAwareCalibrator
 from qm.model.objective import ObjectiveConfig, compute_objective
 from qm.model.targets.intrabar import IntraBarDataset
@@ -417,18 +417,7 @@ def run(args: argparse.Namespace) -> dict:
     logger.info("Loaded cached dataset: %d samples, %d features", len(dataset.y), dataset.X.shape[1])
 
     # ── Cross-asset augmentation (non-BTC only) ──────────────────
-    cross_cfg = knobs.get("cross_asset", {})
-    if cross_cfg.get("enabled", False) and args.asset != "BTC":
-        btc_cache = Path(f"data/models/pulse_v2/BTC_{args.timeframe}/dataset.npz")
-        if btc_cache.exists():
-            btc_ds = IntraBarDataset.load(btc_cache)
-            n_before = dataset.X.shape[1]
-            dataset = augment_cross_asset(dataset, btc_ds, cross_cfg["features"])
-            n_after = dataset.X.shape[1]
-            logger.info("Cross-asset: %d → %d features", n_before, n_after)
-            del btc_ds  # free memory
-        else:
-            logger.warning("Cross-asset enabled but no BTC dataset at %s", btc_cache)
+    dataset = load_and_augment(dataset, args.asset, args.timeframe, knobs)
 
     # Warn if market_sim efficiency differs from what generated the dataset
     eff = knobs.get("market_sim", {}).get("efficiency", 0.75)

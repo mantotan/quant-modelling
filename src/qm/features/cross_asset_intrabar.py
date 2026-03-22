@@ -11,6 +11,7 @@ No raw bar loading or timestamp join needed.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import numpy as np
 
@@ -113,3 +114,37 @@ def augment_cross_asset(
         time_pcts=target_ds.time_pcts,
         feature_names=target_ds.feature_names + list(cross_feature_names),
     )
+
+
+def load_and_augment(
+    dataset: IntraBarDataset,
+    asset: str,
+    timeframe: str,
+    knobs: dict,
+) -> IntraBarDataset:
+    """Load BTC dataset and augment if cross_asset enabled and asset != BTC.
+
+    Convenience function used by ``train_pulse_fast.py``,
+    ``cpcv_validation_pulse.py``, ``kelly_backtest.py``,
+    ``regime_validation.py``, and ``train_ensemble.py``.
+
+    Returns *dataset* unchanged if cross_asset is disabled, asset is BTC,
+    or the BTC dataset is not available.
+    """
+    cross_cfg = knobs.get("cross_asset", {})
+    if not cross_cfg.get("enabled", False) or asset == "BTC":
+        return dataset
+
+    btc_cache = Path(f"data/models/pulse_v2/BTC_{timeframe}/dataset.npz")
+    if not btc_cache.exists():
+        logger.warning(
+            "Cross-asset enabled but no BTC dataset at %s", btc_cache
+        )
+        return dataset
+
+    btc_ds = IntraBarDataset.load(btc_cache)
+    n_before = dataset.X.shape[1]
+    result = augment_cross_asset(dataset, btc_ds, cross_cfg["features"])
+    logger.info("Cross-asset: %d → %d features", n_before, result.X.shape[1])
+    del btc_ds  # free memory
+    return result

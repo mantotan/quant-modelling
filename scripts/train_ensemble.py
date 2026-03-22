@@ -29,6 +29,7 @@ from qm.backtest.validation.walk_forward import WalkForwardSplitter
 from qm.core.types import Asset, Timeframe
 from qm.data.storage.parquet import ParquetStore
 from qm.features.cross_asset import CrossAssetPipeline
+from qm.features.cross_asset_intrabar import load_and_augment
 from qm.features.intrabar import CACHED_FEATURE_NAMES
 from qm.features.pipeline import FeaturePipeline
 from qm.model.calibration.calibrator import IsotonicCalibrator
@@ -114,11 +115,16 @@ def main() -> None:
     # ── 2. Generate Pulse training data from real ticks ─────────────
     # Try cached dataset first (saved by train_pulse_v2.py)
     from qm.model.targets.intrabar import IntraBarDataset
+    knobs_path = Path("autoresearch/knobs.json")
+    knobs = json.loads(knobs_path.read_text()) if knobs_path.exists() else {}
     cache_path = Path(f"data/models/pulse_v2/{asset.value}_{timeframe.value}/dataset.npz")
 
     if cache_path.exists():
         t0 = time.time()
         pulse_dataset = IntraBarDataset.load(cache_path)
+        pulse_dataset = load_and_augment(
+            pulse_dataset, asset.value, timeframe.value, knobs,
+        )
         logger.info("Loaded cached Pulse dataset: %d samples (%.1fs)",
                      len(pulse_dataset.y), time.time() - t0)
     else:

@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from qm.backtest.intrabar_backtest import IntraBarBacktester
 from qm.core.types import Timeframe
+from qm.features.cross_asset_intrabar import load_and_augment
 from qm.model.calibration.calibrator import IsotonicCalibrator
 from qm.model.targets.intrabar import IntraBarDataset
 
@@ -67,6 +68,7 @@ def main() -> None:
         sys.exit(1)
 
     dataset = IntraBarDataset.load(ds_path)
+    dataset = load_and_augment(dataset, args.asset, args.timeframe, knobs)
     all_names = list(dataset.feature_names)
 
     # Find regime_vol_state index in FULL feature set (before filtering)

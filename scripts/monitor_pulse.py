@@ -152,21 +152,20 @@ def parse_args() -> argparse.Namespace:
 def load_model(
     model_dir: Path, asset_label: str, tf_label: str,
 ) -> tuple[lgb.Booster, TimeAwareCalibrator | None]:
-    """Load Pulse LightGBM model + calibrator."""
-    model_path = model_dir / f"{asset_label}_{tf_label}" / "model.lgb"
-    cal_path = model_dir / f"{asset_label}_{tf_label}" / "calibrator.pkl"
+    """Load Pulse LightGBM or specialist model + calibrator."""
+    from qm.model.specialist import SpecialistModelRouter, load_pulse_model
 
-    if not model_path.exists():
-        logger.error("No model at %s -- exiting", model_path)
-        sys.exit(1)
+    sub_dir = model_dir / f"{asset_label}_{tf_label}"
+    model = load_pulse_model(sub_dir)
 
-    model = lgb.Booster(model_file=str(model_path))
     calibrator = None
-    if cal_path.exists():
-        calibrator = TimeAwareCalibrator()
-        calibrator.load(cal_path)
-    else:
-        logger.warning("No calibrator for %s_%s", asset_label, tf_label)
+    if not isinstance(model, SpecialistModelRouter):
+        cal_path = sub_dir / "calibrator.pkl"
+        if cal_path.exists():
+            calibrator = TimeAwareCalibrator()
+            calibrator.load(cal_path)
+        else:
+            logger.warning("No calibrator for %s_%s", asset_label, tf_label)
 
     logger.info("Loaded %s_%s model (%d trees)", asset_label, tf_label, model.num_trees())
     return model, calibrator

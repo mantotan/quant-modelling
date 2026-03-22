@@ -28,6 +28,7 @@ from qm.backtest.intrabar_backtest import IntraBarBacktester
 from qm.backtest.metrics.calibration import brier_score, expected_calibration_error
 from qm.backtest.sanity import BacktestSanityChecker
 from qm.core.types import Timeframe
+from qm.features.cross_asset_intrabar import load_and_augment
 from qm.model.calibration.calibrator import IsotonicCalibrator
 from qm.model.targets.intrabar import IntraBarDataset
 
@@ -81,6 +82,7 @@ def main() -> None:
         sys.exit(1)
 
     dataset = IntraBarDataset.load(cache_path)
+    dataset = load_and_augment(dataset, args.asset, args.timeframe, knobs)
     logger.info(
         "Loaded: %d samples, %d features",
         len(dataset.y), dataset.X.shape[1],
@@ -90,7 +92,8 @@ def main() -> None:
     all_names = dataset.feature_names
     keep_indices = list(range(N_TICK_FEATURES))
     for i in range(N_TICK_FEATURES, len(all_names)):
-        if all_names[i] in cached_features:
+        name = all_names[i]
+        if name in cached_features or name.startswith("btc_"):
             keep_indices.append(i)
     feature_names = [all_names[i] for i in keep_indices]
 

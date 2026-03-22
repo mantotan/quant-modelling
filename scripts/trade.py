@@ -106,24 +106,23 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_model(model_dir: Path, asset: str, tf: str):
-    """Load trained LightGBM model + calibrator."""
-    model_path = model_dir / f"{asset}_{tf}" / "model.lgb"
-    cal_path = model_dir / f"{asset}_{tf}" / "calibrator.pkl"
+    """Load trained LightGBM or specialist model + calibrator."""
+    from qm.model.specialist import SpecialistModelRouter, load_pulse_model
 
-    if not model_path.exists():
-        logger.error("No model at %s", model_path)
-        sys.exit(1)
+    sub_dir = model_dir / f"{asset}_{tf}"
+    model = load_pulse_model(sub_dir)
+    logger.info("Loaded model: %s (%s)", sub_dir, type(model).__name__)
 
-    model = lgb.Booster(model_file=str(model_path))
-    logger.info("Loaded model: %s", model_path)
-
+    # Specialist models load their own calibrators internally
     calibrator = None
-    if cal_path.exists():
-        calibrator = TimeAwareCalibrator()
-        calibrator.load(cal_path)  # handles both legacy and new formats
-        logger.info("Loaded calibrator: %s", cal_path)
-    else:
-        logger.warning("No calibrator found, using uncalibrated probs")
+    if not isinstance(model, SpecialistModelRouter):
+        cal_path = sub_dir / "calibrator.pkl"
+        if cal_path.exists():
+            calibrator = TimeAwareCalibrator()
+            calibrator.load(cal_path)
+            logger.info("Loaded calibrator: %s", cal_path)
+        else:
+            logger.warning("No calibrator found, using uncalibrated probs")
 
     return model, calibrator
 

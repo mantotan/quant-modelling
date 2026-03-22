@@ -146,19 +146,21 @@ def load_dutch_config(
 def load_model(
     model_dir: Path, asset: str, tf_label: str,
 ) -> tuple[lgb.Booster | None, TimeAwareCalibrator | None]:
-    """Load Pulse LightGBM model + calibrator. Returns (None, None) if missing."""
-    model_path = model_dir / f"{asset}_{tf_label}" / "model.lgb"
-    cal_path = model_dir / f"{asset}_{tf_label}" / "calibrator.pkl"
+    """Load Pulse LightGBM or specialist model + calibrator. Returns (None, None) if missing."""
+    from qm.model.specialist import SpecialistModelRouter, load_pulse_model
 
-    if not model_path.exists():
-        logger.warning("No model at %s — skipping %s/%s", model_path, asset, tf_label)
+    sub_dir = model_dir / f"{asset}_{tf_label}"
+    if not (sub_dir / "model.lgb").exists() and not (sub_dir / "specialist_config.json").exists():
+        logger.warning("No model at %s — skipping %s/%s", sub_dir, asset, tf_label)
         return None, None
 
-    model = lgb.Booster(model_file=str(model_path))
+    model = load_pulse_model(sub_dir)
     calibrator = None
-    if cal_path.exists():
-        calibrator = TimeAwareCalibrator()
-        calibrator.load(cal_path)
+    if not isinstance(model, SpecialistModelRouter):
+        cal_path = sub_dir / "calibrator.pkl"
+        if cal_path.exists():
+            calibrator = TimeAwareCalibrator()
+            calibrator.load(cal_path)
 
     logger.info("Loaded %s_%s model (%d trees)", asset, tf_label, model.num_trees())
     return model, calibrator
