@@ -25,13 +25,24 @@ In live mode, most invocations you will EXIT immediately (nothing to do while in
 
 ## Phase 1: Select Role
 
-Priority order (first match wins):
+### BACKTEST MODE (replay_available) — simplified rules:
+
+If `sub_phase == "replay_available"`, use ONLY these rules:
+
+1. **CRITICAL alert** unresolved in alerts.json → **MONITOR**
+2. `iters_since_auditor >= 24` AND `total_iterations > 12` → **AUDITOR**
+3. `iters_since_strategist >= 12` AND `total_iterations > 0` → **STRATEGIST**
+4. **Otherwise** → **RESEARCHER** (always — this is the default in backtest mode)
+
+**Do NOT check monitor staleness or incubation in backtest mode. RESEARCHER is the default.**
+
+### LIVE MODE — full priority rules:
 
 1. **CRITICAL alert** unresolved in alerts.json → **MONITOR**
 2. **Unexecuted auditor directive** in audit.md → **RESEARCHER**
 3. `iters_since_auditor >= 24` AND `total_iterations > 12` → **AUDITOR**
 4. `iters_since_strategist >= 12` AND `total_iterations > 0` → **STRATEGIST**
-5. **Incubation complete** OR **replay_available** → **RESEARCHER** (evaluate + start new experiment)
+5. **Incubation complete** → **RESEARCHER** (evaluate + start new experiment)
 6. `total_iterations == 0` (no experiments yet) → **RESEARCHER** (baseline run)
 7. **Periodic health check** (`last_monitor_at` is null or > 1 hour ago) → **MONITOR**
 8. **Default** → **EXIT immediately**
