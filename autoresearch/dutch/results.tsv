@@ -7,3 +7,4 @@ iteration	pair	timestamp	status	avg_pair_cost	avg_profit	total_profit	matched_ra
 5	BTC_1h	2026-03-22T06:39:33Z	DISCARD	0.9588	-3.5026	-56.0414	0.6465	0.7770	0.0667	0.2601	0.0000	29.78	16	risk_ceil 0.15->0.10 worsened pair_cost (0.9382->0.9588) and raised max_dd (27.3->29.8%); lower exposure reduced fills and matched pairs	risk_ceil
 6	BTC_1h	2026-03-21T23:42:10Z	DISCARD	0.9382	-3.4178	-54.6847	0.6740	0.8065	0.1333	0.3142	0.0000	27.34	16	pace_urgency_hi 2.0->2.5 produced no gain; pair_cost identical to baseline (0.9382=0.9382), avg_profit still negative at -.42	pace_urgency_hi
 7	ETH_5m	2026-03-21T23:52:21Z	BASELINE	0.9236	-4.7936	-862.8482	0.4551	0.8234	0.1186	0.1390	0.0000	431.42	180	baseline observation — no changes	-
+8	ETH_15m	2026-03-22T07:21:26Z	BASELINE	0.9569	-6.2523	-568.9600	0.5602	0.8280	0.0556	0.2013	0.0000	284.48	91	baseline observation — no changes	-

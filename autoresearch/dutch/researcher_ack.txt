@@ -1,4 +1,4 @@
-iter=7 pair=ETH_5m timestamp=2026-03-21T23:51:14Z
-Status: BASELINE run — no ETH_5m data yet. Running baseline observation with no parameter changes.
+iter=8 pair=ETH_15m timestamp=2026-03-22T07:21:26Z
+Status: BASELINE run — no ETH_15m data yet. Running baseline observation with no parameter changes.
 Mode: BACKTEST (replay_available)
-Next hypothesis (after baseline): unmatched_ratio 0.50->0.35 to improve pair matching (cross-pair from BTC_5m learnings).
+Next hypothesis (after baseline): unmatched_ratio 0.50->0.35 to improve pair matching (cross-pair from BTC learnings, as per strategy.md ETH section).

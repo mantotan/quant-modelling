@@ -1,3 +1,6 @@
+2026-03-22T07:21:26Z iter=8 pair=ETH_15m status=BASELINE param=- -→-
+  eval: pair_cost=0.9569 profit=$-6.2523 total_profit=$-568.96 matched=0.5602 fill=0.8280 correct=0.0556 max_dd=284.48% bars=91
+  hypothesis: "BASELINE — no changes. ETH_15m: pair_cost=0.957, matched_ratio=0.560 (lowest non-ETH_5m pair), max_dd=284.48% (very high). sell_ratio=0.0 consistent with all pairs. Cross-pair learning from BTC data: unmatched_ratio is key lever for matched_ratio. Next experiment: unmatched_ratio 0.50→0.35 to force engine to reduce one-sided holdings and promote pair matching, targeting matched_ratio >0.65."
 2026-03-22T05:41:12Z iter=1 pair=BTC_5m status=DISCARD param=sell_loss_start 0.70->0.50
   eval: pair_cost=1.0027 profit=$-6.03 total_profit=$-994.73 matched=0.7064 fill=0.8934 correct=0.1758 max_dd=518.23% bars=165
   reason: all 3 KEEP criteria failed (pair_cost 1.0027>0.9676 baseline, avg_profit -6.03<0, max_dd 518%>30%). Premature loss-cut sells at 0.50 forced exits before recovery, reducing matched pairs and raising pair cost.
