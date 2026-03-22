@@ -58,3 +58,6 @@
 2026-03-23T13:03:16Z iter=91 pair=BTC_1h status=DISCARD param=max_onesided_cost 5.0->3.0
   eval: pair_cost=0.7905 profit=$-0.03 max_dd=6.4% bars=35
   hypothesis: "max_onesided_cost 5.0->3.0 per strategy.md priority #1 for BTC_1h. Thin matched_ratio (1.2%) causes pair_cost variance from single new bars. Capping onesided at 3.0 limits runaway directional accumulation. Result: pair_cost improved 1.04% (0.7988->0.7905) but avg_profit -0.03 fails >0 criterion; improvement below 5% KEEP RELAXED threshold; correct_side 60%, max_dd improved 8.7->6.4%."
+2026-03-23T14:10:00Z iter=92 pair=ETH_5m status=KEEP param=max_onesided_cost 5.0->2.0
+  eval: pair_cost=0.7355 profit=$-0.020 max_dd=22.9% bars=399
+  hypothesis: "ETH_5m max_dd=47% is 2nd highest in system. ETH_15m confirmed onesided cap halves DD at every step. Applying max_onesided_cost=2.0 to prevent runaway directional accumulation. Result: DD halved (47%->23%), pair_cost improved 6.0% (0.7819->0.7355), correct_side recovered above 38% warning floor (37.3%->42.8%). KEEP RELAXED."

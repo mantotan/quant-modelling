@@ -1,4 +1,7 @@
-iter=91 pair=BTC_1h timestamp=2026-03-23T13:00:00Z
+iter=92 pair=ETH_5m timestamp=2026-03-23T14:00:00Z
 Phase: BACKTEST MODE (replay_available)
-Hypothesis: max_onesided_cost 5.0->3.0
-Strategy.md priority #1 for BTC_1h. Thin matched_ratio (1.2% at skip=0.40) causes pair_cost variance from single new bars (iter 79: regression 0.7988->0.8476 with 1 new bar). Capping onesided accumulation at $3 (down from $5) limits runaway directional accumulation and may stabilize pair_cost against thin-dataset variance. Follows ETH_15m onesided series pattern adapted for 1h TF.
+Hypothesis: max_onesided_cost 5.0->2.0
+Strategy.md priority #1 for ETH_5m: URGENT DD repair. max_dd=47% is 2nd highest in system.
+ETH_15m confirmed onesided cap halves DD at every step (iter 68: 5->2 halved DD, iter 82: 2->1.5 halved again).
+Audit.md notes "no remaining levers beyond onesided_cost cap" — this IS the one acknowledged lever.
+Goal: bring max_dd from 47% down to ~23%, unblocking further optimization.
