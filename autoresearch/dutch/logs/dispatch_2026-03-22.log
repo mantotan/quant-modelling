@@ -57,3 +57,4 @@
 2026-03-22T19:40:04Z iter=113 pair=SOL_1h role=researcher outcome=DISCARD re-eval corrected-knobs pair_cost=0.6581 vs best=0.6547; next=bar_budget-300->400 queued; advanced to XRP_5m
 2026-03-22T20:01:10Z iter=117 pair=BTC_15m role=researcher outcome=FROZEN-SKIP -- audit.md FREEZE directive; 0/8 V7.3 KEEPs; all compound+skip hypotheses exhausted; advanced to BTC_1h
 2026-03-22T20:26:26Z iter=121 pair=ETH_1h role=researcher outcome=DISCARD pace_urgency_lo 0.35->0.30 pair_cost=0.6768 max_dd=17.91%
+2026-03-22T20:34:13Z iter=123 pair=SOL_15m role=RESEARCHER outcome=DISCARD pace_urgency_lo 0.35->0.30 negligible effect pair_cost=0.7148 vs best=0.6956 max_dd=16.8%

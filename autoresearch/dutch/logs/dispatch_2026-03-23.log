@@ -38,3 +38,4 @@
 2026-03-23T21:00:00Z iter=119 pair=ETH_15m role=auditor outcome=FREEZE_XRP5m_permanent+BTC15m_UNFREEZE_onesided2+0_KEEPs_rotation8+conviction_mkt_start_global_blacklist+stale_knobs_flagged
 2026-03-23T21:35:00Z iter=119 pair=ETH_15m role=strategist outcome=rotation-9-analysis 0/12-KEEPs-rotation-8 onesided-exhausted-all-tested-pairs conviction_market_start-globally-blacklisted stale-knobs-flagged pace_urgency_lo-primary-lever BTC_15m-onesided=2.0-urgent
 2026-03-23T22:05:00Z iter=120 pair=ETH_15m role=researcher outcome=DISCARD -- corrected stale conviction_buy_skip 0.55->0.45, pair_cost=0.560 confirmed at 143 bars, pace_urgency_lo 0.35->0.30 staged for iter 121
+2026-03-23T03:30:40Z iter=122 pair=SOL_5m role=researcher outcome=DISCARD_re-eval_matched_ratio_0pct_2nd_consecutive_collapse

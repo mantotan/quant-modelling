@@ -1,1 +1,1 @@
-iter=122 pair=SOL_5m timestamp=2026-03-23T20:29:08Z action=re-eval_with_best_knobs reason=matched_ratio_collapse_iter109_audit_directive
+iter=123 pair=SOL_15m timestamp=2026-03-22T20:33:07Z action=pace_urgency_lo_0.35->0.30 reason=first_pace_series_test_per_audit_strategy_queue

@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_15m",
+  "current_pair": "SOL_1h",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 7,
-  "last_updated": "2026-03-23T03:30:30Z",
+  "pair_index": 8,
+  "last_updated": "2026-03-22T20:34:13Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 119,
   "last_auditor_at": 119,
-  "total_iterations": 122,
-  "last_exit_reason": "RESEARCHER iter=122: SOL_5m DISCARD -- re-eval with best_knobs (2nd consecutive): matched_ratio collapsed to 0.0% on 428 bars again (same as iter 109 on 416 bars), max_dd=33.5% exceeds 30%; collapse persistent -- pace_urgency_lo test blocked per audit directive"
+  "total_iterations": 123,
+  "last_exit_reason": "RESEARCHER iter=123: SOL_15m DISCARD -- pace_urgency_lo 0.35->0.30 negligible effect on pair_cost (0.7148 vs best 0.6956): fails to beat best KEEP, pace has minimal influence on SOL_15m matching [pace_urgency_lo]"
 }
