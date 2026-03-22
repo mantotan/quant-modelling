@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 0,
-  "last_updated": "2026-03-22T17:00:00Z",
-  "last_role": "manual_experiment",
+  "last_updated": "2026-03-22T17:15:00Z",
+  "last_role": "strategist",
   "last_monitor_at": "2026-03-22T07:26:47Z",
-  "last_strategist_at": 21,
+  "last_strategist_at": 33,
   "last_auditor_at": 21,
-  "total_iterations": 21,
+  "total_iterations": 33,
   "last_exit_reason": "v7.3_baseline_reset"
 }
