@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 7,
-  "last_updated": "2026-03-23T17:00:00Z",
-  "last_role": "auditor",
+  "last_updated": "2026-03-23T17:10:00Z",
+  "last_role": "strategist",
   "last_monitor_at": "2026-03-22T07:26:47Z",
-  "last_strategist_at": 58,
+  "last_strategist_at": 71,
   "last_auditor_at": 71,
   "total_iterations": 71,
-  "last_exit_reason": "auditor: FREEZE ETH_5m+XRP_5m, CONTINUE x10 -- 9/12 pairs beat 0.85 benchmark"
+  "last_exit_reason": "strategist: 9/12 pairs beat benchmark, 6/13 KEEP rotation 4, DD repair + capital scaling priority for rotation 5"
 }
