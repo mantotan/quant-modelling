@@ -1,7 +1,7 @@
-iter=98 pair=SOL_15m timestamp=2026-03-23T18:00:00Z
+iter=101 pair=SOL_1h timestamp=2026-03-23T18:40:00Z
 Phase: BACKTEST MODE (replay_available)
-Previous best pair_cost: 0.7859 (iter 73, bar_budget 200->300)
-Backtest result: pair_cost=0.7151 (+9.1% improvement), avg_profit=+$0.36/bar, max_dd=17.7%, bars=137
-Decision: KEEP (standard -- all 4 criteria pass)
-Next hypothesis: risk_ceil 0.15->0.20 (capital scaling test; 17.7% DD has 12% headroom to 30% threshold)
-Reasoning: SOL_15m is a confirmed winner (positive profit, low DD). Audit Tier 2 recommends this exact test.
+Previous best pair_cost: 0.6547 (iter 86, bar_budget 300)
+Re-eval result: pair_cost=0.8224 (2 new expensive bars since iter 86) -> DISCARD
+risk_ceil test (0.15->0.20): pair_cost=0.8170 (0.7% improvement vs re-eval, still above best 0.6547) -> DISCARD
+Note: avg_profit=+$1.43/bar, max_dd=6.2% -- fundamentals strong, pair_cost driven by dataset variance
+Next: XRP_5m (pair_index=9)
