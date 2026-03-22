@@ -1,5 +1,5 @@
 {
-  "current_pair": "XRP_15m",
+  "current_pair": "XRP_1h",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 10,
-  "last_updated": "2026-03-22T20:39:26Z",
+  "pair_index": 11,
+  "last_updated": "2026-03-23T03:41:53Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 119,
   "last_auditor_at": 119,
-  "total_iterations": 125,
-  "last_exit_reason": "RESEARCHER iter=125: XRP_5m FREEZE -- permanent FREEZE directive from audit.md; structural dead-end (fill_rate=54% floor, max_dd=69%); advanced pair to XRP_15m"
+  "total_iterations": 126,
+  "last_exit_reason": "RESEARCHER iter=126: XRP_15m DISCARD -- pace_urgency_lo 0.30->0.25 no pair_cost improvement (0.6378=0.6378, 0.0% change); avg_profit marginally worsened -0.01->-0.02; floor confirmed at 0.30 for XRP_15m; advanced pair to XRP_1h"
 }

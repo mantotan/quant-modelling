@@ -1,2 +1,3 @@
-iter=125 pair=XRP_5m timestamp=2026-03-22T20:39:26Z
-Status: FREEZE — permanent FREEZE directive from audit.md; structural dead-end (fill_rate=54% floor, max_dd=69%); advancing rotation to XRP_15m
+iter=126 pair=XRP_15m timestamp=2026-03-23T00:00:00Z
+Role: RESEARCHER (BACKTEST MODE)
+Experiment: pace_urgency_lo 0.30->0.25 (pre-staged in knobs, per audit.md directive)

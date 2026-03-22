@@ -136,3 +136,6 @@
 2026-03-23T03:30:30Z iter=122 pair=SOL_5m status=DISCARD param=none (re-eval) -
   eval: pair_cost=0.0000 profit=$0.02 max_dd=33.5% bars=428
   hypothesis: "2nd consecutive re-eval with best_knobs still shows 0.0% matched_ratio collapse on 428 bars. Audit directive: hold all SOL_5m experiments until matched_ratio recovers above 0.3%. Knobs reset to best_knobs (pace_urgency_lo=0.35). No knob change staged."
+2026-03-23T03:41:53Z iter=126 pair=XRP_15m status=DISCARD param=pace_urgency_lo 0.30->0.25
+  eval: pair_cost=0.6378 profit=$-0.02 max_dd=12.9% bars=144
+  hypothesis: "audit.md directed pace_urgency_lo 0.30->0.25 as continuation of the pace series that yielded 18% improvement at 0.35->0.30; however result shows no improvement at this step (0.6378=0.6378); floor confirmed at pace_urgency_lo=0.30 for XRP_15m"
