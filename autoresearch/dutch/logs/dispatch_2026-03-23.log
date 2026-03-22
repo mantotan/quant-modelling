@@ -1,2 +1,4 @@
 2026-03-23T16:00:00Z iter=58 pair=XRP_5m role=strategist outcome=KEEP_rate=44%_best=SOL_1h(0.661)_worst=ETH_15m(DD=70%)_7pairs_beat_benchmark
 2026-03-23T16:15:00Z iter=59 pair=XRP_5m role=RESEARCHER outcome=DISCARD fill_ticks 10->15 marginal gain, fill_rate structural limit; next=conviction_buy_skip 0.50->0.45
+2026-03-23T00:18:00Z iter=68 pair=ETH_15m role=researcher outcome=KEEP max_onesided_cost 5.0->2.0 pair_cost=0.7032 max_dd=32.5%
+2026-03-23T16:30:00Z iter=69 pair=ETH_1h role=researcher outcome=DISCARD conviction_buy_skip 0.45->0.40 pair_cost 0.7058->0.7212 (+2.2% regression) skip=0.45 confirmed as optimum (XRP_1h analog)

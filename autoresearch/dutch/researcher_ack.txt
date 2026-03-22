@@ -1,8 +1,8 @@
-iter=67 pair=ETH_15m timestamp=2026-03-22T23:55:00Z
+iter=69 pair=ETH_1h timestamp=2026-03-23T16:00:00Z
 Role: RESEARCHER (BACKTEST MODE)
-Status: Running backtest for ETH_15m, then testing max_onesided_cost 5.0->2.0
-Note: strategy.md PRIORITY #1 for ETH_15m is max_onesided_cost 5.0->2.0 (max_dd=70% critical).
-Best known pair_cost for ETH_15m: 0.7506 (iter 54, conviction_buy_skip=0.45 KEEP RELAXED).
-Current knobs already have conviction_buy_skip=0.45 (best state).
-Hypothesis: max_onesided_cost 5.0->2.0 -- reduce max_dd from 70% by capping per-event directional exposure.
-Warning: correct_side=34% is below 38% flag threshold, approaching anti-predictive zone.
+Status: Running backtest for ETH_1h, then testing conviction_buy_skip 0.45->0.40
+Hypothesis: conviction_buy_skip 0.45->0.40 -- continue skip series on ETH_1h.
+BTC_1h confirmed skip=0.40 KEEP (iter 64: 0.8707->0.7988, 8.3% improvement).
+ETH_1h best pair_cost: 0.7058 (iter 40, conviction_buy_skip=0.45 KEEP RELAXED).
+Watch: correct_side was 43.3% at skip=0.45 -- if 0.40 drops below 40%, halt series.
+max_onesided_cost increasing is blacklisted for 1h TFs (zero effect, cap never hit).
