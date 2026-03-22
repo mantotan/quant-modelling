@@ -8,3 +8,4 @@
 2026-03-23T17:30:00Z iter=73 pair=SOL_15m role=researcher outcome=2x KEEP re-eval+bar_budget200->300 pair_cost 0.7947->0.7859 max_dd 14.3->9.5pct
 2026-03-23T23:51:00Z iter=74 pair=SOL_1h role=researcher outcome=DISCARD conviction_buy_skip 0.45->0.40 worsened pair_cost 11.5% (0.6605->0.7367), skip floor confirmed at 0.45
 2026-03-23T23:54:35Z iter=75 pair=XRP_15m role=researcher outcome=DISCARD bar_budget 200->300 worsened pair_cost 0.7pct; next risk_ceil 0.15->0.20 on XRP_15m
+2026-03-23T00:20:00Z iter=77 pair=BTC_5m role=researcher outcome=DISCARD baseline re-eval max_dd=33.2%, next: max_onesided_cost 5.0->3.0

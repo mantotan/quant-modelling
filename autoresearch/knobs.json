@@ -128,7 +128,7 @@
     ],
     "num_leaves": [
       16,
-      32
+      40
     ],
     "min_child_samples": [
       100,

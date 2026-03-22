@@ -1,1 +1,1 @@
-iter=76 pair=XRP_1h timestamp=2026-03-24T00:02:00Z status=DISCARD param=bar_budget 200->300; next hypothesis: risk_ceil 0.15->0.20
+iter=77 pair=BTC_5m timestamp=2026-03-23T00:20:00Z status=DISCARD param=- (baseline re-eval); next hypothesis: max_onesided_cost 5.0->3.0 [max_onesided_cost]
