@@ -91,6 +91,21 @@
     "max_trades_per_bar": 15,
     "max_daily_trades": 500
   },
+  "cross_asset": {
+    "enabled": true,
+    "features": [
+      "btc_distance_from_open",
+      "btc_vol_norm_distance",
+      "btc_partial_range",
+      "btc_partial_bar_position"
+    ]
+  },
+  "specialist": {
+    "enabled": false,
+    "boundary": 0.40,
+    "early_time_pcts": [0.10, 0.20],
+    "late_time_pcts": [0.40, 0.60, 0.80]
+  },
   "strategies": {
     "single_side_sniper": {
       "enabled": true,
