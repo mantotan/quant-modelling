@@ -111,3 +111,6 @@
 2026-03-23T19:50:00Z iter=112 pair=SOL_15m status=DISCARD param=bar_budget 300->400
   eval: pair_cost=0.7150 profit=+$0.36 max_dd=12.5% bars=140
   hypothesis: "bar_budget 300->400 per strategy queue #2; SOL budget-scalable pattern (SOL_1h iter 86); cost neutral (+0.01%), max_dd improved but does not meet KEEP criteria vs best_knobs 0.6956"
+2026-03-23T00:00:00Z iter=114 pair=XRP_5m status=FREEZE param=-
+  eval: pair_cost=- profit=- max_dd=-
+  hypothesis: "FREEZE directive in audit.md — structural fill_rate=54% floor confirmed, max_dd=69%, no profitable pathway; skip=0.45 untested but onesided repair blocked by fill microstructure; advanced to XRP_15m"

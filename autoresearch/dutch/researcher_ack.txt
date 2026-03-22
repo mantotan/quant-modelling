@@ -1,3 +1,4 @@
-iter=113 pair=SOL_1h timestamp=2026-03-22T19:40:04Z mode=BACKTEST
-Action: Fix stale best_knobs (conviction_buy_skip 0.55->0.45) then re-eval SOL_1h.
-Priority: strategy.md item #1 — correct knobs before any structural experiment.
+iter=114 pair=XRP_5m timestamp=2026-03-23T00:00:00Z mode=BACKTEST
+Action: Paused — FREEZE directive in audit.md for XRP_5m.
+Reason: audit.md FREEZE XRP_5m — structural fill_rate=54% floor confirmed, max_dd=69%, no profitable pathway; skip=0.45 untested but onesided repair blocked by fill microstructure — structural dead-end confirmed.
+Advancing pair rotation to XRP_15m.
