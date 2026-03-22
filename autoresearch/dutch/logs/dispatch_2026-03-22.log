@@ -11,3 +11,5 @@
 2026-03-22T07:45:00Z iter=10 role=strategist outcome=KEEP_rate=0/4=0% best_pair=ETH_5m(0.9236) worst_pair=BTC_5m(0.9676) new_blacklist=BTC_1h(risk_ceil,pace_urgency_hi) unmatched_ratio_staged_ETH
 2026-03-22T07:39:19Z iter=11 role=researcher outcome=SOL_5m BASELINE pair_cost=0.9404 matched_ratio=43.2% max_dd=718.3% bars=274 next_pair=SOL_15m
 2026-03-22T07:40:49Z iter=11 EXIT reason=no_active_experiment alerts=0 iters_since_strategist=1 iters_since_auditor=11 next=researcher(SOL_15m)
+2026-03-22T08:00:00Z iter=12 role=researcher outcome=SOL_15m BASELINE pair_cost=0.9513 profit=$-3.63 max_dd=167.1% bars=92 next_pair=SOL_1h
+2026-03-22T07:47:03Z iter=12 EXIT reason=no_role_matched elapsed=1216s alerts=0
