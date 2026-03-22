@@ -130,3 +130,6 @@
 2026-03-23T03:08:45Z iter=119 pair=ETH_5m status=DISCARD param=max_onesided_cost 1.5->1.0
   eval: pair_cost=0.0000 profit=$-4.76 max_dd=15.4% bars=422
   hypothesis: "Continue onesided series (5->2->1.5 all KEEP). Test 1.5->1.0 as next step. Risk was matched_ratio collapse (currently 0.7% vs ETH_15m 1.0% at collapse). Result: full collapse at 0.0% matched_ratio, confirming floor at 1.5. Onesided series exhausted on ETH_5m."
+2026-03-23T22:05:00Z iter=120 pair=ETH_15m status=DISCARD param=conviction_buy_skip 0.55->0.45
+  eval: pair_cost=0.5600 profit=$-0.14 max_dd=26.8% bars=143
+  hypothesis: "Audit.md FREEZE directive: fix stale conviction_buy_skip=0.55 (should be 0.45 per iter 54 KEEP). Re-eval with corrected knobs confirms pair_cost=0.560 matching historical best. avg_profit=-$0.14 negative structural. DISCARD on criteria (not strictly beating 0.560 + negative profit). Next staged: pace_urgency_lo 0.35->0.30 per strategy.md priority #2."

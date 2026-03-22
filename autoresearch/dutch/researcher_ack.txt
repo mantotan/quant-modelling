@@ -1,1 +1,2 @@
-iter=119 pair=ETH_5m timestamp=2026-03-23T03:08:18Z status=active
+iter=120 pair=ETH_15m timestamp=2026-03-23T22:00:00Z
+Status: BACKTEST MODE — fixing stale conviction_buy_skip=0.55->0.45 per audit.md directive, then re-eval
