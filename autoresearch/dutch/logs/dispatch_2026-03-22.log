@@ -51,3 +51,4 @@
 2026-03-22T23:16:16Z iter=64 pair=BTC_1h role=researcher outcome=KEEP_RELAXED conviction_buy_skip 0.45->0.40 pair_cost=0.7988 max_dd=8.70%
 2026-03-22T23:50:00Z iter=66 pair=ETH_5m role=researcher outcome=KEEP_RELAXED conviction_buy_skip_0.50to0.45_pair_cost_0.8469to0.7819
 2026-03-22T17:19:01Z iter=82 pair=ETH_15m role=researcher outcome=ETH_5m FROZEN (audit.md), ETH_15m KEEP max_onesided_cost 2.0->1.5 pair_cost 0.7032->0.5600 (-20.4%) max_dd 32.5%->26.8% (below 30%)
+2026-03-22T17:36:41Z iter=85 pair=SOL_15m role=researcher outcome=DISCARD conviction_buy_skip 0.45->0.40 collapsed pair formation (matched_ratio 0%); skip=0.45 confirmed floor; next=SOL_1h

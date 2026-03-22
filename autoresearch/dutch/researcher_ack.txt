@@ -1,6 +1,5 @@
-iter=84 pair=SOL_5m timestamp=2026-03-24T00:35:00Z status=running
-hypothesis: max_onesided_cost 5.0->2.0 -- URGENT DD repair for SOL_5m
-rationale: SOL_5m max_dd=31.1% exceeds 30% threshold. Strategy priority #1 + audit directive both
-mandate this experiment next. ETH_15m confirmed this pattern twice (iter 68: 5->2 halved DD, iter 82:
-2->1.5 further halved). High confidence onesided cap will reduce DD below threshold and unlock further
-optimization. Current knobs/best_knobs are identical (last experiment was KEEP iter 71).
+iter=85 pair=SOL_15m timestamp=2026-03-22T17:35:51Z status=running
+hypothesis: conviction_buy_skip 0.45->0.40 -- test skip reduction on safe-DD pair
+rationale: SOL_15m has safe DD (9.5%), positive avg_profit (+$0.17/bar), correct_side=44.6% (above 38%
+warning floor). Strategy priority queue item #1 for SOL_15m. XRP_15m collapsed at 0.40 (matched_ratio=2%),
+but SOL_15m has higher matched_ratio (4.8% at 0.45) and better correct_side. Testing cautiously per strategy.
