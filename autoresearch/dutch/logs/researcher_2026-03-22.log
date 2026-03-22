@@ -35,3 +35,7 @@
 2026-03-22T15:02:00Z iter=15 pair=XRP_1h status=BASELINE param=- (no change)
   eval: pair_cost=0.9377 profit=$-148.63 max_dd=75.28% bars=25
   hypothesis: "All 12 baselines complete. Staged unmatched_ratio 0.50->0.35 for next iteration (cross-pair experiment batch begins)."
+2026-03-22T15:06:33Z iter=16 pair=BTC_5m status=DISCARD param=unmatched_ratio 0.50->0.35
+  eval: pair_cost=0.9759 profit=$-6.40 total_profit=$-1772.33 matched=0.6920 fill=0.8900 correct=0.1300 max_dd=907.0% bars=277
+  reason: pair_cost worsened (0.9676->0.9759), avg_profit worsened (-5.63->-6.40), max_dd nearly doubled (482->907%). Matched_ratio improved marginally (67.9->69.2%) but at worse prices — forced pair completions at unfavorable costs.
+  hypothesis: "unmatched_ratio tightening counterproductive for BTC_5m — forcing pair completions at high cost. Next: try pace_urgency_lo 0.5->0.35 (strategy priority #2) to open orders earlier when prices are more favorable in the tight 5m window."

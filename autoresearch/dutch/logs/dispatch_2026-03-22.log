@@ -18,3 +18,4 @@
 2026-03-22T14:55:49Z iter=13 pair=XRP_5m role=researcher outcome=BASELINE pair_cost=0.9273 matched=33.2% bars=278
 2026-03-22T14:58:37Z iter=14 pair=XRP_15m role=researcher outcome=BASELINE pair_cost=0.9627 matched=52.1% bars=93
 2026-03-22T15:02:00Z iter=15 pair=XRP_1h role=researcher outcome=BASELINE pair_cost=0.9377 max_dd=75.28% — last baseline, all 12 complete
+2026-03-22T15:06:33Z iter=16 pair=BTC_5m role=researcher outcome=DISCARD unmatched_ratio 0.50->0.35 pair_cost=0.9759(worse) max_dd=907% matched=69.2%(+1.3%) next=pace_urgency_lo rotation->BTC_15m

@@ -16,7 +16,7 @@
   "rebalance_warmup": 0.10,
   "sell_max_fraction": 0.50,
   "sell_min_shares": 10.0,
-  "max_marginal_pair_cost": 0.99,
+  "max_marginal_pair_cost": 1.03,
   "risk_floor": 0.01,
   "risk_ceil": 0.15,
   "risk_t_start": 0.10,
