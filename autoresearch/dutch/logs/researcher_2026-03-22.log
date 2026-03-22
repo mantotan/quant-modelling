@@ -107,3 +107,6 @@
 2026-03-22T23:55:00Z iter=52 pair=BTC_1h status=KEEP param=conviction_buy_skip 0.50->0.45
   eval: pair_cost=0.8707 profit=$0.36 max_dd=9.26% bars=32
   hypothesis: "ETH_1h analog — lower skip threshold allows more selective pair formation at 1h resolution. BTC_1h has 52% correct_side; expect similar improvement to ETH_1h (0.9528->0.7058). Pair_cost improved 5.8% (0.9244->0.8707), avg_profit positive +$0.36/bar. Pattern confirmed."
+2026-03-23T00:00:00Z iter=53 pair=ETH_5m status=FREEZE param=- -→-
+  eval: pair_cost=- profit=- total_profit=- matched=- fill=- correct=- max_dd=- bars=-
+  hypothesis: "FREEZE — ETH_5m is frozen per audit.md (correct_side=40%, anti-predictive confirmed). No experiment run. Pair rotation advanced to ETH_15m."

@@ -39,3 +39,5 @@
 2026-03-22T23:12:00Z iter=48 pair=XRP_1h role=researcher outcome=iter47_KEEP(dataset_reeval_pair_cost_0.7157->0.6738)+iter48_DISCARD(conviction_buy_skip_0.50->0.45_worsened_pair_cost_0.6738->0.7045) next_pair=BTC_5m
 2026-03-22T23:45:00Z iter=50 pair=BTC_5m role=RESEARCHER outcome=DISCARD conviction_buy_skip 0.50->0.55 worsened pair_cost/profit/dd; both skip directions exhausted for BTC_5m
 2026-03-22T22:22:00Z iter=51 pair=BTC_15m role=researcher outcome=DISCARD conviction_buy_skip 0.50->0.45 pair_cost=0.9201 max_dd=37.9% next=bar_budget_300
+2026-03-22T23:55:00Z iter=52 pair=BTC_1h role=researcher outcome=KEEP conviction_buy_skip 0.50->0.45 pair_cost 0.9244->0.8707 avg_profit +$0.36/bar max_dd 9.26%
+2026-03-23T00:00:00Z iter=52 pair=ETH_5m role=researcher outcome=ETH_5m FREEZE -- audit directive, anti-predictive confirmed, pair rotation advanced to ETH_15m

@@ -1,6 +1,4 @@
-iter=52 pair=BTC_1h timestamp=2026-03-22T23:55:00Z
-Status: BACKTEST MODE — running conviction_buy_skip 0.50->0.45 experiment
-Priority: strategy.md #1 for BTC_1h (ETH_1h analog — KEEP at pair_cost 0.9528->0.7058)
-Best known: pair_cost=0.9244 (iter36 baseline, V7.3), max_dd=6%, avg_profit=+$0.827
-Hypothesis: Lower skip allows more selective pair formation at 1h resolution. 52% correct_side
-should benefit. Watch max_dd doesn't exceed 30% (currently only 6%).
+iter=53 pair=ETH_5m timestamp=2026-03-22T23:59:00Z
+STATUS: FREEZE — ETH_5m is frozen per audit.md directive.
+Reason: correct_side=40%, conv_skip=0.60 DISCARD confirms anti-predictive at all confidence levels.
+No experiment run. Pair rotation advanced to ETH_15m (pair_index=4).
