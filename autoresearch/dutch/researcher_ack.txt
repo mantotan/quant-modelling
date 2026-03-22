@@ -1,3 +1,2 @@
-iter=108 pair=ETH_1h timestamp=2026-03-22T19:21:57Z mode=BACKTEST
-Testing bar_budget 200->250 per strategy.md priority queue item 1 and audit directive.
-knobs_ETH_1h.json already has bar_budget=250 (set last rotation). Running backtest now.
+iter=110 pair=SOL_15m timestamp=2026-03-23T19:34:42Z mode=BACKTEST
+Running Phase 2 evaluation then Phase 4 hypothesis: max_onesided_cost 5.0->2.0 (strategy priority queue #1).

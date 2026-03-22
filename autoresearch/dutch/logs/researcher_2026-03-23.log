@@ -102,3 +102,12 @@
 2026-03-23T19:12:21Z iter=107 pair=ETH_5m status=KEEP param=max_onesided_cost 2.0->1.5
   eval: pair_cost=0.6329 profit=+$0.01 max_dd=13.8% bars=411
   hypothesis: "onesided series: ETH_15m showed gains at 2.0 AND 1.5; ETH_5m at 2.0 is where ETH_15m was before iter 82 KEEP. matched_ratio=0.8% stable (above ETH_15m collapse risk threshold). Tightening onesided cap forces better pair selection, reducing one-sided cost exposure."
+2026-03-23T19:50:00Z iter=110 pair=SOL_15m status=DISCARD param=baseline_reeval -
+  eval: pair_cost=0.7148 profit=+$0.35 max_dd=16.8% bars=140
+  hypothesis: "re-eval on 140 bars (3 new vs iter 99); pair_cost regressed 2.7% (0.6956->0.7148) from dataset expansion; best_knobs unchanged"
+2026-03-23T19:50:00Z iter=111 pair=SOL_15m status=DISCARD param=max_onesided_cost 5.0->2.0
+  eval: pair_cost=0.0 (zero pairs) profit=+$0.22 max_dd=9.1% bars=140
+  hypothesis: "max_onesided_cost 5.0->2.0 per strategy queue #1; collapsed matched_ratio to 0% — cap too aggressive for SOL_15m low-match environment; proven on ETH_5m/SOL_5m at different matched_ratio levels"
+2026-03-23T19:50:00Z iter=112 pair=SOL_15m status=DISCARD param=bar_budget 300->400
+  eval: pair_cost=0.7150 profit=+$0.36 max_dd=12.5% bars=140
+  hypothesis: "bar_budget 300->400 per strategy queue #2; SOL budget-scalable pattern (SOL_1h iter 86); cost neutral (+0.01%), max_dd improved but does not meet KEEP criteria vs best_knobs 0.6956"
