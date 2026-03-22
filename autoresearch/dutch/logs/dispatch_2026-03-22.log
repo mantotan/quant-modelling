@@ -37,3 +37,5 @@
 2026-03-22T22:50:00Z iter=46 pair=XRP_1h role=auditor outcome=FREEZE ETH_5m+SOL_5m; PRIORITIZE ETH_1h+XRP_15m+SOL_1h+XRP_1h; CONTINUE 6 others; 4 pairs beating trader_a benchmark
 2026-03-22T22:58:00Z iter=46 pair=XRP_1h role=strategist outcome=KEEP_rate=33%(4/12) best_pair=SOL_1h(0.697) worst_pair=ETH_5m(0.909) 4_pairs_beat_benchmark skip=0.45_confirmed_on_1h_TFs
 2026-03-22T23:12:00Z iter=48 pair=XRP_1h role=researcher outcome=iter47_KEEP(dataset_reeval_pair_cost_0.7157->0.6738)+iter48_DISCARD(conviction_buy_skip_0.50->0.45_worsened_pair_cost_0.6738->0.7045) next_pair=BTC_5m
+2026-03-22T23:45:00Z iter=50 pair=BTC_5m role=RESEARCHER outcome=DISCARD conviction_buy_skip 0.50->0.55 worsened pair_cost/profit/dd; both skip directions exhausted for BTC_5m
+2026-03-22T22:22:00Z iter=51 pair=BTC_15m role=researcher outcome=DISCARD conviction_buy_skip 0.50->0.45 pair_cost=0.9201 max_dd=37.9% next=bar_budget_300
