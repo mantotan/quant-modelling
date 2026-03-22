@@ -21,3 +21,4 @@
 2026-03-22T15:06:33Z iter=16 pair=BTC_5m role=researcher outcome=DISCARD unmatched_ratio 0.50->0.35 pair_cost=0.9759(worse) max_dd=907% matched=69.2%(+1.3%) next=pace_urgency_lo rotation->BTC_15m
 2026-03-22T15:30:00Z iter=17 pair=BTC_15m role=researcher outcome=DISCARD cheap_threshold 0.10->0.07 pair_cost=0.9608(vs baseline 0.9631) max_dd=272.75% bars=94 — marginal improvement not meaningful; next=pace_urgency_lo 0.5->0.35 rotation->BTC_1h
 2026-03-22T15:14:22Z iter=18 pair=BTC_1h role=researcher outcome=DISCARD sell_loss_start 0.70->0.60 pair_cost=1.0023 max_dd=52.58%
+2026-03-22T15:35:00Z iter=19 pair=ETH_5m role=researcher outcome=DISCARD unmatched_ratio 0.50->0.35 pair_cost worsened 0.9236->0.9300
