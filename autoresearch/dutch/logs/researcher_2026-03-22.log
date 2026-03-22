@@ -53,3 +53,6 @@
 2026-03-22T16:22:00Z iter=20 pair=ETH_15m status=DISCARD param=unmatched_ratio 0.50→0.35
   eval: pair_cost=0.9580 profit=$-6.31 max_dd=299.81% bars=95
   hypothesis: "unmatched_ratio 0.35 failed on 3rd pair (BTC_5m, ETH_5m, ETH_15m). Next: pace_urgency_lo 0.50->0.35 to open orders earlier for better fill prices."
+2026-03-22T17:22:47Z iter=34 pair=BTC_5m status=DISCARD param=conviction_buy_skip 0.50->0.45
+  eval: pair_cost=0.9285 profit=hBc0.04 max_dd=54.3% bars=353
+  hypothesis: "Lower conviction_buy_skip from 0.50 to 0.45 to capture more 45-50% confidence trades; BTC_5m has 56% correct_side which should maintain directional accuracy while increasing throughput. Result: pair_cost improved (0.9480->0.9285) but avg_profit went negative and max_dd doubled (24->54%) -- wrong-side exposure increased with lower filter."
