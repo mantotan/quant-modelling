@@ -1,4 +1,5 @@
-iter=9 pair=ETH_1h timestamp=2026-03-22T07:30:12Z
-Status: BASELINE run — no ETH_1h data yet. Running baseline observation with no parameter changes.
-Mode: BACKTEST (replay_available)
-Next hypothesis (after baseline): unmatched_ratio 0.50->0.35 to improve pair matching (cross-pair from BTC/ETH learnings — low matched_ratio is systemic across all pairs).
+iter=10 pair=SOL_5m timestamp=2026-03-22T07:37:58Z
+Status: BASELINE run — no knob changes. First observation for SOL_5m.
+Phase: BACKTEST MODE (replay_available)
+Hypothesis: No prior data for SOL_5m. Running baseline to establish reference metrics
+before any experiments. Strategy directive: collect all 6 SOL/XRP baselines before experiments.

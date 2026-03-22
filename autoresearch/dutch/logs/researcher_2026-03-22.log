@@ -17,3 +17,6 @@
 2026-03-22T06:39:33Z iter=5 pair=BTC_1h status=DISCARD param=risk_ceil 0.15→0.10
   eval: pair_cost=0.9588 profit=$-3.5026 max_dd=29.78% bars=16
   hypothesis: "risk_ceil 0.15→0.10 added to BLACKLIST for BTC_1h: reducing per-prediction risk cap cut fills (fill_rate 0.807→0.777) and matched_ratio (0.674→0.647), worsening pair_cost (0.9382→0.9588) and raising max_dd (27.3→29.8%). Next: pace_urgency_hi 2.0→2.5 — raises urgency multiplier in the late-bar window, driving more aggressive second-side fill for open pairs in the 3600s 1h bar."
+2026-03-22T07:39:19Z iter=10 pair=SOL_5m status=BASELINE param=- -
+  eval: pair_cost=0.9404 profit=$-5.12 max_dd=718.3% bars=274
+  hypothesis: "No prior SOL_5m data. Running baseline to establish reference metrics. Strategy directive: collect all 6 SOL/XRP baselines before any experiments. SOL_5m matched_ratio=0.432 is low (similar to ETH_5m=0.455), max_dd=718.3% is very high (5m compounding effect). Pair cost 0.9404 is within expected range."
