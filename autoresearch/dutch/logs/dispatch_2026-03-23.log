@@ -12,3 +12,4 @@
 2026-03-23T05:02:00Z iter=78 pair=BTC_15m role=researcher outcome=DISCARD compound skip=0.45+onesided=3.0 pair_cost=0.8964(-3.97%) max_dd=27.8% near-miss
 2026-03-23T08:20:00Z iter=80 pair=BTC_1h role=researcher outcome=DISCARD(x2): re-eval variance + risk_ceil 0.15->0.20 failed to beat best KEEP 0.7988
 2026-03-23T00:24:00Z iter=83 pair=ETH_1h role=researcher outcome=DISCARD risk_ceil 0.15->0.20 pair_cost 0.6789 max_dd=18.2% (3.8% improvement fails >5% KEEP RELAXED threshold)
+2026-03-23T00:40:00Z iter=86 pair=SOL_1h role=researcher outcome=KEEP bar_budget=200->300 pair_cost=0.6547 max_dd=5.8%

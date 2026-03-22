@@ -1,5 +1,6 @@
-iter=85 pair=SOL_15m timestamp=2026-03-22T17:35:51Z status=running
-hypothesis: conviction_buy_skip 0.45->0.40 -- test skip reduction on safe-DD pair
-rationale: SOL_15m has safe DD (9.5%), positive avg_profit (+$0.17/bar), correct_side=44.6% (above 38%
-warning floor). Strategy priority queue item #1 for SOL_15m. XRP_15m collapsed at 0.40 (matched_ratio=2%),
-but SOL_15m has higher matched_ratio (4.8% at 0.45) and better correct_side. Testing cautiously per strategy.
+iter=86 pair=SOL_1h timestamp=2026-03-23T00:00:00Z status=running
+hypothesis: bar_budget 200->300 -- scale capital on best profitable pair
+rationale: SOL_1h is 2nd best pair (pair_cost=0.6605, avg_profit=+$0.54/bar, max_dd=9.1%).
+Skip series fully exhausted (skip=0.45 is floor). Strategy priority #1 for SOL_1h rotation 6.
+SOL_15m confirmed bar_budget=300 KEEP (iter 73, +1.11%). SOL pairs respond differently from XRP pairs
+(XRP DISCARDs at 300, SOL_15m KEEP). Low DD (9.1%) provides ample safety margin for capital scaling.

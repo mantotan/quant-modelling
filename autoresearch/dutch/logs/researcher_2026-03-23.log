@@ -40,3 +40,6 @@
 2026-03-23T00:23:58Z iter=83 pair=ETH_1h status=DISCARD param=risk_ceil 0.15->0.20
   eval: pair_cost=0.6789 profit=-0.25 max_dd=18.2% bars=34
   hypothesis: "risk_ceil 0.15->0.20 per strategy.md ETH_1h priority #1 and audit Tier 3. Skip series exhausted at 0.45. max_dd=17% provides headroom. Result: pair_cost improved 3.8% (0.7058->0.6789), avg_profit halved (-0.50->-0.25), but 3.8% fails KEEP RELAXED >5% threshold. Strict KEEP fails (avg_profit<0). Next: bar_budget 200->300 (ETH_1h priority #2)."
+2026-03-23T00:40:00Z iter=86 pair=SOL_1h status=KEEP param=bar_budget 200->300
+  eval: pair_cost=0.6547 profit=$0.69 max_dd=5.8% bars=34
+  hypothesis: "bar_budget 200->300 — SOL_15m confirmed SOL pairs accept higher budgets (iter 73 KEEP); SOL_1h is 2nd best pair (pair_cost=0.6605, +$0.54/bar, 9.1% DD); strategy priority #1 for rotation 6; capital scaling on low-DD profitable pair; XRP pairs DISCARD at 300 but SOL pairs structurally different"
