@@ -1,5 +1,5 @@
 {
-  "current_pair": "ETH_5m",
+  "current_pair": "ETH_1h",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 3,
-  "last_updated": "2026-03-23T08:20:00Z",
+  "pair_index": 5,
+  "last_updated": "2026-03-22T17:19:01Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 71,
   "last_auditor_at": 71,
-  "total_iterations": 80,
-  "last_exit_reason": "researcher: BTC_1h DISCARD (x2) -- re-eval 0.7988->0.8476 dataset variance; risk_ceil 0.15->0.20 improved correct_side 61.3% and max_dd 7.9% but pair_cost 0.8100 did not beat best KEEP 0.7988 [risk_ceil]"
+  "total_iterations": 82,
+  "last_exit_reason": "researcher: ETH_5m FROZEN (audit.md directive, correct_side=37.3% anti-predictive); ETH_15m KEEP -- max_onesided_cost 2.0->1.5 improved pair_cost 20.4% (0.7032->0.5600), max_dd 32.5%->26.8% (below 30% threshold) [max_onesided_cost]"
 }

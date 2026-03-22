@@ -143,3 +143,12 @@
 2026-03-22T23:50:00Z iter=66 pair=ETH_5m status=KEEP param=conviction_buy_skip 0.50->0.45
   eval: pair_cost=0.7819 profit=$-0.2101 max_dd=47.30% bars=378
   hypothesis: "conviction_buy_skip 0.50->0.45 tested per strategy.md priority #1 for ETH_5m (untested on V7.3). Cost improved 7.7% (0.8469->0.7819), avg_profit improved -$0.32->-$0.21, max_dd improved 71%->47%. KEEP RELAXED. WARNING: correct_side dropped 44.6%->37.3% below 38% flag threshold. Strategy.md FLAG condition nearly triggered -- if next experiment worsens correct_side below 35%, consider DISABLE."
+2026-03-22T17:19:01Z iter=81 pair=ETH_5m status=FROZEN param=- -
+  eval: pair_cost=- profit=- max_dd=-% bars=-
+  hypothesis: "FROZEN per audit.md: correct_side=37.3% below 38% warning floor, anti-predictive trajectory. Advancing to ETH_15m."
+2026-03-22T17:19:01Z iter=81 pair=ETH_15m status=DISCARD param=- -
+  eval: pair_cost=0.7032 profit=$-0.29 max_dd=32.5% bars=131
+  hypothesis: "Re-eval on 131 bars (vs 127): pair_cost=0.7032 matches best KEEP exactly (0% improvement). Not a new KEEP. Proceeding to next lever: max_onesided_cost 2.0->1.5."
+2026-03-22T17:19:01Z iter=82 pair=ETH_15m status=KEEP param=max_onesided_cost 2.0->1.5
+  eval: pair_cost=0.5600 profit=$-0.21 max_dd=26.8% bars=131
+  hypothesis: "max_onesided_cost 2.0->1.5: strategy/audit priority #1 for ETH_15m. max_dd=32.5% still above 30% threshold. ETH_15m analog (iter 68) showed onesided cap effectively reduces DD. Tighter cap 1.5 targets sub-30% max_dd while preserving pair_cost gains. Result: 20.4% pair_cost improvement, max_dd now 26.8% (below threshold). ETH_15m meets all benchmark criteria."
