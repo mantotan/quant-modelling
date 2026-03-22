@@ -19,3 +19,6 @@
 2026-03-23T17:30:00Z iter=73 pair=SOL_15m role=researcher outcome=2x KEEP: re-eval (pair_cost 0.7956->0.7947, +0.112026-03-23T17:30:00Z iter=73 pair=SOL_15m role=researcher outcome=2x KEEP: re-eval pair_cost 0.7956->0.7947 then bar_budget 200->300 cost 0.7947->0.7859 max_dd 14.3->9.5pct
   eval: pair_cost=0.7859 profit=+$0.17/bar max_dd=9.5% bars=129
   hypothesis: "bar_budget 200->300 on benchmark-beating SOL_15m (audit directive: skip=0.40 bypassed due to XRP_15m collapse risk)"
+2026-03-23T23:51:00Z iter=74 pair=SOL_1h status=DISCARD param=conviction_buy_skip 0.45->0.40
+  eval: pair_cost=0.7367 profit=$0.42 max_dd=10.8% bars=33
+  hypothesis: "BTC_1h succeeded at skip=0.40 (iter 64, +8.3%); SOL_1h has 9% DD and +$0.56/bar — similar profile. Test whether skip series can continue. But matched_ratio=3.0% at 0.45 is thin — collapse risk. Result: pair_cost worsened 11.5% (0.6605->0.7367). skip=0.45 is confirmed optimum for SOL_1h. Next: bar_budget 200->300 (audit Tier 1 safety scale)"

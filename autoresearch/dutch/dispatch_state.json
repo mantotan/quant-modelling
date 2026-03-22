@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_1h",
+  "current_pair": "XRP_15m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 8,
-  "last_updated": "2026-03-23T17:30:00Z",
+  "pair_index": 10,
+  "last_updated": "2026-03-23T23:51:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
   "last_strategist_at": 71,
   "last_auditor_at": 71,
-  "total_iterations": 73,
-  "last_exit_reason": "researcher: SOL_15m 2x KEEP -- re-eval +0.11% then bar_budget 200->300 +1.11%, max_dd 14.3%->9.5%, avg_profit positive [bar_budget]"
+  "total_iterations": 74,
+  "last_exit_reason": "researcher: SOL_1h DISCARD -- conviction_buy_skip 0.45->0.40 worsened pair_cost 11.5% (0.6605->0.7367), skip=0.40 floor confirmed [conviction_buy_skip]"
 }
