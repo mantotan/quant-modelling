@@ -83,3 +83,6 @@
 2026-03-22T22:20:00Z iter=43 pair=SOL_1h status=KEEP param=- -→-
   eval: pair_cost=0.6967 profit=$0.8168 total_profit=$26.14 matched=0.0546 fill=0.8398 correct=0.5667 max_dd=9.07% bars=32
   hypothesis: "V7.3 baseline re-eval: pair_cost improved 10.3% (0.7766->0.6967), avg_profit $0.084->$0.817/bar. KEEP. Next: conviction_buy_skip 0.50->0.35 — SOL_1h has best pair_cost in system (0.697) but matched_ratio only 5.5%. Strategy priority queue item 1: aggressively lower skip threshold to deploy more capital while monitoring pair_cost stays under 0.85."
+2026-03-22T22:00:00Z iter=44 pair=XRP_5m status=KEEP param=- -→-
+  eval: pair_cost=0.9085 profit=$-0.3232 total_profit=$-116.77 matched=0.0760 fill=0.5370 correct=0.4470 max_dd=68.70% bars=362
+  hypothesis: "V7.3 baseline re-eval on 362 bars (73 more than iter 30). pair_cost improved 8.9% (0.9973->0.9085), avg_profit improved -$0.398->-$0.32. KEEP RELAXED — >5% cost improvement, profit > -2.0. Next: fill_simulator.fill_ticks 10->15. XRP_5m has worst fill rate in system (53.7%). More limit order patience should improve fill quality and reduce pair_cost further."

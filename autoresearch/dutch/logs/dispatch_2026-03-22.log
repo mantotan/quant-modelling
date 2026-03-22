@@ -31,3 +31,5 @@
 2026-03-22T21:42:00Z iter=38 pair=ETH_15m role=researcher outcome=DISCARD conviction_buy_skip 0.50->0.55 pair_cost=0.8968 max_dd=57.5%
 2026-03-22T22:15:00Z iter=41 pair=SOL_5m role=researcher outcome=DISCARD conviction_buy_skip 0.50->0.55 pair_cost=0.9628 max_dd=108.0%
 2026-03-22T21:50:00Z iter=42 pair=SOL_15m role=researcher outcome=DISCARD min_unmatched_shares 10->5 pair_cost=0.9234 max_dd=35.5%
+2026-03-22T22:20:00Z iter=43 pair=SOL_1h role=researcher outcome=KEEP pair_cost=0.6967->best, conviction_buy_skip 0.50->0.35 queued for next eval
+2026-03-22T22:00:00Z iter=44 pair=XRP_5m role=researcher outcome=KEEP pair_cost=0.9085 max_dd=68.7% next=XRP_15m knobs_edit=fill_ticks:10->15

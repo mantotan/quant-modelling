@@ -1,3 +1,4 @@
-iter=43 pair=SOL_1h timestamp=2026-03-22T22:20:00Z
+iter=44 pair=XRP_5m timestamp=2026-03-22T22:00:00Z
 Mode: BACKTEST (replay_available)
-Action: V7.3 baseline re-eval on 32 bars (7 more than iter 29): pair_cost improved 0.7766->0.6967 (10.3%), avg_profit dramatically better $0.084->$0.817/bar. KEEP (updated best_knobs). Next experiment: conviction_buy_skip 0.50->0.35 — strategy queue item 1 for SOL_1h. Very low throughput (matched_ratio=5.5%), great cost. Aggressively lower threshold to deploy more capital while monitoring pair_cost stays under 0.85.
+Action: V7.3 baseline re-eval on 362 bars (73 more than iter 30): pair_cost improved 0.9973->0.9085 (8.9%), avg_profit improved -$0.398->-$0.32/bar. KEEP RELAXED (>5% cost improvement, profit > -2.0). Updated best_knobs.
+Next hypothesis: fill_simulator.fill_ticks 10->15 — fill rate 53.7% is worst in system; more patience for limit order fills should improve pair formation quality and reduce pair_cost.
