@@ -22,3 +22,4 @@
 2026-03-23T14:45:00Z iter=94 pair=ETH_15m role=researcher outcome=DISCARD(x2) re-eval 0.5600->0.6750 dataset variance; onesided=1.0 collapsed matched_ratio, floor confirmed at 1.5; next=ETH_1h
 2026-03-23T15:10:00Z iter=95 pair=ETH_1h role=researcher outcome=DISCARD re-eval 1.8% below threshold; staged bar_budget 200->250; advancing to SOL_5m
 2026-03-23T15:35:00Z iter=95 pair=SOL_5m role=auditor outcome=FREEZE BTC_15m+ETH_15m+XRP_5m, CONTINUE 9 pairs, UNFREEZE ETH_5m; rotation6 KEEP 20.8% (5/24); timing params frontier; last_auditor_at updated 71->95
+2026-03-23T16:00:00Z iter=95 pair=SOL_5m role=strategist outcome=rotation6 KEEP 3/12=25%; onesided=2.0 next for BTC_5m/BTC_15m/XRP_5m; SOL_1h risk_ceil priority; BTC_15m skip=0.45 exhausted; 9/12 pairs beat benchmark
