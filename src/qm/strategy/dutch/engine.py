@@ -104,6 +104,11 @@ class DutchConfig:
     # 0.0 = disabled.  5.0 = max $5 spent before first pair forms.
     max_onesided_cost: float = 0.0
 
+    # V7.5: Flip kill gate — stop buying after N model direction flips.
+    # High flip count = whipsaw bar → cancel pending orders, go sell-only.
+    # 0 = disabled.  6 = recommended for BTC 15m (validated on 130-bar sweep).
+    flip_kill_after: int = 0
+
     # V7.4: Resting limit orders — place below bid to catch dips.
     # 0.0 = disabled (reactive only, V7.3 behavior).
     resting_discount: float = 0.0
@@ -325,6 +330,7 @@ class DutchAccumulationEngine:
         self._decision_log: list[str] = []
         self._model_probs: list[float] = []
         self._model_flips: int = 0
+        self._flip_killed: bool = False
         self._mid_range_up: list[float] = []
         self._spreads_up: list[float] = []
         self._spreads_dn: list[float] = []
@@ -390,6 +396,11 @@ class DutchAccumulationEngine:
         self._condition_id = condition_id
         self._window_start = window_start
         self._window_end = window_end
+
+    @property
+    def flip_killed(self) -> bool:
+        """Whether the flip kill gate has fired for this bar."""
+        return self._flip_killed
 
     def set_event_callback(self, cb: Callable[[dict], None]) -> None:
         """Set optional callback for compact event logging."""
@@ -557,6 +568,17 @@ class DutchAccumulationEngine:
                 cost=round(self._inventory.total_cost + self._committed_spend, 2),
                 cap=self._config.max_onesided_cost,
             )
+            return self._sell_pass(time_pct, cal_prob, book_up, book_dn, [])
+
+        # -- V7.5: Flip kill gate — too many model flips = whipsaw, sell only --
+        if self._config.flip_kill_after > 0 and self._model_flips >= self._config.flip_kill_after:
+            if not self._flip_killed:
+                self._flip_killed = True
+                self._emit(
+                    "gate_flip_kill", time_pct=time_pct,
+                    flips=self._model_flips,
+                    threshold=self._config.flip_kill_after,
+                )
             return self._sell_pass(time_pct, cal_prob, book_up, book_dn, [])
 
         # -- R4b: Per-prediction spend cap --
@@ -1140,6 +1162,7 @@ class DutchAccumulationEngine:
         self._decision_log.clear()
         self._model_probs.clear()
         self._model_flips = 0
+        self._flip_killed = False
         self._mid_range_up.clear()
         self._spreads_up.clear()
         self._spreads_dn.clear()

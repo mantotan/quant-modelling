@@ -1107,6 +1107,11 @@ async def main_loop(args: argparse.Namespace) -> None:
 
             # Engine decides orders
             orders = dutch_engine.on_tick(elapsed_pct, cal_prob, book_up, book_dn)
+            # V7.5: Cancel pending orders on flip kill (matches sweep behavior).
+            # cancel_all() is a no-op after first call per bar (returns []).
+            if dutch_engine.flip_killed and not orders:
+                for c_order in dutch_sim.cancel_all():
+                    dutch_engine.on_order_cancelled(c_order)
             for order in orders:
                 dutch_sim.place(order)
 

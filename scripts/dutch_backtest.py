@@ -518,6 +518,11 @@ def run_backtest(
 
             # Engine → orders → sim → fills → engine
             orders = engine.on_tick(time_pct, cal_prob, book_up, book_dn)
+            # V7.5: Cancel pending orders on flip kill (matches sweep behavior).
+            # cancel_all() is a no-op after first call per bar (returns []).
+            if engine.flip_killed and not orders:
+                for c_order in sim.cancel_all():
+                    engine.on_order_cancelled(c_order)
             for order in orders:
                 sim.place(order)
             fills = sim.on_tick(time_pct, book_up, book_dn)

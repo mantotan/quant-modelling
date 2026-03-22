@@ -220,6 +220,80 @@ class TestDutchEngine:
         assert orders == []
 
 
+class TestFlipKillGate:
+    """Tests for V7.5 flip kill gate."""
+
+    def _make_engine(self, **kwargs) -> DutchAccumulationEngine:
+        config = DutchConfig(**kwargs)
+        return DutchAccumulationEngine(config)
+
+    def test_flip_kill_gate_blocks_buys(self):
+        """After flip_kill_after flips, engine returns no buy orders (sell-only)."""
+        engine = self._make_engine(flip_kill_after=3)
+        book_up = make_book(0.48, 0.52)
+        book_dn = make_book(0.48, 0.52)
+        # Drive 3 flips: 0.55→0.45 (flip1), 0.45→0.55 (flip2), 0.55→0.45 (flip3)
+        for p in [0.55, 0.45, 0.55, 0.45]:
+            engine.on_tick(0.3, p, book_up, book_dn)
+        assert engine._model_flips == 3
+        # Now at 3 flips — next tick should produce no buy orders
+        orders = engine.on_tick(0.4, 0.55, book_up, book_dn)
+        buy_orders = [o for o in orders if o.action == "BUY"]
+        assert buy_orders == []
+
+    def test_flip_kill_gate_disabled_when_zero(self):
+        """flip_kill_after=0 means gate is disabled — orders still flow."""
+        engine = self._make_engine(flip_kill_after=0)
+        book_up = make_book(0.48, 0.52)
+        book_dn = make_book(0.48, 0.52)
+        # Drive 5 flips
+        for p in [0.55, 0.45, 0.55, 0.45, 0.55, 0.45]:
+            engine.on_tick(0.3, p, book_up, book_dn)
+        assert engine._model_flips == 5
+        # Gate disabled — should not block
+        assert not engine.flip_killed
+
+    def test_flip_kill_gate_emits_event_once(self):
+        """gate_flip_kill event emitted exactly once on first trigger."""
+        events = []
+        engine = self._make_engine(flip_kill_after=2)
+        engine.set_event_callback(events.append)
+        book_up = make_book(0.48, 0.52)
+        book_dn = make_book(0.48, 0.52)
+        # Drive 2 flips
+        for p in [0.55, 0.45, 0.55]:
+            engine.on_tick(0.3, p, book_up, book_dn)
+        # Call multiple times after kill — should only emit once
+        engine.on_tick(0.4, 0.45, book_up, book_dn)
+        engine.on_tick(0.5, 0.55, book_up, book_dn)
+        engine.on_tick(0.6, 0.45, book_up, book_dn)
+        gate_events = [e for e in events if e["type"] == "gate_flip_kill"]
+        assert len(gate_events) == 1
+        assert gate_events[0]["flips"] >= 2
+        assert gate_events[0]["threshold"] == 2
+
+    def test_flip_killed_property_and_reset(self):
+        """flip_killed is False before threshold, True after, resets on reset()."""
+        engine = self._make_engine(flip_kill_after=2)
+        book_up = make_book(0.48, 0.52)
+        book_dn = make_book(0.48, 0.52)
+        assert not engine.flip_killed
+        # 1 flip — not yet killed
+        engine.on_tick(0.3, 0.55, book_up, book_dn)
+        engine.on_tick(0.3, 0.45, book_up, book_dn)
+        assert engine._model_flips == 1
+        assert not engine.flip_killed
+        # 2nd flip — killed
+        engine.on_tick(0.4, 0.55, book_up, book_dn)
+        assert engine._model_flips == 2
+        engine.on_tick(0.5, 0.45, book_up, book_dn)
+        assert engine.flip_killed
+        # Reset clears it
+        engine.reset()
+        assert not engine.flip_killed
+        assert engine._model_flips == 0
+
+
 class TestDutchPacingGates:
     """Tests for the V3 pacing gates (R1-R6)."""
 
