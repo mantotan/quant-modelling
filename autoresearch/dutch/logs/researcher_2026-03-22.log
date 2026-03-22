@@ -59,3 +59,6 @@
 2026-03-22T17:32:00Z iter=35 pair=BTC_15m status=DISCARD param=conviction_buy_skip 0.50->0.50 (no change evaluated; new hypothesis applied)
   eval: pair_cost=0.9425 profit=$0.43 max_dd=23.0% bars=119
   hypothesis: "BTC_15m V7.3 baseline re-run on extended dataset (119 bars) shows pair_cost regressed 0.9334->0.9425 due to variance; recorded as DISCARD (no param change from best). Next: conviction_buy_skip 0.50->0.45 — 63% correct_side means more trades likely directionally correct."
+2026-03-22T21:29:45Z iter=36 pair=BTC_1h status=DISCARD param=bar_budget 200->400 pair_cost=0.9335(worse vs pre-edit 0.9244) max_dd=4.6%
+  eval: pair_cost=0.9335 profit=$0.53 total_profit=$16.30 matched=0.115 fill=0.771 correct=0.552 max_dd=4.6% bars=31
+  hypothesis: "bar_budget 200->400 — BTC_1h lowest max_dd (6%) and best profit/bar. Hypothesis: doubling budget scales total profit. Disproved: pair_cost worsened 0.9244->0.9335, avg_profit dropped 38% (/usr/bin/bash.85->/usr/bin/bash.53), fill rate fell 80.5%->77.1%, budget_util fell 3.3%->2.0%. Pacing efficiency degrades at higher budget. Restored baseline knobs."

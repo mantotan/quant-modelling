@@ -1,4 +1,5 @@
-iter=35 pair=BTC_15m timestamp=2026-03-22T17:30:00Z
+iter=36 pair=BTC_1h timestamp=2026-03-22T21:29:30Z
 Role: RESEARCHER (backtest mode)
-Hypothesis: conviction_buy_skip 0.50->0.45 to increase throughput on BTC_15m (63% correct_side)
-V7.3 baseline: pair_cost=0.9334, avg_profit=+$0.498/bar, max_dd=22.99%
+Hypothesis: bar_budget 200->400 to scale capital on BTC_1h (lowest max_dd=6%, best profit/bar=$0.85)
+V7.3 baseline: pair_cost=0.9378, avg_profit=+$0.827/bar, max_dd=6.02%
+Strategy priority queue item #1 for BTC_1h.
