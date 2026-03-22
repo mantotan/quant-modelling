@@ -1,6 +1,6 @@
-iter=88 pair=XRP_1h timestamp=2026-03-23T11:00:00Z
+iter=89 pair=BTC_5m timestamp=2026-03-23T12:00:00Z
 Phase: BACKTEST MODE (replay_available)
-Status: Running experiment — risk_ceil 0.15->0.20 (positive avg_profit +$1.08/bar, 6% DD headroom)
-Hypothesis: XRP_1h is fundamentally different from failed risk_ceil tests (BTC_1h neg profit, ETH_1h neg profit).
-XRP_1h avg_profit=+$1.08/bar means more capital per bar should directly amplify returns.
-max_dd=6% provides enormous headroom. Both skip directions and bar_budget exhausted — risk_ceil is top lever.
+Status: Evaluating pending experiment — max_onesided_cost 5.0->3.0
+Hypothesis: BTC_5m has max_dd=33.2% exceeding 30% threshold. Strategy priority #1 is max_onesided_cost reduction.
+Current knobs show 3.0 (previously set as hypothesis). Evaluating this now before attempting 2.0.
+If 3.0 insufficient to bring max_dd<30%, will try 2.0 next iteration.
