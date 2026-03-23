@@ -623,11 +623,15 @@ def run_backtest(
             spot = tick["spot_price"]
 
             # In live mode: only feed BarBuilder when spot_price changes
-            # (matches live TradingView which only fires on_trade on new lp)
+            # BUT always process ticks with is_inference=True (cal_prob update)
+            is_inference_tick = (
+                live_cadence and tick.get("is_inference", False)
+            )
             is_sampled = (
                 not live_cadence
                 or last_spot_price is None
                 or spot != last_spot_price
+                or is_inference_tick  # Always process inference ticks
             )
 
             if not is_sampled:
@@ -638,12 +642,17 @@ def run_backtest(
                     engine.on_fill(fill.order, fill.fill_price, fill.filled_shares)
                 continue
 
-            last_spot_price = spot
+            # Feed BarBuilder only when spot actually changed (not on inference-only ticks)
+            spot_changed = (last_spot_price is None or spot != last_spot_price)
+            if spot_changed:
+                last_spot_price = spot
 
-            # Feed spot into BarBuilder (at cadence rate, matching live)
-            completed = bar_builder.on_trade(
-                asset_enum, tick["spot_price"], 0.001, ts,
-            )
+            # Feed spot into BarBuilder (only when price changed)
+            completed = []
+            if spot_changed:
+                completed = bar_builder.on_trade(
+                    asset_enum, tick["spot_price"], 0.001, ts,
+                )
             for bar in completed:
                 recent_bars.append(bar)
                 recent_bars[:] = recent_bars[-500:]
