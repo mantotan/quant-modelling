@@ -15,11 +15,12 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import logging
 import sys
 import time
-from datetime import date as date_type
+from datetime import UTC, date as date_type, datetime
 from pathlib import Path
 
 import lightgbm as lgb
@@ -99,6 +100,11 @@ def parse_args() -> argparse.Namespace:
         help="Write bar JSONL to data/dutch_backtest/",
     )
     p.add_argument("--verbose", action="store_true", help="Per-bar detail logging")
+    p.add_argument(
+        "--outcome-source", choices=["gamma", "live-log", "spot"], default="spot",
+        help="Outcome source: 'gamma'=Polymarket API (accurate), "
+             "'live-log'=from paper trading logs, 'spot'=first/last spot (default)",
+    )
     p.add_argument(
         "--tick-cadence", choices=["live", "full"], default="full",
         help="Tick rate: 'live'=1Hz downsample (parity with paper trading), "
@@ -198,6 +204,143 @@ def warm_up_cache(
         "Warm-up %s/%s: cached %d features from %d bars",
         asset_enum.value, tf.value, len(cache_dict), n,
     )
+
+
+# -- Outcome resolution (Gamma API / live logs / spot fallback) ------------
+
+_SLUG_ASSET = {"BTC": "btc", "ETH": "ethereum", "SOL": "solana", "XRP": "xrp"}
+GAMMA_API_URL = "https://gamma-api.polymarket.com/markets"
+
+
+def _derive_slug(asset: str, tf_label: str, bar_id: int) -> str:
+    """Derive Gamma API slug from asset + timeframe + bar_id."""
+    prefix = _SLUG_ASSET.get(asset, asset.lower())
+    if tf_label == "1h":
+        from qm.execution.polymarket.market_scanner import _build_1h_slug
+        bar_dt = datetime.fromtimestamp(bar_id, tz=UTC)
+        return _build_1h_slug(ASSET_MAP[asset], bar_dt)
+    return f"{prefix}-updown-{tf_label}-{bar_id}"
+
+
+def _parse_outcome(market: dict) -> str | None:
+    """Parse outcome from Gamma API market response."""
+    outcomes_raw = market.get("outcomes", "[]")
+    prices_raw = market.get("outcomePrices", "[]")
+    try:
+        outcomes = json.loads(outcomes_raw) if isinstance(outcomes_raw, str) else outcomes_raw
+        prices = json.loads(prices_raw) if isinstance(prices_raw, str) else prices_raw
+    except (json.JSONDecodeError, TypeError):
+        return None
+    for i, p in enumerate(prices):
+        if float(p) >= 0.99 and i < len(outcomes):
+            raw = outcomes[i].upper()
+            # Normalize: Gamma returns "Up"/"Down", we use "UP"/"DN"
+            if raw == "DOWN":
+                return "DN"
+            return raw
+    return None
+
+
+def _load_resolution_cache(cache_file: Path) -> dict[int, str]:
+    """Load cached resolutions from JSONL."""
+    cached = {}
+    if cache_file.exists():
+        for line in open(cache_file):
+            try:
+                r = json.loads(line)
+                cached[r["bar_id"]] = r["outcome"]
+            except (json.JSONDecodeError, KeyError):
+                continue
+    return cached
+
+
+def _save_resolution_cache(cache_file: Path, resolutions: dict[int, str]) -> None:
+    """Save resolutions to JSONL cache."""
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(cache_file, "w") as f:
+        for bar_id, outcome in sorted(resolutions.items()):
+            json.dump({"bar_id": bar_id, "outcome": outcome,
+                       "fetched_at": datetime.now(UTC).isoformat()}, f)
+            f.write("\n")
+
+
+async def _batch_fetch_gamma(
+    bars: list[tuple[int, str]], asset: str, tf_label: str,
+) -> dict[int, str]:
+    """Query Gamma API for each bar's resolution. Rate-limited to 5 req/sec."""
+    import aiohttp
+
+    results = {}
+    async with aiohttp.ClientSession(
+        timeout=aiohttp.ClientTimeout(total=10),
+    ) as session:
+        for i, (bar_id, cid) in enumerate(bars):
+            slug = _derive_slug(asset, tf_label, bar_id)
+            try:
+                async with session.get(GAMMA_API_URL, params={"slug": slug}) as resp:
+                    if resp.status == 200:
+                        markets = await resp.json()
+                        if markets and markets[0].get("closed", False):
+                            outcome = _parse_outcome(markets[0])
+                            if outcome:
+                                results[bar_id] = outcome
+            except Exception:
+                pass
+            # Rate limit: 5 req/sec
+            if (i + 1) % 5 == 0:
+                await asyncio.sleep(1.0)
+
+    logger.info("Fetched %d/%d resolutions from Gamma API", len(results), len(bars))
+    return results
+
+
+def _fetch_gamma_resolutions(
+    ticks_df: pl.DataFrame, asset: str, tf_label: str,
+    ticks_dir: Path, filter_date: date_type | None,
+) -> dict[int, str]:
+    """Fetch Polymarket outcomes. Uses local cache, falls back to Gamma API."""
+    date_str = str(filter_date) if filter_date else "all"
+    cache_file = ticks_dir / "resolutions" / f"{asset}_{tf_label}_{date_str}.jsonl"
+    cached = _load_resolution_cache(cache_file)
+
+    # Find bars not in cache
+    bar_cids = (
+        ticks_df.group_by("window_start", maintain_order=True)
+        .agg(pl.col("condition_id").first())
+    )
+    missing = []
+    for row in bar_cids.iter_rows(named=True):
+        bar_id = int(row["window_start"].timestamp())
+        if bar_id not in cached:
+            missing.append((bar_id, row["condition_id"]))
+
+    if not missing:
+        logger.info("All %d resolutions loaded from cache", len(cached))
+        return cached
+
+    logger.info("Fetching %d resolutions from Gamma API (%d cached)...",
+                len(missing), len(cached))
+    new_resolutions = asyncio.run(_batch_fetch_gamma(missing, asset, tf_label))
+
+    cached.update(new_resolutions)
+    _save_resolution_cache(cache_file, cached)
+    return cached
+
+
+def _load_live_outcomes(asset: str, tf_label: str) -> dict[int, str]:
+    """Load outcomes from live paper trading bar logs."""
+    outcomes = {}
+    bar_dir = Path(f"data/dutch_paper/{asset}_{tf_label}")
+    for bf in bar_dir.glob("bars_*.jsonl"):
+        for line in open(bf):
+            try:
+                b = json.loads(line)
+                if b.get("outcome"):
+                    outcomes[b["bar_id"]] = b["outcome"]
+            except (json.JSONDecodeError, KeyError):
+                continue
+    logger.info("Loaded %d outcomes from live bar logs", len(outcomes))
+    return outcomes
 
 
 # -- TokenBook reconstruction from BBO tick data --------------------------
@@ -322,6 +465,7 @@ def run_backtest(
     verbose: bool,
     filter_date: date_type | None,
     tick_cadence: str = "full",
+    outcome_source: str = "spot",
 ) -> dict:
     """Run backtest for one (asset, timeframe) pair. Returns metrics dict."""
     asset_enum = ASSET_MAP[asset]
@@ -424,6 +568,15 @@ def run_backtest(
         )
         engine.set_event_callback(dutch_logger.log_event)
 
+    # -- Load resolutions for outcome determination --
+    resolutions: dict[int, str] = {}
+    if outcome_source == "gamma":
+        resolutions = _fetch_gamma_resolutions(
+            ticks_df, asset, tf_label, ticks_dir, filter_date,
+        )
+    elif outcome_source == "live-log":
+        resolutions = _load_live_outcomes(asset, tf_label)
+
     # -- Replay loop --
     recent_bars: list = []  # Store Bar objects (same as live monitor_pulse.py)
     bar_summaries: list[DutchBarSummary] = []
@@ -440,15 +593,13 @@ def run_backtest(
         if bar_secs <= 0:
             continue
 
-        # Outcome from spot price (first vs last)
-        first_spot = bar_ticks["spot_price"][0]
-        last_spot = bar_ticks["spot_price"][-1]
-        if last_spot > first_spot:
-            outcome = "UP"
-        elif last_spot < first_spot:
-            outcome = "DN"
-        else:
-            outcome = "DN"  # no movement → DN (Polymarket: "not up")
+        # Outcome determination
+        outcome = resolutions.get(bar_id)
+        if outcome is None:
+            # Fallback: spot price direction
+            first_spot = bar_ticks["spot_price"][0]
+            last_spot = bar_ticks["spot_price"][-1]
+            outcome = "UP" if last_spot > first_spot else "DN"
 
         # Reset (same as live bar boundary)
         engine.reset()
@@ -741,6 +892,7 @@ def main() -> None:
                 verbose=args.verbose,
                 filter_date=filter_date,
                 tick_cadence=args.tick_cadence,
+                outcome_source=args.outcome_source,
             )
             all_metrics.append(metrics)
             if metrics.get("bars_evaluated", 0) > 0:
