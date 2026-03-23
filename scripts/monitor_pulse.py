@@ -346,9 +346,12 @@ async def price_feed(
                         )
                         for bar in bars:
                             await completed_bars.put(bar)
+                            logger.info("BarBuilder completed: %s %s", bar.timeframe.value, bar.timestamp)
                         tick_count += 1
                         if tick_count == 1:
                             logger.info("First tick: %s $%.2f", asset_enum.value, lp)
+                        if tick_count % 50 == 0:
+                            logger.info("Price feed alive: %d ticks", tick_count)
 
                 await ws.close()
         except Exception:
