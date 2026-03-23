@@ -38,6 +38,9 @@ TICK_SCHEMA = {
     "spot_price": pl.Float64,
     "window_start": pl.Datetime("us", "UTC"),
     "window_end": pl.Datetime("us", "UTC"),
+    "elapsed_pct": pl.Float64,
+    "cal_prob": pl.Float64,
+    "is_inference": pl.Boolean,
 }
 
 
@@ -65,6 +68,9 @@ class TickSnapshot:
     spot_price: float
     window_start: datetime
     window_end: datetime
+    elapsed_pct: float = 0.0
+    cal_prob: float = 0.5
+    is_inference: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -88,6 +94,9 @@ class TickSnapshot:
             "spot_price": self.spot_price,
             "window_start": self.window_start,
             "window_end": self.window_end,
+            "elapsed_pct": self.elapsed_pct,
+            "cal_prob": self.cal_prob,
+            "is_inference": self.is_inference,
         }
 
 

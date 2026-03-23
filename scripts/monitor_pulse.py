@@ -1310,28 +1310,31 @@ async def main_loop(args: argparse.Namespace) -> None:
                             _dutch_tick(state, elapsed_pct, book_up, book_dn, args, bar_id_from_market)
                             # Record early-bar tick to Parquet
                             if tick_queue is not None and book_up and book_dn:
-                                pm_mkt = state.pm_markets.get(tf)
-                                if pm_mkt and pm_mkt.window_end:
-                                    from qm.data.connectors.tick_writer import TickSnapshot
-                                    tick_queue.put_nowait(TickSnapshot(
-                                        ts=datetime.now(UTC),
-                                        asset=asset_label,
-                                        timeframe=state.tf_label,
-                                        condition_id=state.dutch_bar_condition_id,
-                                        bid_up=book_up.best_bid, ask_up=book_up.best_ask,
-                                        bid_dn=book_dn.best_bid, ask_dn=book_dn.best_ask,
-                                        mid_up=book_up.mid,
-                                        spread_up=book_up.spread, spread_dn=book_dn.spread,
-                                        depth_bid_up=book_up.bids.get(book_up.best_bid, 0.0),
-                                        depth_ask_up=book_up.asks.get(book_up.best_ask, 0.0),
-                                        depth_bid_dn=book_dn.bids.get(book_dn.best_bid, 0.0),
-                                        depth_ask_dn=book_dn.asks.get(book_dn.best_ask, 0.0),
-                                        is_heartbeat=False,
-                                        is_stale=not ws_feed_early._connected.is_set(),
-                                        spot_price=getattr(state, "last_spot", float("nan")),
-                                        window_start=pm_mkt.window_end - timedelta(seconds=BAR_SECONDS[tf]),
-                                        window_end=pm_mkt.window_end,
-                                    ))
+                                from qm.data.connectors.tick_writer import TickSnapshot
+                                eb_ws = datetime.fromtimestamp(bar_id_from_market, tz=UTC)
+                                eb_we = datetime.fromtimestamp(bar_id_from_market + int(bar_secs), tz=UTC)
+                                tick_queue.put_nowait(TickSnapshot(
+                                    ts=datetime.now(UTC),
+                                    asset=asset_label,
+                                    timeframe=state.tf_label,
+                                    condition_id=state.dutch_bar_condition_id,
+                                    bid_up=book_up.best_bid, ask_up=book_up.best_ask,
+                                    bid_dn=book_dn.best_bid, ask_dn=book_dn.best_ask,
+                                    mid_up=book_up.mid,
+                                    spread_up=book_up.spread, spread_dn=book_dn.spread,
+                                    depth_bid_up=book_up.bids.get(book_up.best_bid, 0.0),
+                                    depth_ask_up=book_up.asks.get(book_up.best_ask, 0.0),
+                                    depth_bid_dn=book_dn.bids.get(book_dn.best_bid, 0.0),
+                                    depth_ask_dn=book_dn.asks.get(book_dn.best_ask, 0.0),
+                                    is_heartbeat=False,
+                                    is_stale=not ws_feed_early._connected.is_set(),
+                                    spot_price=getattr(state, "last_spot", float("nan")),
+                                    window_start=eb_ws,
+                                    window_end=eb_we,
+                                    elapsed_pct=elapsed_pct,
+                                    cal_prob=state.cal_prob,
+                                    is_inference=getattr(state, "_did_infer", False),
+                                ))
                 continue  # no partial bar yet for this TF
 
             last_price = state.last_spot = partial.current_price
@@ -1411,28 +1414,38 @@ async def main_loop(args: argparse.Namespace) -> None:
                 _dutch_tick(state, elapsed_pct, book_up, book_dn, args, bar_id)
 
                 # Record tick to Parquet (same data backtest will replay)
-                if tick_queue is not None and book_up and book_dn:
-                    pm_mkt = state.pm_markets.get(tf)
-                    if pm_mkt and pm_mkt.window_end:
+                # Use ws_feed books directly (not gated on market_matches) to capture
+                # all ticks from bar start, even during market transition
+                if tick_queue is not None and ws_feed and ws_feed._connected.is_set():
+                    rec_up = ws_feed.get_book("up")
+                    rec_dn = ws_feed.get_book("down")
+                    if (rec_up and rec_dn
+                            and rec_up.best_bid > 0 and rec_up.best_ask < 1):
+                        # Use PartialBar window if available, else derive from bar_id
+                        rec_ws = partial.window_start if partial else datetime.fromtimestamp(bar_id, tz=UTC)
+                        rec_we = partial.window_end if partial else datetime.fromtimestamp(bar_id + int(bar_secs), tz=UTC)
                         from qm.data.connectors.tick_writer import TickSnapshot
                         tick_queue.put_nowait(TickSnapshot(
                             ts=datetime.now(UTC),
                             asset=asset_label,
                             timeframe=state.tf_label,
                             condition_id=state.dutch_bar_condition_id,
-                            bid_up=book_up.best_bid, ask_up=book_up.best_ask,
-                            bid_dn=book_dn.best_bid, ask_dn=book_dn.best_ask,
-                            mid_up=book_up.mid,
-                            spread_up=book_up.spread, spread_dn=book_dn.spread,
-                            depth_bid_up=book_up.bids.get(book_up.best_bid, 0.0),
-                            depth_ask_up=book_up.asks.get(book_up.best_ask, 0.0),
-                            depth_bid_dn=book_dn.bids.get(book_dn.best_bid, 0.0),
-                            depth_ask_dn=book_dn.asks.get(book_dn.best_ask, 0.0),
+                            bid_up=rec_up.best_bid, ask_up=rec_up.best_ask,
+                            bid_dn=rec_dn.best_bid, ask_dn=rec_dn.best_ask,
+                            mid_up=rec_up.mid,
+                            spread_up=rec_up.spread, spread_dn=rec_dn.spread,
+                            depth_bid_up=rec_up.bids.get(rec_up.best_bid, 0.0),
+                            depth_ask_up=rec_up.asks.get(rec_up.best_ask, 0.0),
+                            depth_bid_dn=rec_dn.bids.get(rec_dn.best_bid, 0.0),
+                            depth_ask_dn=rec_dn.asks.get(rec_dn.best_ask, 0.0),
                             is_heartbeat=False,
-                            is_stale=not ws_feed._connected.is_set() if ws_feed else True,
+                            is_stale=False,
                             spot_price=getattr(state, "last_spot", float("nan")),
-                            window_start=pm_mkt.window_end - timedelta(seconds=BAR_SECONDS[tf]),
-                            window_end=pm_mkt.window_end,
+                            window_start=rec_ws,
+                            window_end=rec_we,
+                            elapsed_pct=elapsed_pct,
+                            cal_prob=state.cal_prob,
+                            is_inference=getattr(state, "_did_infer", False),
                         ))
 
             # -- Resolution polling (every 30s) -------------------

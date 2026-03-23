@@ -648,12 +648,16 @@ def run_backtest(
                 recent_bars.append(bar)
                 recent_bars[:] = recent_bars[-500:]
 
-            # Compute elapsed_pct from PartialBar (same formula as live)
-            partial = bar_builder.get_partial_bar(asset_enum, tf_enum, now=ts)
-            if partial is not None:
-                current_elapsed_pct = partial.elapsed_seconds / (
-                    partial.remaining_seconds + partial.elapsed_seconds + 1e-10
-                )
+            # Compute elapsed_pct: use recorded value if available, else from PartialBar
+            has_recorded_pct = live_cadence and "elapsed_pct" in tick and tick["elapsed_pct"] > 0
+            if has_recorded_pct:
+                current_elapsed_pct = tick["elapsed_pct"]
+            else:
+                partial = bar_builder.get_partial_bar(asset_enum, tf_enum, now=ts)
+                if partial is not None:
+                    current_elapsed_pct = partial.elapsed_seconds / (
+                        partial.remaining_seconds + partial.elapsed_seconds + 1e-10
+                    )
 
             # Advance BTC ticks at same cadence for cross-asset models
             if btc_bar_builder and isinstance(feat_cache, CrossAssetLiveFeatureCache):
@@ -676,15 +680,24 @@ def run_backtest(
             else:
                 btc_partial = None
 
-            # Model inference at cadence (same as live's 1Hz MODEL_INTERVAL)
-            if (
+            # Model inference: use recorded cal_prob if available, else recompute
+            has_recorded_cal = (
+                live_cadence and "cal_prob" in tick and "is_inference" in tick
+            )
+            if has_recorded_cal:
+                # Use live's exact recorded values — 100% parity
+                if tick["is_inference"]:
+                    cal_prob = tick["cal_prob"]
+                    last_inference_ts = ts
+            elif (
                 last_inference_ts is None
                 or (ts - last_inference_ts).total_seconds() >= inference_interval
             ):
-                if partial is not None:
+                partial_for_inf = partial if not has_recorded_pct else bar_builder.get_partial_bar(asset_enum, tf_enum, now=ts)
+                if partial_for_inf is not None:
                     _raw, cal_prob, _feats = run_inference(
                         model, calibrator, feat_cache,
-                        partial, current_elapsed_pct, btc_partial,
+                        partial_for_inf, current_elapsed_pct, btc_partial,
                     )
                     last_inference_ts = ts
 
