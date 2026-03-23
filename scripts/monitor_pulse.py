@@ -992,6 +992,23 @@ async def _check_resolutions(
                     state.tf_label, item["bar_id"], outcome, profit,
                     summary.inventory.get("matched", 0), pair_cost,
                 )
+                # Record outcome to resolution cache for backtest parity
+                try:
+                    res_dir = Path("data/raw/polymarket_ticks/resolutions")
+                    res_dir.mkdir(parents=True, exist_ok=True)
+                    date_str = datetime.fromtimestamp(
+                        item["bar_id"], tz=UTC,
+                    ).strftime("%Y-%m-%d")
+                    res_file = res_dir / f"{state.tf_label}_{date_str}.jsonl"
+                    with open(res_file, "a") as rf:
+                        json.dump({
+                            "bar_id": item["bar_id"],
+                            "outcome": outcome,
+                            "condition_id": item.get("condition_id", ""),
+                        }, rf)
+                        rf.write("\n")
+                except Exception:
+                    pass  # Non-fatal
         except Exception as e:
             logger.debug("Resolution check %s failed: %s", state.tf_label, e)
     # Cap pending list to prevent unbounded growth
@@ -1200,6 +1217,19 @@ async def main_loop(args: argparse.Namespace) -> None:
     signal.signal(signal.SIGINT, handle_shutdown)
     signal.signal(signal.SIGTERM, handle_shutdown)
 
+    # -- Tick Parquet writer (records what live sees for backtest replay) --
+    tick_queue: asyncio.Queue | None = None
+    tick_writer_task = None
+    if dutch_mode:
+        from qm.data.connectors.tick_writer import TickWriter, TickSnapshot
+        tick_queue = asyncio.Queue()
+        _tw = TickWriter(
+            base_dir=Path("data/raw/polymarket_ticks"),
+            flush_interval=60.0,
+            flush_size=500,
+        )
+        tick_writer_task = asyncio.create_task(_tw.run(tick_queue, running_flag))
+
     # -- Timing cadences ------------------------------------------
     last_display_time = 0.0
     last_state_save = time.time()
@@ -1278,6 +1308,30 @@ async def main_loop(args: argparse.Namespace) -> None:
                             book_up = ws_feed_early.get_book("up")
                             book_dn = ws_feed_early.get_book("down")
                             _dutch_tick(state, elapsed_pct, book_up, book_dn, args, bar_id_from_market)
+                            # Record early-bar tick to Parquet
+                            if tick_queue is not None and book_up and book_dn:
+                                pm_mkt = state.pm_markets.get(tf)
+                                if pm_mkt and pm_mkt.window_end:
+                                    from qm.data.connectors.tick_writer import TickSnapshot
+                                    tick_queue.put_nowait(TickSnapshot(
+                                        ts=datetime.now(UTC),
+                                        asset=asset_label,
+                                        timeframe=state.tf_label,
+                                        condition_id=state.dutch_bar_condition_id,
+                                        bid_up=book_up.best_bid, ask_up=book_up.best_ask,
+                                        bid_dn=book_dn.best_bid, ask_dn=book_dn.best_ask,
+                                        mid_up=book_up.mid,
+                                        spread_up=book_up.spread, spread_dn=book_dn.spread,
+                                        depth_bid_up=book_up.bids.get(book_up.best_bid, 0.0),
+                                        depth_ask_up=book_up.asks.get(book_up.best_ask, 0.0),
+                                        depth_bid_dn=book_dn.bids.get(book_dn.best_bid, 0.0),
+                                        depth_ask_dn=book_dn.asks.get(book_dn.best_ask, 0.0),
+                                        is_heartbeat=False,
+                                        is_stale=not ws_feed_early._connected.is_set(),
+                                        spot_price=getattr(state, "last_spot", float("nan")),
+                                        window_start=pm_mkt.window_start,
+                                        window_end=pm_mkt.window_end,
+                                    ))
                 continue  # no partial bar yet for this TF
 
             last_price = state.last_spot = partial.current_price
@@ -1355,6 +1409,31 @@ async def main_loop(args: argparse.Namespace) -> None:
                 book_up = ws_feed.get_book("up") if ws_feed and has_book else None
                 book_dn = ws_feed.get_book("down") if ws_feed and has_book else None
                 _dutch_tick(state, elapsed_pct, book_up, book_dn, args, bar_id)
+
+                # Record tick to Parquet (same data backtest will replay)
+                if tick_queue is not None and book_up and book_dn:
+                    pm_mkt = state.pm_markets.get(tf)
+                    if pm_mkt and pm_mkt.window_end:
+                        from qm.data.connectors.tick_writer import TickSnapshot
+                        tick_queue.put_nowait(TickSnapshot(
+                            ts=datetime.now(UTC),
+                            asset=asset_label,
+                            timeframe=state.tf_label,
+                            condition_id=state.dutch_bar_condition_id,
+                            bid_up=book_up.best_bid, ask_up=book_up.best_ask,
+                            bid_dn=book_dn.best_bid, ask_dn=book_dn.best_ask,
+                            mid_up=book_up.mid,
+                            spread_up=book_up.spread, spread_dn=book_dn.spread,
+                            depth_bid_up=book_up.bids.get(book_up.best_bid, 0.0),
+                            depth_ask_up=book_up.asks.get(book_up.best_ask, 0.0),
+                            depth_bid_dn=book_dn.bids.get(book_dn.best_bid, 0.0),
+                            depth_ask_dn=book_dn.asks.get(book_dn.best_ask, 0.0),
+                            is_heartbeat=False,
+                            is_stale=not ws_feed._connected.is_set() if ws_feed else True,
+                            spot_price=getattr(state, "last_spot", float("nan")),
+                            window_start=pm_mkt.window_start,
+                            window_end=pm_mkt.window_end,
+                        ))
 
             # -- Resolution polling (every 30s) -------------------
             if dutch_mode and not args.no_polymarket and state.scanner:
@@ -1438,6 +1517,12 @@ async def main_loop(args: argparse.Namespace) -> None:
             state.dutch_logger.close()
         for feed in state.ws_feeds.values():
             feed.stop()
+    # Wait for TickWriter to flush remaining ticks
+    if tick_writer_task:
+        try:
+            await asyncio.wait_for(tick_writer_task, timeout=5.0)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            pass
     logger.info("Monitor stopped.")
 
 
