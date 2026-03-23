@@ -1054,6 +1054,18 @@ def _update_feature_cache(state: TFState, bar, pipeline: FeaturePipeline) -> Non
             }
             state.feat_cache.update_history(cache_dict)
             logger.debug("Updated feature cache %s (%d features)", state.tf_label, len(cache_dict))
+
+            # Record cache snapshot for backtest parity
+            try:
+                bar_id = int(bar.timestamp.timestamp())
+                snap_dir = state.dutch_logger._dir if state.dutch_logger else Path(f"data/dutch_paper/{state.tf_label}")
+                snap_dir.mkdir(parents=True, exist_ok=True)
+                snap_file = snap_dir / f"cache_snapshots_{datetime.now(UTC).strftime('%Y-%m-%d')}.jsonl"
+                with open(snap_file, "a") as f:
+                    json.dump({"bar_id": bar_id, "cache": cache_dict}, f)
+                    f.write("\n")
+            except Exception:
+                pass  # Non-fatal
         except Exception as e:
             logger.warning("Feature cache update failed (%s): %s", state.tf_label, e)
 

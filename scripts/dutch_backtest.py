@@ -106,6 +106,11 @@ def parse_args() -> argparse.Namespace:
              "'live-log'=from paper trading logs, 'spot'=first/last spot (default)",
     )
     p.add_argument(
+        "--feature-source", choices=["recorded", "recompute"], default="recompute",
+        help="Feature source: 'recorded'=live's cache snapshots (100%% parity), "
+             "'recompute'=run full pipeline (default, for model changes)",
+    )
+    p.add_argument(
         "--tick-cadence", choices=["live", "full"], default="full",
         help="Tick rate: 'live'=1Hz downsample (parity with paper trading), "
              "'full'=all ticks (default, for researcher/sweeps)",
@@ -466,6 +471,7 @@ def run_backtest(
     filter_date: date_type | None,
     tick_cadence: str = "full",
     outcome_source: str = "spot",
+    feature_source: str = "recompute",
 ) -> dict:
     """Run backtest for one (asset, timeframe) pair. Returns metrics dict."""
     asset_enum = ASSET_MAP[asset]
@@ -576,6 +582,19 @@ def run_backtest(
         )
     elif outcome_source == "live-log":
         resolutions = _load_live_outcomes(asset, tf_label)
+
+    # -- Load feature cache snapshots (for recorded mode) --
+    cache_snapshots: dict[int, dict] = {}
+    if feature_source == "recorded":
+        snap_dir = Path(f"data/dutch_paper/{asset}_{tf_label}")
+        for sf in snap_dir.glob("cache_snapshots_*.jsonl"):
+            for line in open(sf):
+                try:
+                    s = json.loads(line)
+                    cache_snapshots[s["bar_id"]] = s["cache"]
+                except (json.JSONDecodeError, KeyError):
+                    continue
+        logger.info("Loaded %d cache snapshots for recorded feature mode", len(cache_snapshots))
 
     # -- Replay loop --
     recent_bars: list = []  # Store Bar objects (same as live monitor_pulse.py)
@@ -733,9 +752,15 @@ def run_backtest(
                 matched, pc, profit, fills_n,
             )
 
-        # -- Inter-bar feature cache update (mirrors monitor_pulse.py:876-902) --
+        # -- Inter-bar feature cache update --
         recent_bars[:] = recent_bars[-500:]
-        if len(recent_bars) >= 20:
+        if feature_source == "recorded":
+            # Use live's exact cache snapshot (100% parity)
+            recorded_cache = cache_snapshots.get(bar_id)
+            if recorded_cache:
+                feat_cache.update_history(recorded_cache)
+        elif len(recent_bars) >= 20:
+            # Recompute from BarBuilder (for model changes)
             try:
                 bars_data = {
                     "time": [b.timestamp for b in recent_bars],
@@ -898,6 +923,7 @@ def main() -> None:
                 filter_date=filter_date,
                 tick_cadence=args.tick_cadence,
                 outcome_source=args.outcome_source,
+                feature_source=args.feature_source,
             )
             all_metrics.append(metrics)
             if metrics.get("bars_evaluated", 0) > 0:
