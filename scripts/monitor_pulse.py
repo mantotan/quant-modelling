@@ -1329,7 +1329,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                                         is_heartbeat=False,
                                         is_stale=not ws_feed_early._connected.is_set(),
                                         spot_price=getattr(state, "last_spot", float("nan")),
-                                        window_start=pm_mkt.window_start,
+                                        window_start=pm_mkt.window_end - timedelta(seconds=BAR_SECONDS[tf]),
                                         window_end=pm_mkt.window_end,
                                     ))
                 continue  # no partial bar yet for this TF
@@ -1431,7 +1431,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                             is_heartbeat=False,
                             is_stale=not ws_feed._connected.is_set() if ws_feed else True,
                             spot_price=getattr(state, "last_spot", float("nan")),
-                            window_start=pm_mkt.window_start,
+                            window_start=pm_mkt.window_end - timedelta(seconds=BAR_SECONDS[tf]),
                             window_end=pm_mkt.window_end,
                         ))
 
