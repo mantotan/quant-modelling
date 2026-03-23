@@ -1057,28 +1057,27 @@ def _update_feature_cache(state: TFState, bar, pipeline: FeaturePipeline) -> Non
             }
             state.feat_cache.update_history(cache_dict)
             logger.debug("Updated feature cache %s (%d features)", state.tf_label, len(cache_dict))
+
+            # Record cache snapshot for backtest parity
+            try:
+                bar_id = int(bar.timestamp.timestamp())
+                snap_dir = state.dutch_logger._dir if state.dutch_logger else Path(f"data/dutch_paper/{state.tf_label}")
+                snap_dir.mkdir(parents=True, exist_ok=True)
+                snap_file = snap_dir / f"cache_snapshots_{datetime.now(UTC).strftime('%Y-%m-%d')}.jsonl"
+                with open(snap_file, "a") as f:
+                    json.dump({"bar_id": bar_id, "cache": cache_dict}, f)
+                    f.write("\n")
+                logger.info("Recorded cache snapshot for bar %d (%d features)", bar_id, len(cache_dict))
+            except Exception as e2:
+                logger.warning("Cache snapshot write failed: %s", e2)
         except Exception as e:
             logger.warning("Feature cache update failed (%s): %s", state.tf_label, e)
 
-    # Record cache snapshot for backtest parity (always, even with < 20 bars)
-    # The cache has valid values from warm-up; this records whatever state it's in.
-    try:
-        bar_id = int(bar.timestamp.timestamp())
-        snap_dir = state.dutch_logger._dir if state.dutch_logger else Path(f"data/dutch_paper/{state.tf_label}")
-        snap_dir.mkdir(parents=True, exist_ok=True)
-        snap_file = snap_dir / f"cache_snapshots_{datetime.now(UTC).strftime('%Y-%m-%d')}.jsonl"
-        # Get current cache state (whatever was set by warm-up or last update)
-        cache = getattr(state.feat_cache, "_calculator", None)
-        if cache:
-            asset_key = f"{bar.asset.value}_{bar.timeframe.value}"
-            cache_state = getattr(cache, "_history_cache", {}).get(asset_key, {})
-            if cache_state:
-                with open(snap_file, "a") as f:
-                    json.dump({"bar_id": bar_id, "cache": cache_state}, f)
-                    f.write("\n")
-                logger.info("Recorded cache snapshot for bar %d (%d features)", bar_id, len(cache_state))
-    except Exception as e:
-        logger.warning("Cache snapshot write failed: %s", e)
+    # Record cache snapshot for backtest parity
+    # When recent_bars < 20, cache hasn't changed from warm-up (same in BT and live).
+    # When >= 20, cache_dict was just computed above — record it.
+    # (This intentionally only records when cache is recomputed, which is the
+    #  moment the backtest needs to match.)
 
 
 # -- Main loop --------------------------------------------------------
@@ -1282,10 +1281,14 @@ async def main_loop(args: argparse.Namespace) -> None:
             await asyncio.sleep(POLL_INTERVAL)
 
         # -- Process completed bars (route to correct TFState) ----
+        if not completed_bars.empty():
+            logger.info("Draining completed_bars queue (size=%d)", completed_bars.qsize())
         while not completed_bars.empty():
             bar = completed_bars.get_nowait()
+            logger.info("Processing completed bar: %s %s", bar.timeframe.value, bar.timestamp)
             state = tf_states.get(bar.timeframe)
             if state is None:
+                logger.warning("No TFState for %s, skipping", bar.timeframe)
                 continue
             print_bar_complete(bar)
             _update_feature_cache(state, bar, pipeline)
