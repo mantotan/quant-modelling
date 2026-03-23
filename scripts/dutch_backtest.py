@@ -462,19 +462,21 @@ def run_backtest(
 
         last_inference_ts = None
         cal_prob = 0.5
-        last_sampled_ts = None
-        btc_last_sampled_ts = None
+        last_spot_price = None
+        btc_last_spot_price = None
         current_elapsed_pct = 0.0
-        tick_cadence_sec = 1.0 if tick_cadence == "live" else 0.0
+        live_cadence = tick_cadence == "live"
 
         for tick in bar_ticks.iter_rows(named=True):
             ts = tick["ts"]
+            spot = tick["spot_price"]
 
-            # Downsample: only feed BarBuilder at cadence rate (1Hz for live parity)
+            # In live mode: only feed BarBuilder when spot_price changes
+            # (matches live TradingView which only fires on_trade on new lp)
             is_sampled = (
-                tick_cadence_sec == 0.0
-                or last_sampled_ts is None
-                or (ts - last_sampled_ts).total_seconds() >= tick_cadence_sec
+                not live_cadence
+                or last_spot_price is None
+                or spot != last_spot_price
             )
 
             if not is_sampled:
@@ -485,7 +487,7 @@ def run_backtest(
                     engine.on_fill(fill.order, fill.fill_price, fill.filled_shares)
                 continue
 
-            last_sampled_ts = ts
+            last_spot_price = spot
 
             # Feed spot into BarBuilder (at cadence rate, matching live)
             completed = bar_builder.on_trade(
@@ -505,17 +507,17 @@ def run_backtest(
             # Advance BTC ticks at same cadence for cross-asset models
             if btc_bar_builder and isinstance(feat_cache, CrossAssetLiveFeatureCache):
                 while btc_next_tick and btc_next_tick["ts"] <= ts:
-                    btc_ts = btc_next_tick["ts"]
+                    btc_spot = btc_next_tick["spot_price"]
                     btc_sampled = (
-                        tick_cadence_sec == 0.0
-                        or btc_last_sampled_ts is None
-                        or (btc_ts - btc_last_sampled_ts).total_seconds() >= tick_cadence_sec
+                        not live_cadence
+                        or btc_last_spot_price is None
+                        or btc_spot != btc_last_spot_price
                     )
                     if btc_sampled:
                         btc_bar_builder.on_trade(
-                            Asset.BTC, btc_next_tick["spot_price"], 0.001, btc_ts,
+                            Asset.BTC, btc_spot, 0.001, btc_next_tick["ts"],
                         )
-                        btc_last_sampled_ts = btc_ts
+                        btc_last_spot_price = btc_spot
                     btc_next_tick = next(btc_tick_iter, None)
                 btc_partial = btc_bar_builder.get_partial_bar(
                     Asset.BTC, tf_enum, now=ts,
