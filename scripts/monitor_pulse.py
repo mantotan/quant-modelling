@@ -342,7 +342,7 @@ async def price_feed(
                         vol = v.get("volume", 0)
                         now = datetime.now(UTC)
                         bars = bar_builder.on_trade(
-                            asset_enum, float(lp), float(vol) * 0.0001, now,
+                            asset_enum, float(lp), 0.001, now,
                         )
                         for bar in bars:
                             await completed_bars.put(bar)
@@ -899,21 +899,17 @@ def _run_inference(
     btc_bar_builder: BarBuilder | None,
 ) -> None:
     """Run model prediction and update state probabilities."""
-    # Inject BTC context from parallel BarBuilder (cross-asset)
-    if btc_bar_builder is not None and isinstance(state.feat_cache, CrossAssetLiveFeatureCache):
+    from qm.strategy.dutch.tick_processor import run_inference
+
+    btc_partial = None
+    if btc_bar_builder is not None:
         btc_partial = btc_bar_builder.get_partial_bar(Asset.BTC, state.tf)
-        if btc_partial is not None:
-            state.feat_cache.set_btc_partial(btc_partial)
 
     t0 = time.perf_counter_ns()
-    features = state.feat_cache.get_features(partial)
-    state.raw_prob = float(state.model.predict(features.reshape(1, -1))[0])
-    state.cal_prob = state.raw_prob
-    if state.calibrator:
-        state.cal_prob = float(state.calibrator.transform(
-            np.array([state.raw_prob]),
-            np.array([elapsed_pct]),
-        )[0])
+    state.raw_prob, state.cal_prob, _features = run_inference(
+        state.model, state.calibrator, state.feat_cache,
+        partial, elapsed_pct, btc_partial,
+    )
     state.pred_us = (time.perf_counter_ns() - t0) / 1000
     state.last_model_time = time.time()
 
@@ -923,25 +919,19 @@ def _dutch_tick(
     args: argparse.Namespace, bar_id: int,
 ) -> None:
     """Run Dutch engine on_tick + simulator fills."""
+    from qm.strategy.dutch.tick_processor import process_tick
+
     if not state.dutch_engine or not state.dutch_sim:
         return
 
-    # Engine decides orders (only when model has run this bar)
-    if state.last_model_time > 0:  # model_ready equivalent
-        orders = state.dutch_engine.on_tick(elapsed_pct, state.cal_prob, book_up, book_dn)
+    # Only process when model has run this bar
+    if state.last_model_time > 0:
+        orders, fills = process_tick(
+            elapsed_pct, state.cal_prob, book_up, book_dn,
+            state.dutch_engine, state.dutch_sim,
+        )
     else:
-        orders = []
-    # V7.5: Cancel pending orders on flip kill (matches sweep behavior).
-    if state.dutch_engine.flip_killed and not orders:
-        for c_order in state.dutch_sim.cancel_all():
-            state.dutch_engine.on_order_cancelled(c_order)
-    for order in orders:
-        state.dutch_sim.place(order)
-
-    # Simulator processes fills
-    fills = state.dutch_sim.on_tick(elapsed_pct, book_up, book_dn)
-    for fill in fills:
-        state.dutch_engine.on_fill(fill.order, fill.fill_price, fill.filled_shares)
+        orders, fills = [], []
 
     # Optional tick logging
     if getattr(args, "dutch_tick_log", False) and state.dutch_logger:
@@ -1285,7 +1275,7 @@ async def main_loop(args: argparse.Namespace) -> None:
 
             last_price = partial.current_price
             bar_id = int(partial.window_start.timestamp())
-            elapsed_pct = partial.elapsed_seconds / (bar_secs + 1e-10)
+            elapsed_pct = partial.elapsed_seconds / (partial.remaining_seconds + partial.elapsed_seconds + 1e-10)
 
             # Reset on new bar
             if bar_id != state.current_bar_id:

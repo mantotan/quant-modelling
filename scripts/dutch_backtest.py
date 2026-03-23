@@ -23,7 +23,6 @@ from datetime import date as date_type
 from pathlib import Path
 
 import lightgbm as lgb
-import numpy as np
 import polars as pl
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -42,6 +41,7 @@ from qm.strategy.dutch.engine import (  # noqa: E402
 )
 from qm.strategy.dutch.fill_simulator import LimitOrderSimulator  # noqa: E402
 from qm.strategy.dutch.summary_logger import DutchSummaryLogger  # noqa: E402
+from qm.strategy.dutch.tick_processor import process_tick, run_inference  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -339,15 +339,14 @@ def run_backtest(
     warm_up_cache(feat_cache, asset_enum, tf_enum)
 
     # -- BTC cross-asset context (non-BTC models only) --
-    btc_bars_dict: dict = {}
+    btc_bar_builder: BarBuilder | None = None
+    btc_tick_iter = None
+    btc_next_tick = None
     if isinstance(feat_cache, CrossAssetLiveFeatureCache):
+        # Warm up BTC historical features from OHLCV (same as live warm-up)
         store = ParquetStore(base_dir=Path("data/raw/ohlcv"))
         btc_bars_df = store.read_bars(Asset.BTC, tf_enum)
         if not btc_bars_df.is_empty():
-            for row in btc_bars_df.iter_rows(named=True):
-                btc_bars_dict[row["time"]] = row
-            logger.info("Loaded %d BTC bars for cross-asset context", len(btc_bars_dict))
-            # Warm up BTC historical features
             btc_pipeline = FeaturePipeline()
             btc_featured = btc_pipeline.compute(btc_bars_df.tail(500))
             btc_last = btc_featured.row(-1, named=True)
@@ -357,6 +356,25 @@ def run_backtest(
             }
             feat_cache.update_btc_history(btc_hist)
             logger.info("BTC warm-up: cached %d features", len(btc_hist))
+
+        # Load BTC tick data for incremental PartialBar (same as live BarBuilder)
+        btc_ticks_path = ticks_dir / "asset=BTC" / f"timeframe={tf_label}"
+        if btc_ticks_path.exists():
+            btc_scan = pl.scan_parquet(str(btc_ticks_path / "**/*.parquet"))
+            btc_scan = btc_scan.filter(~pl.col("is_stale") & ~pl.col("is_heartbeat"))
+            if filter_date is not None:
+                btc_scan = btc_scan.filter(pl.col("ts").dt.date() == filter_date)
+            btc_ticks_df = btc_scan.sort("ts").collect()
+            if not btc_ticks_df.is_empty():
+                btc_bar_builder = BarBuilder(
+                    assets=[Asset.BTC], timeframes=[tf_enum],
+                )
+                btc_tick_iter = iter(btc_ticks_df.iter_rows(named=True))
+                btc_next_tick = next(btc_tick_iter, None)
+                logger.info(
+                    "BTC ticks: %d for incremental PartialBar",
+                    len(btc_ticks_df),
+                )
 
     # -- BarBuilder --
     bar_builder = BarBuilder(assets=[asset_enum], timeframes=[tf_enum])
@@ -401,7 +419,7 @@ def run_backtest(
         engine.set_event_callback(dutch_logger.log_event)
 
     # -- Replay loop --
-    recent_bars: list[dict] = []  # empty — matches paper trading (monitor_pulse.py:833)
+    recent_bars: list = []  # Store Bar objects (same as live monitor_pulse.py)
     bar_summaries: list[DutchBarSummary] = []
     bar_groups = ticks_df.group_by("window_start", maintain_order=True)
 
@@ -432,8 +450,8 @@ def run_backtest(
         engine.set_bar_info(
             bar_id=bar_id,
             condition_id=condition_id,
-            window_start=str(window_start),
-            window_end=str(window_end),
+            window_start=str(bar_id),
+            window_end=str(bar_id + int(bar_secs)),
         )
 
         last_inference_ts = None
@@ -449,85 +467,45 @@ def run_backtest(
                 asset_enum, tick["spot_price"], 0.001, ts,
             )
             for bar in completed:
-                recent_bars.append({
-                    "time": bar.timestamp,
-                    "open": bar.open, "high": bar.high,
-                    "low": bar.low, "close": bar.close,
-                    "volume": bar.volume,
-                    "trade_count": bar.trade_count,
-                    "vwap": bar.vwap,
-                })
+                recent_bars.append(bar)  # Store Bar objects (same as live)
                 recent_bars[:] = recent_bars[-500:]
-                # Update feature cache (mirrors monitor_pulse.py:889-899)
-                if len(recent_bars) >= 20:
-                    try:
-                        bars_df = pl.DataFrame(recent_bars)
-                        featured = pipeline.compute(bars_df)
-                        last_row = featured.row(-1, named=True)
-                        cache_dict = {
-                            name: float(val)
-                            for name in pipeline.feature_names
-                            if (val := last_row.get(name)) is not None
-                        }
-                        feat_cache.update_history(cache_dict)
-                    except Exception:
-                        pass  # non-fatal: stale features better than crash
 
             # Model inference at cadence (1Hz default)
             if (
                 last_inference_ts is None
                 or (ts - last_inference_ts).total_seconds() >= inference_interval
             ):
-                # Inject BTC context for cross-asset models
-                if btc_bars_dict and isinstance(feat_cache, CrossAssetLiveFeatureCache):
-                    btc_bar = btc_bars_dict.get(window_start)
-                    if btc_bar is not None:
-                        elapsed_sec = (ts - window_start).total_seconds()
-                        feat_cache.set_btc_partial(PartialBar(
-                            window_start=window_start, window_end=window_end,
-                            asset=Asset.BTC, timeframe=tf_enum,
-                            open=btc_bar["open"],
-                            high_so_far=btc_bar["high"],
-                            low_so_far=btc_bar["low"],
-                            current_price=btc_bar["close"],
-                            volume_so_far=btc_bar["volume"],
-                            trade_count=btc_bar.get("trade_count", 0),
-                            elapsed_seconds=elapsed_sec,
-                            remaining_seconds=max(0.0, bar_secs - elapsed_sec),
-                        ))
+                # Advance BTC ticks for cross-asset models (incremental, same as live)
+                if btc_bar_builder and isinstance(feat_cache, CrossAssetLiveFeatureCache):
+                    while btc_next_tick and btc_next_tick["ts"] <= ts:
+                        btc_bar_builder.on_trade(
+                            Asset.BTC, btc_next_tick["spot_price"], 0.001,
+                            btc_next_tick["ts"],
+                        )
+                        btc_next_tick = next(btc_tick_iter, None)
+                    btc_partial = btc_bar_builder.get_partial_bar(
+                        Asset.BTC, tf_enum, now=ts,
+                    )
+                else:
+                    btc_partial = None
 
                 partial = bar_builder.get_partial_bar(
                     asset_enum, tf_enum, now=ts,
                 )
                 if partial is not None:
-                    features = feat_cache.get_features(partial)
-                    raw_prob = float(
-                        model.predict(features.reshape(1, -1))[0],
+                    _raw, cal_prob, _feats = run_inference(
+                        model, calibrator, feat_cache,
+                        partial, time_pct, btc_partial,
                     )
-                    if calibrator:
-                        cal_prob = float(calibrator.transform(
-                            np.array([raw_prob]),
-                            np.array([time_pct]),
-                        )[0])
-                    else:
-                        cal_prob = raw_prob
                     last_inference_ts = ts
 
             # Reconstruct books from tick BBO
             book_up, book_dn = tick_to_books(tick)
 
-            # Engine → orders → sim → fills → engine
-            orders = engine.on_tick(time_pct, cal_prob, book_up, book_dn)
-            # V7.5: Cancel pending orders on flip kill (matches sweep behavior).
-            # cancel_all() is a no-op after first call per bar (returns []).
-            if engine.flip_killed and not orders:
-                for c_order in sim.cancel_all():
-                    engine.on_order_cancelled(c_order)
-            for order in orders:
-                sim.place(order)
-            fills = sim.on_tick(time_pct, book_up, book_dn)
-            for fill in fills:
-                engine.on_fill(fill.order, fill.fill_price, fill.filled_shares)
+            # Engine → orders → sim → fills (shared code path with live)
+            _orders, _fills = process_tick(
+                time_pct, cal_prob, book_up, book_dn, engine, sim,
+            )
 
         # -- Bar end: cancel + resolve (mirrors monitor_pulse.py:916-947) --
         cancelled = sim.cancel_all()
