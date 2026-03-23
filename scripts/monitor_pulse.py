@@ -933,11 +933,17 @@ def _dutch_tick(
     else:
         orders, fills = [], []
 
-    # Optional tick logging
+    # Optional tick logging (includes spot_price + book BBO for replay parity)
     if getattr(args, "dutch_tick_log", False) and state.dutch_logger:
         state.dutch_logger.log_tick(bar_id, {
             "time_pct": round(elapsed_pct, 4),
             "cal_prob": round(state.cal_prob, 4),
+            "raw_prob": round(state.raw_prob, 4),
+            "spot_price": getattr(state, "last_spot", None),
+            "bid_up": round(book_up.best_bid, 4) if book_up else None,
+            "ask_up": round(book_up.best_ask, 4) if book_up else None,
+            "bid_dn": round(book_dn.best_bid, 4) if book_dn else None,
+            "ask_dn": round(book_dn.best_ask, 4) if book_dn else None,
             "has_book": book_up is not None,
             "snap": state.dutch_engine.snapshot(),
             "pending_orders": len(state.dutch_sim.pending_orders),
@@ -1273,7 +1279,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                             _dutch_tick(state, elapsed_pct, book_up, book_dn, args, bar_id_from_market)
                 continue  # no partial bar yet for this TF
 
-            last_price = partial.current_price
+            last_price = state.last_spot = partial.current_price
             bar_id = int(partial.window_start.timestamp())
             elapsed_pct = partial.elapsed_seconds / (partial.remaining_seconds + partial.elapsed_seconds + 1e-10)
 
