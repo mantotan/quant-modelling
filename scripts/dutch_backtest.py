@@ -622,27 +622,10 @@ def run_backtest(
             ts = tick["ts"]
             spot = tick["spot_price"]
 
-            # In live mode: only feed BarBuilder when spot_price changes
-            # BUT always process ticks with is_inference=True (cal_prob update)
-            is_inference_tick = (
-                live_cadence and tick.get("is_inference", False)
-            )
-            is_sampled = (
-                not live_cadence
-                or last_spot_price is None
-                or spot != last_spot_price
-                or is_inference_tick  # Always process inference ticks
-            )
-
-            if not is_sampled:
-                # Feed ONLY the fill simulator for fill detection (not BarBuilder)
-                book_up, book_dn = tick_to_books(tick)
-                fills = sim.on_tick(current_elapsed_pct, book_up, book_dn)
-                for fill in fills:
-                    engine.on_fill(fill.order, fill.fill_price, fill.filled_shares)
-                continue
-
-            # Feed BarBuilder only when spot actually changed (not on inference-only ticks)
+            # In live mode: process EVERY tick (live's main loop runs on every
+            # book update, not just spot changes). Only feed BarBuilder when
+            # spot_price actually changes.
+            # In full mode: also process every tick.
             spot_changed = (last_spot_price is None or spot != last_spot_price)
             if spot_changed:
                 last_spot_price = spot
