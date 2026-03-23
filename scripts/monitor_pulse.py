@@ -1064,8 +1064,9 @@ def _update_feature_cache(state: TFState, bar, pipeline: FeaturePipeline) -> Non
                 with open(snap_file, "a") as f:
                     json.dump({"bar_id": bar_id, "cache": cache_dict}, f)
                     f.write("\n")
-            except Exception:
-                pass  # Non-fatal
+                logger.info("Recorded cache snapshot for bar %d (%d features)", bar_id, len(cache_dict))
+            except Exception as e:
+                logger.warning("Cache snapshot write failed: %s", e)
         except Exception as e:
             logger.warning("Feature cache update failed (%s): %s", state.tf_label, e)
 
