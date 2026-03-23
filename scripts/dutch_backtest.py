@@ -99,6 +99,11 @@ def parse_args() -> argparse.Namespace:
         help="Write bar JSONL to data/dutch_backtest/",
     )
     p.add_argument("--verbose", action="store_true", help="Per-bar detail logging")
+    p.add_argument(
+        "--tick-cadence", choices=["live", "full"], default="full",
+        help="Tick rate: 'live'=1Hz downsample (parity with paper trading), "
+             "'full'=all ticks (default, for researcher/sweeps)",
+    )
     return p.parse_args()
 
 
@@ -316,6 +321,7 @@ def run_backtest(
     save_bars: bool,
     verbose: bool,
     filter_date: date_type | None,
+    tick_cadence: str = "full",
 ) -> dict:
     """Run backtest for one (asset, timeframe) pair. Returns metrics dict."""
     asset_enum = ASSET_MAP[asset]
@@ -456,46 +462,76 @@ def run_backtest(
 
         last_inference_ts = None
         cal_prob = 0.5
+        last_sampled_ts = None
+        btc_last_sampled_ts = None
+        current_elapsed_pct = 0.0
+        tick_cadence_sec = 1.0 if tick_cadence == "live" else 0.0
 
         for tick in bar_ticks.iter_rows(named=True):
             ts = tick["ts"]
-            elapsed = (ts - window_start).total_seconds()
-            time_pct = min(elapsed / bar_secs, 1.0)
 
-            # Feed spot into BarBuilder
+            # Downsample: only feed BarBuilder at cadence rate (1Hz for live parity)
+            is_sampled = (
+                tick_cadence_sec == 0.0
+                or last_sampled_ts is None
+                or (ts - last_sampled_ts).total_seconds() >= tick_cadence_sec
+            )
+
+            if not is_sampled:
+                # Feed ONLY the fill simulator for fill detection (not BarBuilder)
+                book_up, book_dn = tick_to_books(tick)
+                fills = sim.on_tick(current_elapsed_pct, book_up, book_dn)
+                for fill in fills:
+                    engine.on_fill(fill.order, fill.fill_price, fill.filled_shares)
+                continue
+
+            last_sampled_ts = ts
+
+            # Feed spot into BarBuilder (at cadence rate, matching live)
             completed = bar_builder.on_trade(
                 asset_enum, tick["spot_price"], 0.001, ts,
             )
             for bar in completed:
-                recent_bars.append(bar)  # Store Bar objects (same as live)
+                recent_bars.append(bar)
                 recent_bars[:] = recent_bars[-500:]
 
-            # Model inference at cadence (1Hz default)
+            # Compute elapsed_pct from PartialBar (same formula as live)
+            partial = bar_builder.get_partial_bar(asset_enum, tf_enum, now=ts)
+            if partial is not None:
+                current_elapsed_pct = partial.elapsed_seconds / (
+                    partial.remaining_seconds + partial.elapsed_seconds + 1e-10
+                )
+
+            # Advance BTC ticks at same cadence for cross-asset models
+            if btc_bar_builder and isinstance(feat_cache, CrossAssetLiveFeatureCache):
+                while btc_next_tick and btc_next_tick["ts"] <= ts:
+                    btc_ts = btc_next_tick["ts"]
+                    btc_sampled = (
+                        tick_cadence_sec == 0.0
+                        or btc_last_sampled_ts is None
+                        or (btc_ts - btc_last_sampled_ts).total_seconds() >= tick_cadence_sec
+                    )
+                    if btc_sampled:
+                        btc_bar_builder.on_trade(
+                            Asset.BTC, btc_next_tick["spot_price"], 0.001, btc_ts,
+                        )
+                        btc_last_sampled_ts = btc_ts
+                    btc_next_tick = next(btc_tick_iter, None)
+                btc_partial = btc_bar_builder.get_partial_bar(
+                    Asset.BTC, tf_enum, now=ts,
+                )
+            else:
+                btc_partial = None
+
+            # Model inference at cadence (same as live's 1Hz MODEL_INTERVAL)
             if (
                 last_inference_ts is None
                 or (ts - last_inference_ts).total_seconds() >= inference_interval
             ):
-                # Advance BTC ticks for cross-asset models (incremental, same as live)
-                if btc_bar_builder and isinstance(feat_cache, CrossAssetLiveFeatureCache):
-                    while btc_next_tick and btc_next_tick["ts"] <= ts:
-                        btc_bar_builder.on_trade(
-                            Asset.BTC, btc_next_tick["spot_price"], 0.001,
-                            btc_next_tick["ts"],
-                        )
-                        btc_next_tick = next(btc_tick_iter, None)
-                    btc_partial = btc_bar_builder.get_partial_bar(
-                        Asset.BTC, tf_enum, now=ts,
-                    )
-                else:
-                    btc_partial = None
-
-                partial = bar_builder.get_partial_bar(
-                    asset_enum, tf_enum, now=ts,
-                )
                 if partial is not None:
                     _raw, cal_prob, _feats = run_inference(
                         model, calibrator, feat_cache,
-                        partial, time_pct, btc_partial,
+                        partial, current_elapsed_pct, btc_partial,
                     )
                     last_inference_ts = ts
 
@@ -504,7 +540,7 @@ def run_backtest(
 
             # Engine → orders → sim → fills (shared code path with live)
             _orders, _fills = process_tick(
-                time_pct, cal_prob, book_up, book_dn, engine, sim,
+                current_elapsed_pct, cal_prob, book_up, book_dn, engine, sim,
             )
 
         # -- Bar end: cancel + resolve (mirrors monitor_pulse.py:916-947) --
@@ -702,6 +738,7 @@ def main() -> None:
                 save_bars=args.save_bars,
                 verbose=args.verbose,
                 filter_date=filter_date,
+                tick_cadence=args.tick_cadence,
             )
             all_metrics.append(metrics)
             if metrics.get("bars_evaluated", 0) > 0:
