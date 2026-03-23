@@ -939,6 +939,7 @@ def _dutch_tick(
             "time_pct": round(elapsed_pct, 4),
             "cal_prob": round(state.cal_prob, 4),
             "raw_prob": round(state.raw_prob, 4),
+            "is_inference": getattr(state, "_did_infer", False),
             "spot_price": getattr(state, "last_spot", None),
             "bid_up": round(book_up.best_bid, 4) if book_up else None,
             "ask_up": round(book_up.best_ask, 4) if book_up else None,
@@ -1301,8 +1302,10 @@ async def main_loop(args: argparse.Namespace) -> None:
                 state.last_triggered = set()
 
             # -- Model inference at 1Hz ----------------------------
+            state._did_infer = False
             if now - state.last_model_time >= MODEL_INTERVAL:
                 _run_inference(state, partial, elapsed_pct, btc_bar_builder)
+                state._did_infer = True
 
             # -- Check market data --------------------------------
             pm_market = state.pm_markets.get(tf)

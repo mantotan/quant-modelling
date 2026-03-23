@@ -175,10 +175,15 @@ def replay_bar(
             partial.remaining_seconds + partial.elapsed_seconds + 1e-10
         )
 
-        # Inference at ~1Hz (when live's cal_prob changed = new inference happened)
+        # Inference: only when live actually inferred (is_inference flag)
+        # Fallback for old logs without is_inference: detect cal_prob changes
         live_cal = tick["cal_prob"]
-        if live_cal != cal_prob or last_inference_pct < 0:
-            # Live did an inference here — we do too
+        did_infer = tick.get("is_inference", False)
+        if not did_infer:
+            # Fallback: infer when cal_prob changed (old tick logs)
+            did_infer = (live_cal != cal_prob or last_inference_pct < 0)
+
+        if did_infer:
             _raw, replay_cal, _feats = run_inference(
                 model, calibrator, feat_cache,
                 partial, current_elapsed_pct, None,
