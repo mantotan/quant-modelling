@@ -178,8 +178,10 @@ def replay_bar(
         # Inference: only when live actually inferred (is_inference flag)
         # Fallback for old logs without is_inference: detect cal_prob changes
         live_cal = tick["cal_prob"]
-        did_infer = tick.get("is_inference", False)
-        if not did_infer:
+        has_flag = "is_inference" in tick
+        if has_flag:
+            did_infer = tick["is_inference"]
+        else:
             # Fallback: infer when cal_prob changed (old tick logs)
             did_infer = (live_cal != cal_prob or last_inference_pct < 0)
 
@@ -314,14 +316,20 @@ def main():
     print(f"Cost:   replay=${result['replay_cost']:.2f}  live=${result['live_cost']:.2f}")
     print(f"PnL:    replay=${result['replay_pnl']:.2f}  live=${result['live_pnl']:.2f}")
 
-    # Verdict
-    all_ok = (
-        len(ro) == len(lo)
-        and all(r["side"] == l["side"] for r, l in zip(ro, lo))
-        and abs(result["replay_flips"] - result["live_flips"]) <= 1
-        and exact / len(infs) > 0.95 if infs else True
-    )
-    print(f"\nVerdict: {'PASS' if all_ok else 'FAIL'}")
+    # Verdict — what matters: same orders, same PnL
+    order_count_ok = len(ro) == len(lo)
+    side_ok = all(r["side"] == l["side"] for r, l in zip(ro, lo))
+    cost_ok = abs(result["replay_cost"] - result["live_cost"]) < 0.50
+    pnl_ok = abs(result["replay_pnl"] - result["live_pnl"]) < 0.50
+    flips_ok = abs(result["replay_flips"] - result["live_flips"]) <= 1
+
+    all_ok = order_count_ok and side_ok and cost_ok and pnl_ok and flips_ok
+    print(f"\nVerdict: {'PASS' if all_ok else 'FAIL'}  "
+          f"[orders={'OK' if order_count_ok else 'DIFF'} "
+          f"side={'OK' if side_ok else 'DIFF'} "
+          f"cost={'OK' if cost_ok else 'DIFF'} "
+          f"pnl={'OK' if pnl_ok else 'DIFF'} "
+          f"flips={'OK' if flips_ok else 'DIFF'}]")
 
 
 if __name__ == "__main__":
