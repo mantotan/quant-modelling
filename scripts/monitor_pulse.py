@@ -135,6 +135,7 @@ class TFState:
     last_model_time: float = 0.0
     dutch_state_file: Path | None = None
     recent_bars: list = field(default_factory=list)
+    _market_matches: bool = True
 
 
 def parse_args() -> argparse.Namespace:
@@ -954,6 +955,49 @@ def _dutch_tick(
         })
 
 
+def _record_tick(
+    tick_queue, state, ws_feed, elapsed_pct: float,
+    asset_label: str, bar_secs: float,
+) -> None:
+    """Record a tick to Parquet for backtest replay."""
+    rec_up = ws_feed.get_book("up")
+    rec_dn = ws_feed.get_book("down")
+    if not (rec_up and rec_dn and rec_up.best_bid > 0 and rec_up.best_ask < 1):
+        return
+    from qm.data.connectors.tick_writer import TickSnapshot
+    bar_id = state.current_bar_id
+    rec_ws = datetime.fromtimestamp(bar_id, tz=UTC)
+    rec_we = datetime.fromtimestamp(bar_id + int(bar_secs), tz=UTC)
+    # Consume is_inference flag (only first tick after inference is marked)
+    is_inf = getattr(state, "_did_infer", False)
+    if is_inf:
+        state._did_infer = False
+    try:
+        tick_queue.put_nowait(TickSnapshot(
+            ts=datetime.now(UTC),
+            asset=asset_label,
+            timeframe=state.tf_label,
+            condition_id=state.dutch_bar_condition_id,
+            bid_up=rec_up.best_bid, ask_up=rec_up.best_ask,
+            bid_dn=rec_dn.best_bid, ask_dn=rec_dn.best_ask,
+            mid_up=rec_up.mid,
+            spread_up=rec_up.spread, spread_dn=rec_dn.spread,
+            depth_bid_up=rec_up.bids.get(rec_up.best_bid, 0.0),
+            depth_ask_up=rec_up.asks.get(rec_up.best_ask, 0.0),
+            depth_bid_dn=rec_dn.bids.get(rec_dn.best_bid, 0.0),
+            depth_ask_dn=rec_dn.asks.get(rec_dn.best_ask, 0.0),
+            is_heartbeat=False,
+            is_stale=not ws_feed._connected.is_set(),
+            spot_price=getattr(state, "last_spot", float("nan")),
+            window_start=rec_ws, window_end=rec_we,
+            elapsed_pct=elapsed_pct,
+            cal_prob=state.cal_prob,
+            is_inference=is_inf,
+        ))
+    except asyncio.QueueFull:
+        pass  # Non-fatal: drop tick if queue full
+
+
 async def _check_resolutions(
     state: TFState, asset_enum: Asset, scanner: MarketScanner,
 ) -> None:
@@ -1263,22 +1307,10 @@ async def main_loop(args: argparse.Namespace) -> None:
                 len(timeframes))
 
     while running_flag[0]:
-        # -- WAIT: event-driven (dutch) or polling (non-dutch) ----
-        # In dutch mode, wait for ANY book update across all TF ws_feeds
-        waited = False
-        if dutch_mode:
-            for state in tf_states.values():
-                ws_feed = state.ws_feeds.get(state.tf)
-                if ws_feed and ws_feed._connected.is_set():
-                    try:
-                        await asyncio.wait_for(ws_feed.book_updated.wait(), timeout=0.2)
-                        ws_feed.book_updated.clear()
-                        waited = True
-                        break
-                    except asyncio.TimeoutError:
-                        pass
-        if not waited:
-            await asyncio.sleep(POLL_INTERVAL)
+        # ============================================================
+        # SLOW PATH: bar management, inference, display (~20 Hz)
+        # Must run FIRST so current_bar_id and cal_prob are fresh
+        # ============================================================
 
         # -- Process completed bars (route to correct TFState) ----
         if not completed_bars.empty():
@@ -1299,7 +1331,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                 btc_completed_bars.get_nowait()
                 # BTC bars consumed to keep queue clear; cache updated via partial
 
-        # -- Per-TF processing ------------------------------------
+        # -- Per-TF processing: bar detection + inference -----------
         now = time.time()
         for tf, state in tf_states.items():
             bar_secs = BAR_SECONDS[tf]
@@ -1309,6 +1341,7 @@ async def main_loop(args: argparse.Namespace) -> None:
 
             if partial is None:
                 # V7.5: early-bar Dutch processing from Polymarket market timing
+                # Bar boundary detection + setup only (tick processing in fast path)
                 if dutch_mode and state.dutch_engine:
                     pm_mkt = state.pm_markets.get(tf)
                     if pm_mkt and pm_mkt.window_end:
@@ -1316,7 +1349,6 @@ async def main_loop(args: argparse.Namespace) -> None:
                         now_ts = time.time()
                         if now_ts < bar_id_from_market or now_ts >= bar_id_from_market + bar_secs + 5:
                             continue
-                        elapsed_pct = max(0.0, min(1.0, (now_ts - bar_id_from_market) / bar_secs))
                         # Handle bar boundary (new bar detected)
                         if bar_id_from_market != state.current_bar_id and state.current_bar_id != 0:
                             state.last_model_time = 0.0  # require fresh prediction
@@ -1326,41 +1358,6 @@ async def main_loop(args: argparse.Namespace) -> None:
                         elif state.current_bar_id == 0:
                             state.current_bar_id = bar_id_from_market
                             _setup_new_bar(state, bar_id_from_market, pm_mkt)
-                        # Feed engine with book data
-                        ws_feed_early = state.ws_feeds.get(tf)
-                        if (ws_feed_early and ws_feed_early._connected.is_set()
-                                and ws_feed_early.best_bid_up > 0
-                                and ws_feed_early.best_ask_up < 1):
-                            book_up = ws_feed_early.get_book("up")
-                            book_dn = ws_feed_early.get_book("down")
-                            _dutch_tick(state, elapsed_pct, book_up, book_dn, args, bar_id_from_market)
-                            # Record early-bar tick to Parquet
-                            if tick_queue is not None and book_up and book_dn:
-                                from qm.data.connectors.tick_writer import TickSnapshot
-                                eb_ws = datetime.fromtimestamp(bar_id_from_market, tz=UTC)
-                                eb_we = datetime.fromtimestamp(bar_id_from_market + int(bar_secs), tz=UTC)
-                                tick_queue.put_nowait(TickSnapshot(
-                                    ts=datetime.now(UTC),
-                                    asset=asset_label,
-                                    timeframe=state.tf_label,
-                                    condition_id=state.dutch_bar_condition_id,
-                                    bid_up=book_up.best_bid, ask_up=book_up.best_ask,
-                                    bid_dn=book_dn.best_bid, ask_dn=book_dn.best_ask,
-                                    mid_up=book_up.mid,
-                                    spread_up=book_up.spread, spread_dn=book_dn.spread,
-                                    depth_bid_up=book_up.bids.get(book_up.best_bid, 0.0),
-                                    depth_ask_up=book_up.asks.get(book_up.best_ask, 0.0),
-                                    depth_bid_dn=book_dn.bids.get(book_dn.best_bid, 0.0),
-                                    depth_ask_dn=book_dn.asks.get(book_dn.best_ask, 0.0),
-                                    is_heartbeat=False,
-                                    is_stale=not ws_feed_early._connected.is_set(),
-                                    spot_price=getattr(state, "last_spot", float("nan")),
-                                    window_start=eb_ws,
-                                    window_end=eb_we,
-                                    elapsed_pct=elapsed_pct,
-                                    cal_prob=state.cal_prob,
-                                    is_inference=getattr(state, "_did_infer", False),
-                                ))
                 continue  # no partial bar yet for this TF
 
             last_price = state.last_spot = partial.current_price
@@ -1390,7 +1387,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                 _run_inference(state, partial, elapsed_pct, btc_bar_builder)
                 state._did_infer = True
 
-            # -- Check market data --------------------------------
+            # -- Check market data (cache for fast path) -----------
             pm_market = state.pm_markets.get(tf)
             ws_feed = state.ws_feeds.get(tf)
 
@@ -1400,6 +1397,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                 market_bar_start = int(pm_market.window_end.timestamp()) - bar_secs_int
                 if market_bar_start != bar_id:
                     market_matches = False
+            state._market_matches = market_matches
 
             has_book = (
                 market_matches
@@ -1433,50 +1431,46 @@ async def main_loop(args: argparse.Namespace) -> None:
                             None, None, None, None,
                         )
 
-            # -- Dutch tick processing ----------------------------
-            if dutch_mode and state.dutch_engine and state.dutch_sim:
-                book_up = ws_feed.get_book("up") if ws_feed and has_book else None
-                book_dn = ws_feed.get_book("down") if ws_feed and has_book else None
-                _dutch_tick(state, elapsed_pct, book_up, book_dn, args, bar_id)
-
-                # Record tick to Parquet (same data backtest will replay)
-                # Use ws_feed books directly (not gated on market_matches) to capture
-                # all ticks from bar start, even during market transition
-                if tick_queue is not None and ws_feed and ws_feed._connected.is_set():
-                    rec_up = ws_feed.get_book("up")
-                    rec_dn = ws_feed.get_book("down")
-                    if (rec_up and rec_dn
-                            and rec_up.best_bid > 0 and rec_up.best_ask < 1):
-                        # Use PartialBar window if available, else derive from bar_id
-                        rec_ws = partial.window_start if partial else datetime.fromtimestamp(bar_id, tz=UTC)
-                        rec_we = partial.window_end if partial else datetime.fromtimestamp(bar_id + int(bar_secs), tz=UTC)
-                        from qm.data.connectors.tick_writer import TickSnapshot
-                        tick_queue.put_nowait(TickSnapshot(
-                            ts=datetime.now(UTC),
-                            asset=asset_label,
-                            timeframe=state.tf_label,
-                            condition_id=state.dutch_bar_condition_id,
-                            bid_up=rec_up.best_bid, ask_up=rec_up.best_ask,
-                            bid_dn=rec_dn.best_bid, ask_dn=rec_dn.best_ask,
-                            mid_up=rec_up.mid,
-                            spread_up=rec_up.spread, spread_dn=rec_dn.spread,
-                            depth_bid_up=rec_up.bids.get(rec_up.best_bid, 0.0),
-                            depth_ask_up=rec_up.asks.get(rec_up.best_ask, 0.0),
-                            depth_bid_dn=rec_dn.bids.get(rec_dn.best_bid, 0.0),
-                            depth_ask_dn=rec_dn.asks.get(rec_dn.best_ask, 0.0),
-                            is_heartbeat=False,
-                            is_stale=False,
-                            spot_price=getattr(state, "last_spot", float("nan")),
-                            window_start=rec_ws,
-                            window_end=rec_we,
-                            elapsed_pct=elapsed_pct,
-                            cal_prob=state.cal_prob,
-                            is_inference=getattr(state, "_did_infer", False),
-                        ))
-
             # -- Resolution polling (every 30s) -------------------
             if dutch_mode and not args.no_polymarket and state.scanner:
                 await _check_resolutions(state, asset_enum, state.scanner)
+
+        # ============================================================
+        # FAST PATH: process ALL pending book updates for dutch engine
+        # Runs AFTER slow path so current_bar_id and cal_prob are fresh
+        # ============================================================
+        if dutch_mode:
+            for tf, state in tf_states.items():
+                ws_feed = state.ws_feeds.get(tf)
+                if not ws_feed or not ws_feed._connected.is_set():
+                    continue
+                if not ws_feed.book_updated.is_set():
+                    continue
+                ws_feed.book_updated.clear()
+
+                # Skip if no bar set up yet or market doesn't match
+                if state.current_bar_id == 0:
+                    continue
+                if not state._market_matches:
+                    continue
+
+                # Compute elapsed_pct from wall clock
+                bar_secs = BAR_SECONDS[tf]
+                elapsed_pct = max(0.0, min(1.0,
+                    (time.time() - state.current_bar_id) / bar_secs))
+
+                # Dutch tick processing
+                if state.dutch_engine and state.dutch_sim:
+                    book_up = ws_feed.get_book("up") if ws_feed.best_bid_up > 0 and ws_feed.best_ask_up < 1 else None
+                    book_dn = ws_feed.get_book("down") if book_up else None
+                    if book_up and book_dn:
+                        _dutch_tick(state, elapsed_pct, book_up, book_dn, args,
+                                    state.current_bar_id)
+
+                        # Record tick to Parquet
+                        if tick_queue is not None:
+                            _record_tick(tick_queue, state, ws_feed, elapsed_pct,
+                                         asset_label, bar_secs)
 
         # -- Display at cadence (cycle through TFs) ----------------
         now_disp = time.time()
@@ -1546,6 +1540,11 @@ async def main_loop(args: argparse.Namespace) -> None:
             last_state_save = now_disp
             for state in tf_states.values():
                 _save_tf_state(state)
+
+        # -- Yield to WSS tasks -----------------------------------
+        # Dutch: 50ms sleep — WSS runs during this, sets book_updated.
+        # Non-dutch: 1s poll (no fast path needed, display-only mode).
+        await asyncio.sleep(0.05 if dutch_mode else POLL_INTERVAL)
 
     # -- Shutdown -------------------------------------------------
     logger.info("Shutting down...")

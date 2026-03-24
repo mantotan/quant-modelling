@@ -14,9 +14,9 @@ Autonomously optimize DutchConfig parameters for bilateral accumulation of Polym
 | correct_side_pct | > 0.55 | Fraction of bars where unmatched side wins |
 | sell_ratio | 0.10-0.40 | Sell events / buy events (capital recycling) |
 
-Note: `matched_ratio` and `fill_rate` are tracked but NOT KEEP gates — backtest produces
-lower values than live (12% fill, 6% match) due to tick density differences. These improve
-when moving to live execution.
+Note: As of V4 (2026-03-24), backtest and live process identical ticks at the same rate
+(event-driven ~20Hz). Backtest fill behavior matches live exactly — `matched_ratio` and
+`fill_rate` are now reliable in backtest.
 
 ## Architecture
 
@@ -54,7 +54,7 @@ See `knobs_{PAIR}.json` for per-pair parameters. Key categories:
 - One-sided cost cap (max_onesided_cost) — **V7.3**
 - Balance (max_side_fraction)
 - Sell (sell_loss_start, sell_dump_start, sell_max_fraction, sell_min_shares, rebalance_warmup)
-- Fill simulator (fill_ticks, sweep_threshold, chase_threshold, max_chase, spread_offset, cancel_distance)
+- Fill simulator (chase_threshold, max_chase, spread_offset, cancel_distance)
 
 ### V7.1: Conviction Buy Skip (2026-03-22)
 Skip buying the unfavored side when model conviction is below threshold.
@@ -72,16 +72,15 @@ Limit total spend when no matched pairs exist (pure directional bet).
 - `max_onesided_cost=5.0` — max $5 before first pair forms.
 - Prevents $8-9 tail losses on wrong directional bets.
 
-## Fill Simulator V3 (2026-03-21)
+## Fill Simulator V4 (2026-03-24)
 
-Maker-only simulation matching production `post_only=True` behavior:
-- **Buy orders**: placed at bid (maker) or at ask-0.01 (aggressive tiers). Never at/above ask.
-- **Sell orders**: placed at ask (maker on sell side). Fill when bid >= ask.
-- **fill_ticks=10** (~5s): ask must stay at/below limit for 10 consecutive book updates.
-- **Sweep detection**: price passes through limit by >= 1c → instant fill on tick 1.
-- **Zero-depth rejection**: no depth at limit price → order stays pending.
-- **Chase**: below ask only, max 2 chases, cancel at >= 5c drift.
-- **Sell depth**: checks `book.bids` (not asks) for sell-side liquidity.
+Market-cross fill model using real recorded bid/ask tick data:
+- **Buy orders**: fills immediately when `ask <= limit` on any tick (market crossed our level).
+- **Sell orders**: fills immediately when `bid >= limit` on any tick.
+- **Depth check**: verifies shares available at price level before filling. Zero depth → stays pending.
+- **No artificial delay**: removed V3's `fill_ticks=10` consecutive-tick counter. Real market data determines fills.
+- **Chase**: below ask only, max 2 chases, cancel at >= 5c drift (unchanged).
+- **Parity**: live and backtest process identical ticks at same rate (event-driven ~20Hz).
 
 ## Current Best Config (Exp17, 2026-03-22)
 

@@ -159,7 +159,7 @@ Priority chain — first match wins:
 | Unmatched cap | min_unmatched_shares, unmatched_ratio |
 | Balance | max_side_fraction |
 | Sell | sell_loss_start, sell_dump_start, sell_max_fraction, sell_min_shares, rebalance_warmup |
-| Fill sim | fill_ticks, sweep_threshold, chase_threshold, max_chase, spread_offset, cancel_distance |
+| Fill sim | chase_threshold, max_chase, spread_offset, cancel_distance |
 
 **Read-only params** (NEVER change): `strategy`, `version`, `min_order_usd`. `bar_seconds` is not in knobs.json.
 

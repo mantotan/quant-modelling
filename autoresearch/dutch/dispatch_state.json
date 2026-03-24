@@ -18,8 +18,8 @@
   "last_updated": "2026-03-23T04:00:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-22T07:26:47Z",
-  "last_strategist_at": 119,
-  "last_auditor_at": 119,
-  "total_iterations": 127,
-  "last_exit_reason": "RESEARCHER iter=127: XRP_1h DISCARD -- max_onesided_cost 5.0->2.0 worsened pair_cost 7.9% (0.6738->0.7271); low matched_ratio=3.4% sensitive to onesided cap; floor confirmed at onesided=5.0 for XRP_1h; advanced pair to BTC_5m"
+  "last_strategist_at": 0,
+  "last_auditor_at": 0,
+  "total_iterations": 0,
+  "last_exit_reason": "RESET: V4 fill model + event-driven ticks, fresh baselines needed"
 }

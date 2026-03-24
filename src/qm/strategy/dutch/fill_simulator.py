@@ -1,12 +1,13 @@
-"""Limit order fill simulator V3 for dutch accumulation paper trading.
+"""Limit order fill simulator V4 for dutch accumulation paper trading.
 
-Simulates realistic maker-only (post_only=True) limit order fills:
-  - Consecutive-tick fill model (N ticks at/below limit = fill, default 10 ~5s)
-  - Sweep detection: instant fill when price passes through by >= 1c
+Simulates realistic maker-only (post_only=True) limit order fills using
+real market tick data:
+  - Market-cross fill model: fills when market price crosses our limit
+    (ask <= buy_limit or bid >= sell_limit) — uses real recorded book data
+  - Depth-aware partial fills (buy checks asks, sell checks bids)
   - Order chasing: cancel + re-place when market moves away (never above ask)
   - Cancel orders that drift too far (>=5c)
-  - Depth-aware partial fills (buy checks asks, sell checks bids)
-  - State machine: PENDING → CROSSING → FILLED | CANCELLED | EXPIRED
+  - State machine: PENDING → FILLED | CANCELLED | EXPIRED
 """
 
 from __future__ import annotations
@@ -62,11 +63,12 @@ class SimulatorStats:
 
 
 class LimitOrderSimulator:
-    """Simulates limit order fills with consecutive-tick model and chasing.
+    """Simulates limit order fills using real market tick data.
 
-    Fill model: order fills after N consecutive ticks where ask <= limit (buy)
-    or bid >= limit (sell). If price bounces, counter resets to 0.
-    Sweep: if price passes through limit by >= sweep_threshold, fill on tick 1.
+    Fill model (V4): fills immediately when market price crosses our limit
+    (ask <= buy_limit or bid >= sell_limit). Uses actual recorded book data
+    — no artificial tick counters. Depth-aware: checks available shares
+    at price level before filling.
 
     Chase model: if market moves >chase_threshold from our limit, cancel
     and re-place at new bid + offset (never at/above ask). Max chase_count.
@@ -74,12 +76,12 @@ class LimitOrderSimulator:
 
     def __init__(
         self,
-        fill_ticks: int = 10,
+        fill_ticks: int = 1,  # V4: kept for stats compatibility, not used in fill logic
         chase_threshold: float = 0.03,
         max_chase: int = 2,
         spread_offset: float = 0.01,
         cancel_distance: float = 0.05,
-        sweep_threshold: float = 0.01,
+        sweep_threshold: float = 0.01,  # V4: unused, kept for backward compat
         resting_cancel_distance: float = 0.10,  # V7.4: wider for resting
     ) -> None:
         self._fill_ticks = fill_ticks
@@ -182,50 +184,32 @@ class LimitOrderSimulator:
                 # Sell fills when bid >= limit (buyer reaches our ask price)
                 bid = book.best_bid
                 if bid >= limit:
-                    po.consecutive_ticks_at_limit += 1
-                    # V3: sweep detection — bid passed through our sell limit
-                    sweep = (bid - limit) >= self._sweep_threshold
-                    if sweep or po.consecutive_ticks_at_limit >= self._fill_ticks:
-                        # V3: check bid-side depth before filling
-                        available = self._available_at_or_above(book, limit)
-                        if available <= 0:
-                            po.consecutive_ticks_at_limit = 0
-                            remaining.append(po)
-                        else:
-                            fill = self._execute_fill(po, time_pct, available)
-                            fills.append(fill)
-                            po.state = "FILLED"
+                    # Market crossed our level — check depth and fill
+                    available = self._available_at_or_above(book, limit)
+                    if available > 0:
+                        po.consecutive_ticks_at_limit += 1
+                        fill = self._execute_fill(po, time_pct, available)
+                        fills.append(fill)
+                        po.state = "FILLED"
                     else:
                         remaining.append(po)
                 else:
-                    if po.consecutive_ticks_at_limit > 0:
-                        po.would_fill_count += 1
-                    po.consecutive_ticks_at_limit = 0
                     po.state = "PENDING"
                     remaining.append(po)
             else:
                 # Buy fills when ask <= limit (seller reaches our bid price)
                 ask = book.best_ask
                 if ask <= limit:
-                    po.consecutive_ticks_at_limit += 1
-                    # V3: sweep detection — ask dropped through our buy limit
-                    sweep = (limit - ask) >= self._sweep_threshold
-                    if sweep or po.consecutive_ticks_at_limit >= self._fill_ticks:
-                        # V3: check ask-side depth before filling
-                        available = self._available_at_or_below(book, limit)
-                        if available <= 0:
-                            po.consecutive_ticks_at_limit = 0
-                            remaining.append(po)
-                        else:
-                            fill = self._execute_fill(po, time_pct, available)
-                            fills.append(fill)
-                            po.state = "FILLED"
+                    # Market crossed our level — check depth and fill
+                    available = self._available_at_or_below(book, limit)
+                    if available > 0:
+                        po.consecutive_ticks_at_limit += 1
+                        fill = self._execute_fill(po, time_pct, available)
+                        fills.append(fill)
+                        po.state = "FILLED"
                     else:
                         remaining.append(po)
                 else:
-                    if po.consecutive_ticks_at_limit > 0:
-                        po.would_fill_count += 1
-                    po.consecutive_ticks_at_limit = 0
                     po.state = "PENDING"
                     remaining.append(po)
 
