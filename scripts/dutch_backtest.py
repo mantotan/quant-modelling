@@ -635,6 +635,7 @@ def run_backtest(
         last_spot_price = None
         btc_last_spot_price = None
         _last_recorded_pb = None
+        _last_recorded_btc_pb = None
         current_elapsed_pct = 0.0
         live_cadence = tick_cadence == "live"
 
@@ -710,6 +711,22 @@ def run_backtest(
                     elapsed_seconds=tick["pb_elapsed_s"],
                     remaining_seconds=tick["pb_remaining_s"],
                 )
+                # Also cache BTC cross-asset PartialBar if recorded
+                if tick.get("btc_open") is not None:
+                    _last_recorded_btc_pb = PB(
+                        window_start=tick["window_start"],
+                        window_end=tick["window_end"],
+                        asset=Asset.BTC,
+                        timeframe=tf_enum,
+                        open=tick["btc_open"],
+                        high_so_far=tick["btc_high"],
+                        low_so_far=tick["btc_low"],
+                        current_price=tick["btc_close"],
+                        volume_so_far=tick["btc_volume"],
+                        trade_count=tick["btc_trade_count"],
+                        elapsed_seconds=tick["btc_elapsed_s"],
+                        remaining_seconds=tick["btc_remaining_s"],
+                    )
 
             # Model inference: use recorded cal_prob if available, else recompute
             has_recorded_cal = (
@@ -729,6 +746,9 @@ def run_backtest(
                 # Use latest recorded PartialBar if available
                 if live_cadence and _last_recorded_pb is not None:
                     partial_for_inf = _last_recorded_pb
+                    # Also use recorded BTC PartialBar for cross-asset
+                    if _last_recorded_btc_pb is not None:
+                        btc_partial = _last_recorded_btc_pb
                 else:
                     partial_for_inf = partial if not has_recorded_pct else bar_builder.get_partial_bar(asset_enum, tf_enum, now=ts)
                 if partial_for_inf is not None:

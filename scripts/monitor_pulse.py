@@ -917,6 +917,7 @@ def _run_inference(
     state.pred_us = (time.perf_counter_ns() - t0) / 1000
     state.last_model_time = time.time()
     state._last_inference_partial = partial  # Cache for tick recording
+    state._last_inference_btc_partial = btc_partial  # Cache BTC cross-asset for recording
 
 
 def _dutch_tick(
@@ -975,6 +976,7 @@ def _record_tick(
         state._did_infer = False
     # PartialBar snapshot on inference ticks (for backtest feature parity)
     pb = getattr(state, "_last_inference_partial", None) if is_inf else None
+    btc_pb = getattr(state, "_last_inference_btc_partial", None) if is_inf else None
     try:
         tick_queue.put_nowait(TickSnapshot(
             ts=datetime.now(UTC),
@@ -1004,6 +1006,14 @@ def _record_tick(
             pb_trade_count=pb.trade_count if pb else None,
             pb_elapsed_s=pb.elapsed_seconds if pb else None,
             pb_remaining_s=pb.remaining_seconds if pb else None,
+            btc_open=btc_pb.open if btc_pb else None,
+            btc_high=btc_pb.high_so_far if btc_pb else None,
+            btc_low=btc_pb.low_so_far if btc_pb else None,
+            btc_close=btc_pb.current_price if btc_pb else None,
+            btc_volume=btc_pb.volume_so_far if btc_pb else None,
+            btc_trade_count=btc_pb.trade_count if btc_pb else None,
+            btc_elapsed_s=btc_pb.elapsed_seconds if btc_pb else None,
+            btc_remaining_s=btc_pb.remaining_seconds if btc_pb else None,
         ))
     except asyncio.QueueFull:
         pass  # Non-fatal: drop tick if queue full

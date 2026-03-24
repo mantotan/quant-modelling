@@ -50,6 +50,15 @@ TICK_SCHEMA = {
     "pb_trade_count": pl.Int64,
     "pb_elapsed_s": pl.Float64,
     "pb_remaining_s": pl.Float64,
+    # BTC cross-asset PartialBar (for non-BTC models, inference ticks only)
+    "btc_open": pl.Float64,
+    "btc_high": pl.Float64,
+    "btc_low": pl.Float64,
+    "btc_close": pl.Float64,
+    "btc_volume": pl.Float64,
+    "btc_trade_count": pl.Int64,
+    "btc_elapsed_s": pl.Float64,
+    "btc_remaining_s": pl.Float64,
 }
 
 
@@ -89,6 +98,15 @@ class TickSnapshot:
     pb_trade_count: int | None = None
     pb_elapsed_s: float | None = None
     pb_remaining_s: float | None = None
+    # BTC cross-asset PartialBar (for non-BTC models)
+    btc_open: float | None = None
+    btc_high: float | None = None
+    btc_low: float | None = None
+    btc_close: float | None = None
+    btc_volume: float | None = None
+    btc_trade_count: int | None = None
+    btc_elapsed_s: float | None = None
+    btc_remaining_s: float | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -123,6 +141,14 @@ class TickSnapshot:
             "pb_trade_count": self.pb_trade_count,
             "pb_elapsed_s": self.pb_elapsed_s,
             "pb_remaining_s": self.pb_remaining_s,
+            "btc_open": self.btc_open,
+            "btc_high": self.btc_high,
+            "btc_low": self.btc_low,
+            "btc_close": self.btc_close,
+            "btc_volume": self.btc_volume,
+            "btc_trade_count": self.btc_trade_count,
+            "btc_elapsed_s": self.btc_elapsed_s,
+            "btc_remaining_s": self.btc_remaining_s,
         }
 
 
