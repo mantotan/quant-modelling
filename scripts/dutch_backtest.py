@@ -704,7 +704,30 @@ def run_backtest(
                 last_inference_ts is None
                 or (ts - last_inference_ts).total_seconds() >= inference_interval
             ):
-                partial_for_inf = partial if not has_recorded_pct else bar_builder.get_partial_bar(asset_enum, tf_enum, now=ts)
+                # Use recorded PartialBar if available (for intra-bar feature parity)
+                has_recorded_pb = (
+                    live_cadence
+                    and tick.get("pb_open") is not None
+                    and tick.get("is_inference")
+                )
+                if has_recorded_pb:
+                    from qm.core.types import PartialBar
+                    partial_for_inf = PartialBar(
+                        window_start=tick["window_start"],
+                        window_end=tick["window_end"],
+                        asset=asset_enum,
+                        timeframe=tf_enum,
+                        open=tick["pb_open"],
+                        high_so_far=tick["pb_high"],
+                        low_so_far=tick["pb_low"],
+                        current_price=tick["pb_close"],
+                        volume_so_far=tick["pb_volume"],
+                        trade_count=tick["pb_trade_count"],
+                        elapsed_seconds=tick["pb_elapsed_s"],
+                        remaining_seconds=tick["pb_remaining_s"],
+                    )
+                else:
+                    partial_for_inf = partial if not has_recorded_pct else bar_builder.get_partial_bar(asset_enum, tf_enum, now=ts)
                 if partial_for_inf is not None:
                     _raw, cal_prob, _feats = run_inference(
                         model, calibrator, feat_cache,

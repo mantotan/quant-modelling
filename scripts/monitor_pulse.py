@@ -916,6 +916,7 @@ def _run_inference(
     )
     state.pred_us = (time.perf_counter_ns() - t0) / 1000
     state.last_model_time = time.time()
+    state._last_inference_partial = partial  # Cache for tick recording
 
 
 def _dutch_tick(
@@ -972,6 +973,8 @@ def _record_tick(
     is_inf = getattr(state, "_did_infer", False)
     if is_inf:
         state._did_infer = False
+    # PartialBar snapshot on inference ticks (for backtest feature parity)
+    pb = getattr(state, "_last_inference_partial", None) if is_inf else None
     try:
         tick_queue.put_nowait(TickSnapshot(
             ts=datetime.now(UTC),
@@ -993,6 +996,14 @@ def _record_tick(
             elapsed_pct=elapsed_pct,
             cal_prob=state.cal_prob,
             is_inference=is_inf,
+            pb_open=pb.open if pb else None,
+            pb_high=pb.high_so_far if pb else None,
+            pb_low=pb.low_so_far if pb else None,
+            pb_close=pb.current_price if pb else None,
+            pb_volume=pb.volume_so_far if pb else None,
+            pb_trade_count=pb.trade_count if pb else None,
+            pb_elapsed_s=pb.elapsed_seconds if pb else None,
+            pb_remaining_s=pb.remaining_seconds if pb else None,
         ))
     except asyncio.QueueFull:
         pass  # Non-fatal: drop tick if queue full

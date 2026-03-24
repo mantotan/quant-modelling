@@ -41,6 +41,15 @@ TICK_SCHEMA = {
     "elapsed_pct": pl.Float64,
     "cal_prob": pl.Float64,
     "is_inference": pl.Boolean,
+    # PartialBar snapshot (populated on inference ticks only, null otherwise)
+    "pb_open": pl.Float64,
+    "pb_high": pl.Float64,
+    "pb_low": pl.Float64,
+    "pb_close": pl.Float64,
+    "pb_volume": pl.Float64,
+    "pb_trade_count": pl.Int64,
+    "pb_elapsed_s": pl.Float64,
+    "pb_remaining_s": pl.Float64,
 }
 
 
@@ -71,6 +80,15 @@ class TickSnapshot:
     elapsed_pct: float = 0.0
     cal_prob: float = 0.5
     is_inference: bool = False
+    # PartialBar snapshot (populated on inference ticks only)
+    pb_open: float | None = None
+    pb_high: float | None = None
+    pb_low: float | None = None
+    pb_close: float | None = None
+    pb_volume: float | None = None
+    pb_trade_count: int | None = None
+    pb_elapsed_s: float | None = None
+    pb_remaining_s: float | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -97,6 +115,14 @@ class TickSnapshot:
             "elapsed_pct": self.elapsed_pct,
             "cal_prob": self.cal_prob,
             "is_inference": self.is_inference,
+            "pb_open": self.pb_open,
+            "pb_high": self.pb_high,
+            "pb_low": self.pb_low,
+            "pb_close": self.pb_close,
+            "pb_volume": self.pb_volume,
+            "pb_trade_count": self.pb_trade_count,
+            "pb_elapsed_s": self.pb_elapsed_s,
+            "pb_remaining_s": self.pb_remaining_s,
         }
 
 
