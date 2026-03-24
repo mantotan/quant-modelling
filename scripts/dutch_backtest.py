@@ -634,6 +634,7 @@ def run_backtest(
         cal_prob = 0.5
         last_spot_price = None
         btc_last_spot_price = None
+        _last_recorded_pb = None
         current_elapsed_pct = 0.0
         live_cadence = tick_cadence == "live"
 
@@ -691,9 +692,30 @@ def run_backtest(
             else:
                 btc_partial = None
 
+            # Cache latest recorded PartialBar from is_inference ticks
+            if (live_cadence and tick.get("pb_open") is not None
+                    and tick.get("is_inference")):
+                from qm.core.types import PartialBar as PB
+                _last_recorded_pb = PB(
+                    window_start=tick["window_start"],
+                    window_end=tick["window_end"],
+                    asset=asset_enum,
+                    timeframe=tf_enum,
+                    open=tick["pb_open"],
+                    high_so_far=tick["pb_high"],
+                    low_so_far=tick["pb_low"],
+                    current_price=tick["pb_close"],
+                    volume_so_far=tick["pb_volume"],
+                    trade_count=tick["pb_trade_count"],
+                    elapsed_seconds=tick["pb_elapsed_s"],
+                    remaining_seconds=tick["pb_remaining_s"],
+                )
+
             # Model inference: use recorded cal_prob if available, else recompute
             has_recorded_cal = (
-                live_cadence and "cal_prob" in tick and "is_inference" in tick
+                live_cadence
+                and feature_source == "recorded"
+                and "cal_prob" in tick and "is_inference" in tick
             )
             if has_recorded_cal:
                 # Use live's exact recorded values — 100% parity
@@ -704,28 +726,9 @@ def run_backtest(
                 last_inference_ts is None
                 or (ts - last_inference_ts).total_seconds() >= inference_interval
             ):
-                # Use recorded PartialBar if available (for intra-bar feature parity)
-                has_recorded_pb = (
-                    live_cadence
-                    and tick.get("pb_open") is not None
-                    and tick.get("is_inference")
-                )
-                if has_recorded_pb:
-                    from qm.core.types import PartialBar
-                    partial_for_inf = PartialBar(
-                        window_start=tick["window_start"],
-                        window_end=tick["window_end"],
-                        asset=asset_enum,
-                        timeframe=tf_enum,
-                        open=tick["pb_open"],
-                        high_so_far=tick["pb_high"],
-                        low_so_far=tick["pb_low"],
-                        current_price=tick["pb_close"],
-                        volume_so_far=tick["pb_volume"],
-                        trade_count=tick["pb_trade_count"],
-                        elapsed_seconds=tick["pb_elapsed_s"],
-                        remaining_seconds=tick["pb_remaining_s"],
-                    )
+                # Use latest recorded PartialBar if available
+                if live_cadence and _last_recorded_pb is not None:
+                    partial_for_inf = _last_recorded_pb
                 else:
                     partial_for_inf = partial if not has_recorded_pct else bar_builder.get_partial_bar(asset_enum, tf_enum, now=ts)
                 if partial_for_inf is not None:
