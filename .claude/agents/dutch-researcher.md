@@ -60,9 +60,13 @@ Parse into ASSET and TF: split on `_` (e.g. "BTC" and "5m").
    uv run scripts/dutch_backtest.py \
      --knobs-dir autoresearch/dutch/ \
      --pair {PAIR} \
+     --tick-cadence live \
+     --outcome-source live-log \
      --output autoresearch/dutch/backtest_results.tsv \
      --model-dir data/models/pulse_v2
    ```
+   Flags: `--tick-cadence live` uses recorded features for 100% prediction parity.
+   `--outcome-source live-log` uses Polymarket resolution (not spot price direction).
 
 2. **Parse the {ASSET} {TF} row** from `autoresearch/dutch/backtest_results.tsv` — extract the 10 standard metrics:
    avg_pair_cost, avg_profit, total_profit, matched_ratio, fill_rate, correct_side_pct, budget_util, sell_ratio, max_dd_pct, bars_evaluated.
