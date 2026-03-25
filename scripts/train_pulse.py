@@ -45,10 +45,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--asset", type=str, default="BTC", help="Asset (default: BTC)")
     parser.add_argument("--timeframe", type=str, default="5m", help="Timeframe (default: 5m)")
     parser.add_argument("--data-dir", type=str, default="data/raw/ohlcv", help="Data directory")
-    parser.add_argument("--model-dir", type=str, default="data/models/pulse", help="Model output dir")
+    parser.add_argument(
+        "--model-dir", type=str, default="data/models/pulse", help="Model output dir",
+    )
     parser.add_argument("--n-trials", type=int, default=20, help="Optuna HPO trials")
     parser.add_argument("--efficiency", type=float, default=0.75, help="Market efficiency (0-1)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument(
+        "--model-type", default="lgbm",
+        choices=["lgbm", "alstm"],
+        help="Model architecture (lgbm or alstm)",
+    )
     return parser.parse_args()
 
 
@@ -113,13 +120,23 @@ def main() -> None:
 
     # 4. Optuna HPO with bar-level walk-forward
     t0 = time.time()
-    trainer = PulseTrainer(
-        n_trials=args.n_trials,
-        n_splits=5,
-        train_bars=5000,
-        test_bars=1000,
-        seed=args.seed,
-    )
+    if args.model_type == "alstm":
+        from qm.model.trainers.alstm_pulse_trainer import ALSTMPulseTrainer
+        trainer = ALSTMPulseTrainer(
+            n_trials=min(args.n_trials, 30),
+            n_splits=5,
+            train_bars=5000,
+            test_bars=1000,
+            seed=args.seed,
+        )
+    else:
+        trainer = PulseTrainer(
+            n_trials=args.n_trials,
+            n_splits=5,
+            train_bars=5000,
+            test_bars=1000,
+            seed=args.seed,
+        )
     best_metrics = trainer.fit(dataset)
     logger.info("HPO complete in %.1fs", time.time() - t0)
     logger.info("Best CV metrics: %s", best_metrics)
@@ -223,8 +240,12 @@ def main() -> None:
         logger.info("  %-30s %.0f", name, imp)
 
     # 9. Save model + calibrator
-    model_dir = Path(args.model_dir) / f"{asset.value}_{timeframe.value}"
-    trainer.save(model_dir / "model.lgb")
+    suffix = f"_{args.model_type}" if args.model_type != "lgbm" else ""
+    model_dir = Path(args.model_dir) / f"{asset.value}_{timeframe.value}{suffix}"
+    if args.model_type == "lgbm":
+        trainer.save(model_dir / "model.lgb")
+    else:
+        trainer.save(model_dir)
     calibrator.save(model_dir / "calibrator.pkl")
     logger.info("Model saved to %s", model_dir)
 

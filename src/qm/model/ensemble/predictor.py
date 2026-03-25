@@ -129,6 +129,36 @@ class TimeWeightedStrategy:
         return _clip(combined)
 
 
+def _load_model(path: Path, model_type: str = "lgbm") -> object:
+    """Load a model by type. Supports lgbm and onnx.
+
+    Both return objects with a ``.predict(X_2d)`` interface that
+    accepts ``(1, n_features)`` and returns a 1-D array of probabilities.
+    """
+    if model_type == "lgbm":
+        return lgb.Booster(model_file=str(path))
+    if model_type == "onnx":
+        from qm.model.trainers.onnx_export import OnnxPredictor
+
+        # Wrap OnnxPredictor so .predict() works with 2-D input
+        # (EnsemblePredictor passes (1, n_features) to .predict())
+        class _OnnxAdapter:
+            def __init__(self, predictor: OnnxPredictor) -> None:
+                self._predictor = predictor
+
+            def predict(self, X: np.ndarray) -> np.ndarray:
+                # OnnxPredictor expects 3-D (batch, seq, feat).
+                # For ensemble use, X is (1, n_features) — treat as
+                # seq_len=1 by adding a time dimension.
+                if X.ndim == 2:
+                    X = X[:, np.newaxis, :]  # (batch, 1, feat)
+                return self._predictor.predict_proba(X)
+
+        return _OnnxAdapter(OnnxPredictor(path))
+    msg = f"Unknown model_type: {model_type!r}. Supported: lgbm, onnx"
+    raise ValueError(msg)
+
+
 class EnsemblePredictor:
     """Loads both Sentinel and Pulse models, combines predictions.
 
@@ -152,23 +182,25 @@ class EnsemblePredictor:
         pulse_model_path: Path,
         pulse_cal_path: Path,
         strategy: CombinationStrategy | None = None,
+        sentinel_model_type: str = "lgbm",
+        pulse_model_type: str = "lgbm",
     ) -> None:
         # Load Sentinel
-        self._sentinel = lgb.Booster(model_file=str(sentinel_model_path))
+        self._sentinel = _load_model(sentinel_model_path, sentinel_model_type)
         self._sentinel_cal = IsotonicCalibrator()
         self._sentinel_cal.load(sentinel_cal_path)
 
         # Load Pulse
-        self._pulse = lgb.Booster(model_file=str(pulse_model_path))
+        self._pulse = _load_model(pulse_model_path, pulse_model_type)
         self._pulse_cal = IsotonicCalibrator()
         self._pulse_cal.load(pulse_cal_path)
 
         self._strategy = strategy or BayesianUpdateStrategy()
 
         logger.info(
-            "EnsemblePredictor loaded: sentinel=%s, pulse=%s, strategy=%s",
-            sentinel_model_path.name,
-            pulse_model_path.name,
+            "EnsemblePredictor loaded: sentinel=%s (%s), pulse=%s (%s), strategy=%s",
+            sentinel_model_path.name, sentinel_model_type,
+            pulse_model_path.name, pulse_model_type,
             type(self._strategy).__name__,
         )
 

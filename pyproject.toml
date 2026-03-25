@@ -70,6 +70,9 @@ dev = [
 ]
 gpu = [
     "torch>=2.2",
+    "pytorch-tabnet>=4.0",
+    "onnx>=1.15",
+    "onnxruntime>=1.17",
 ]
 
 [project.scripts]
@@ -126,6 +129,10 @@ module = [
     "apscheduler.*",
     "ntplib.*",
     "py_clob_client.*",
+    "torch.*",
+    "pytorch_tabnet.*",
+    "onnx.*",
+    "onnxruntime.*",
 ]
 ignore_missing_imports = true
 
