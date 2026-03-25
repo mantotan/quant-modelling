@@ -91,7 +91,8 @@ def main() -> None:
     logger.info("Computing features...")
     pipeline = FeaturePipeline()
     featured_df = pipeline.compute(bars_df)
-    feature_names = pipeline.feature_names
+    # Filter to features actually present (alpha groups no-op if data absent)
+    feature_names = [f for f in pipeline.feature_names if f in featured_df.columns]
     logger.info("Computed %d features: %s", len(feature_names), feature_names[:5])
 
     # ── 3. Construct targets ──────────────────────────────────────────

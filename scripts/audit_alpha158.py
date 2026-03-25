@@ -182,8 +182,11 @@ def main() -> None:
     # 2. Compute all features (including new Alpha158 groups)
     pipeline = FeaturePipeline()
     featured_df = pipeline.compute(bars_df)
-    all_feature_names = pipeline.feature_names
-    logger.info("Total features computed: %d", len(all_feature_names))
+    # Filter to features that actually exist (alpha groups no-op if data absent)
+    all_feature_names = [
+        f for f in pipeline.feature_names if f in featured_df.columns
+    ]
+    logger.info("Total features available: %d", len(all_feature_names))
 
     # 3. Construct targets
     target_builder = BinaryDirectionTarget(horizon_bars=1)

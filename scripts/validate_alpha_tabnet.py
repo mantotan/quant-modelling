@@ -174,7 +174,8 @@ def main() -> None:
 
     pipeline = FeaturePipeline()
     featured_df = pipeline.compute(bars_df)
-    all_features = pipeline.feature_names
+    # Filter to features actually present (alpha groups no-op if data absent)
+    all_features = [f for f in pipeline.feature_names if f in featured_df.columns]
 
     target_builder = BinaryDirectionTarget(horizon_bars=1)
     target = target_builder.compute(featured_df)
