@@ -517,9 +517,13 @@ class DutchAccumulationEngine:
         """
 
         # -- B: Track model stats (incremental flip counting) --
+        # Only count flips when cal_prob actually changes (new inference).
+        # Forward-filled ticks repeat the same value and must not inflate
+        # the flip count — live tick subsets differ from recorded data due
+        # to QueueFull drops and last_model_time guards.
         if self._model_probs:
             prev = self._model_probs[-1]
-            if (prev - 0.5) * (cal_prob - 0.5) < 0:
+            if cal_prob != prev and (prev - 0.5) * (cal_prob - 0.5) < 0:
                 self._model_flips += 1
         self._model_probs.append(cal_prob)
 

@@ -1187,3 +1187,73 @@ class TestDutchBarSummary:
         d = summary.to_dict()
         assert d["bar_id"] == 123
         assert "decision_log" in d
+
+
+class TestFlipCounting:
+    """Flip counting should only trigger on actual cal_prob changes,
+    not on forward-filled (repeated) values."""
+
+    def _make_engine(self, **kwargs) -> DutchAccumulationEngine:
+        config = DutchConfig(**kwargs)
+        engine = DutchAccumulationEngine(config)
+        engine.set_bar_info(
+            bar_id=1, condition_id="test",
+            window_start="2026-01-01T00:00:00Z",
+            window_end="2026-01-01T00:15:00Z",
+        )
+        return engine
+
+    def test_forward_filled_ticks_no_flip(self):
+        """Repeated identical cal_prob should never produce a flip."""
+        engine = self._make_engine(flip_kill_after=6)
+        book = make_book(0.50, 0.51)
+        for _ in range(500):
+            engine.on_tick(0.1, 0.45, book, book)
+        assert engine._model_flips == 0
+
+    def test_real_crossing_counts_once(self):
+        """A single 0.5 crossing between distinct values = 1 flip."""
+        engine = self._make_engine(flip_kill_after=6)
+        book = make_book(0.50, 0.51)
+        # 100 ticks at 0.45
+        for _ in range(100):
+            engine.on_tick(0.1, 0.45, book, book)
+        assert engine._model_flips == 0
+        # 100 ticks at 0.55 — crosses 0.5
+        for _ in range(100):
+            engine.on_tick(0.2, 0.55, book, book)
+        assert engine._model_flips == 1
+        # 100 more at 0.55 — no new flip
+        for _ in range(100):
+            engine.on_tick(0.3, 0.55, book, book)
+        assert engine._model_flips == 1
+
+    def test_multiple_crossings(self):
+        """Each distinct crossing of 0.5 increments flip count by 1."""
+        engine = self._make_engine(flip_kill_after=100)
+        book = make_book(0.50, 0.51)
+        probs = [0.45, 0.55, 0.40, 0.60, 0.35]  # 4 crossings
+        for i, p in enumerate(probs):
+            for _ in range(50):
+                engine.on_tick(0.1 + i * 0.1, p, book, book)
+        assert engine._model_flips == 4
+
+    def test_same_side_changes_no_flip(self):
+        """Changes that stay on the same side of 0.5 don't count."""
+        engine = self._make_engine(flip_kill_after=6)
+        book = make_book(0.50, 0.51)
+        for p in [0.45, 0.30, 0.40, 0.20, 0.48]:
+            for _ in range(50):
+                engine.on_tick(0.5, p, book, book)
+        assert engine._model_flips == 0
+
+    def test_flip_kill_fires_on_real_flips(self):
+        """flip_kill_after=3 fires after 3 real crossings."""
+        engine = self._make_engine(flip_kill_after=3)
+        book = make_book(0.50, 0.51)
+        probs = [0.45, 0.55, 0.45, 0.55]  # 3 crossings at idx 1,2,3
+        for p in probs:
+            for _ in range(50):
+                engine.on_tick(0.5, p, book, book)
+        assert engine._model_flips == 3
+        assert engine.flip_killed is True
