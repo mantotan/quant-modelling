@@ -61,7 +61,8 @@ def _build_transformer_model(
             self._max_sl = max_sl
 
         def forward(self, x: torch.Tensor) -> torch.Tensor:
-            batch, seq_len, _ = x.shape
+            batch = x.shape[0]
+            seq_len = x.shape[1]
             # Project input to d_model
             x = self.input_proj(x)
             # Add positional encoding (positions 1..seq_len, 0 reserved for CLS)
@@ -69,12 +70,16 @@ def _build_transformer_model(
             x = x + self.pos_embed(positions)
             # Prepend CLS token
             cls = self.cls_token.expand(batch, -1, -1)
-            cls = cls + self.pos_embed(torch.zeros(1, 1, dtype=torch.long, device=x.device))
-            x = torch.cat([cls, x], dim=1)
+            cls_pos = self.pos_embed(
+                torch.zeros(1, 1, dtype=torch.long, device=x.device),
+            )
+            x = torch.cat([cls + cls_pos, x], dim=1)
             # Encode
             x = self.encoder(x)
-            # CLS token output
-            return torch.sigmoid(self.fc(x[:, 0])).squeeze(-1)
+            # CLS token output — index then project
+            cls_out = x[:, 0, :]  # (batch, d_model) — explicit 3-index for ONNX
+            logit = self.fc(cls_out)  # (batch, 1)
+            return torch.sigmoid(logit).view(batch)
 
     return TransformerModel(
         n_features, d_model, n_heads, n_layers, dim_feedforward, dropout, max_seq_len,
@@ -285,7 +290,7 @@ class TransformerTrainer:
                     X_te_norm, y[test_idx], self.seq_len,
                 )
 
-                if len(X_tr_seq) < 100 or len(X_te_seq) < 10:
+                if len(X_tr_seq) < 20 or len(X_te_seq) < 5:
                     continue
 
                 val_n = max(1, len(X_tr_seq) // 5)

@@ -71,8 +71,10 @@ dev = [
 gpu = [
     "torch>=2.2",
     "pytorch-tabnet>=4.0",
+    "pandas>=2.0",         # required by pytorch-tabnet
     "onnx>=1.15",
     "onnxruntime>=1.17",
+    "onnxscript>=0.6",     # required by torch.onnx.export in torch>=2.10
 ]
 
 [project.scripts]

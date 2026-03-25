@@ -1,0 +1,168 @@
+{
+  "exp0_BASELINE (fixed best params)": {
+    "brier": 0.212082,
+    "ece": 0.0094,
+    "accuracy": 0.6575,
+    "pnl": 309.18,
+    "sharpe": 245.1,
+    "win_rate": 0.4984,
+    "n_trades": 81000,
+    "max_dd": 0.0687,
+    "top5_features": [
+      "partial_bar_position=1629029",
+      "partial_range=263104",
+      "time_remaining_pct=90692",
+      "elapsed_pct=72952",
+      "trade_intensity=38241"
+    ],
+    "elapsed_s": 45.0
+  },
+  "exp2_SAMPLE WEIGHT by |return|": {
+    "brier": 0.212584,
+    "ece": 0.0138,
+    "accuracy": 0.6569,
+    "pnl": 307.53,
+    "sharpe": 243.95,
+    "win_rate": 0.4983,
+    "n_trades": 81000,
+    "max_dd": 0.0687,
+    "top5_features": [
+      "partial_bar_position=1685035",
+      "partial_range=264678",
+      "time_remaining_pct=113580",
+      "elapsed_pct=63498",
+      "distance_from_open=55208"
+    ],
+    "elapsed_s": 41.3
+  },
+  "exp3_CROSS-ASSET BTC lead": {
+    "brier": 0.199238,
+    "ece": 0.0049,
+    "accuracy": 0.6807,
+    "pnl": 312.17,
+    "sharpe": 252.65,
+    "win_rate": 0.5086,
+    "n_trades": 81000,
+    "max_dd": 0.06,
+    "top5_features": [
+      "btc_vol_norm_distance=1826071",
+      "btc_distance_from_open=830117",
+      "partial_bar_position=96473",
+      "elapsed_pct=57762",
+      "time_remaining_pct=51381"
+    ],
+    "elapsed_s": 54.9
+  },
+  "exp4_FILTER COIN-FLIPS": {
+    "brier": 0.21223,
+    "ece": 0.0139,
+    "accuracy": 0.6579,
+    "pnl": 307.85,
+    "sharpe": 244.58,
+    "win_rate": 0.4981,
+    "n_trades": 81000,
+    "max_dd": 0.0687,
+    "top5_features": [
+      "partial_bar_position=1387213",
+      "partial_range=215850",
+      "time_remaining_pct=84942",
+      "elapsed_pct=59044",
+      "distance_from_open=32907"
+    ],
+    "elapsed_s": 31.6
+  },
+  "exp5_PER-TIMEPOINT SPECIALISTS": {
+    "early": {
+      "brier": 0.235873,
+      "ece": 0.0101,
+      "accuracy": 0.5974,
+      "pnl": 302.55,
+      "sharpe": 242.92,
+      "win_rate": 0.4996,
+      "n_trades": 80730,
+      "max_dd": 0.035,
+      "top5_features": [
+        "partial_bar_position=235583",
+        "partial_range=46310",
+        "rsi_14=14902",
+        "distance_from_open=10897",
+        "parkinson_vol_10=10143"
+      ]
+    },
+    "late": {
+      "brier": 0.195989,
+      "ece": 0.0125,
+      "accuracy": 0.698,
+      "pnl": 318.91,
+      "sharpe": 248.21,
+      "win_rate": 0.5026,
+      "n_trades": 80819,
+      "max_dd": 0.0525,
+      "top5_features": [
+        "partial_bar_position=1596073",
+        "partial_range=165573",
+        "volume_ratio_partial=36620",
+        "trade_intensity=34875",
+        "distance_from_open=32253"
+      ]
+    },
+    "combined": {
+      "brier": 0.21592,
+      "accuracy": 0.6477,
+      "pnl": 621.46,
+      "sharpe": 245.57,
+      "win_rate": 0.5011,
+      "n_trades": 161549
+    },
+    "elapsed_s": 36.3
+  },
+  "exp6_CONTINUOUS TARGET (regression)": {
+    "brier": 0.249968,
+    "ece": 0.0009,
+    "accuracy": 0.5039,
+    "pnl": 301.8,
+    "sharpe": 241.61,
+    "win_rate": 0.4976,
+    "n_trades": 81000,
+    "max_dd": 0.0687,
+    "top5_features": [
+      "distance_from_open=0",
+      "funding_hours_since=0",
+      "body_ratio=0",
+      "bar_position=0",
+      "volume_sma_10=0"
+    ],
+    "return_scale": 0.002279,
+    "elapsed_s": 4.7
+  },
+  "exp7_TRINOMIAL (downweight flat)": {
+    "brier": 0.212098,
+    "ece": 0.0107,
+    "accuracy": 0.6579,
+    "pnl": 308.51,
+    "sharpe": 244.72,
+    "win_rate": 0.4984,
+    "n_trades": 81000,
+    "max_dd": 0.0687,
+    "top5_features": [
+      "partial_bar_position=1277390",
+      "partial_range=198003",
+      "time_remaining_pct=73046",
+      "elapsed_pct=63278",
+      "distance_from_open=30160"
+    ],
+    "elapsed_s": 25.1
+  },
+  "exp8_CONDITIONAL BETTING (oracle)": {
+    "note": "ORACLE FILTER (uses future |return|) - shows ceiling, not achievable",
+    "full_brier": 0.212083,
+    "filtered_brier": 0.212322,
+    "filtered_accuracy": 0.6571,
+    "filtered_pnl": 299.72,
+    "filtered_sharpe": 247.17,
+    "filtered_win_rate": 0.5017,
+    "filtered_n_trades": 78482,
+    "pct_bars_kept": 49.9,
+    "elapsed_s": 34.2
+  }
+}

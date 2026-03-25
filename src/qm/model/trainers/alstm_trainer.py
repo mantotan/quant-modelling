@@ -263,7 +263,7 @@ class ALSTMTrainer:
                     X_te_norm, y[test_idx], self.seq_len,
                 )
 
-                if len(X_tr_seq) < 100 or len(X_te_seq) < 10:
+                if len(X_tr_seq) < 20 or len(X_te_seq) < 5:
                     continue
 
                 # Use last 20% of train as validation for early stopping

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Tooltip Test</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  body { margin: 0; background: #0F172A; }
+  #container { position: relative; width: 100vw; height: 100vh; }
+</style>
+</head>
+<body>
+<div id="container"></div>
+<script>
+const container = document.getElementById('container');
+const chart = LightweightCharts.createChart(container, {
+  layout: { background: { color: '#0F172A' }, textColor: '#94A3B8' },
+  timeScale: { timeVisible: true, secondsVisible: true },
+});
+
+const series = chart.addLineSeries({ color: '#F59E0B', lineWidth: 2 });
+
+// Generate some test data
+const now = Math.floor(Date.now() / 1000);
+const data = [];
+for (let i = 0; i < 300; i++) {
+  data.push({ time: now - 300 + i, value: 0.5 + 0.1 * Math.sin(i / 20) });
+}
+series.setData(data);
+
+// Tracking tooltip - per LW Charts docs
+const toolTipWidth = 160;
+const toolTipHeight = 80;
+const toolTipMargin = 15;
+
+const toolTip = document.createElement('div');
+toolTip.style = `width: ${toolTipWidth}px; height: ${toolTipHeight}px; position: absolute; display: none; padding: 8px; box-sizing: border-box; font-size: 12px; text-align: left; z-index: 1000; top: 12px; left: 12px; pointer-events: none; border: 1px solid; border-radius: 4px; font-family: monospace;`;
+toolTip.style.background = 'rgba(30,41,59,0.95)';
+toolTip.style.color = 'white';
+toolTip.style.borderColor = '#F59E0B';
+container.appendChild(toolTip);
+
+chart.subscribeCrosshairMove(param => {
+  if (
+    param.point === undefined ||
+    !param.time ||
+    param.point.x < 0 ||
+    param.point.x > container.clientWidth ||
+    param.point.y < 0 ||
+    param.point.y > container.clientHeight
+  ) {
+    toolTip.style.display = 'none';
+    return;
+  }
+
+  toolTip.style.display = 'block';
+  const data = param.seriesData.get(series);
+  const price = data ? data.value : 0;
+  toolTip.innerHTML = `<div style="color: #F59E0B; font-weight: bold">P(UP)</div><div style="font-size: 18px; margin: 4px 0">${(price * 100).toFixed(2)}%</div>`;
+
+  let left = param.point.x + toolTipMargin;
+  if (left > container.clientWidth - toolTipWidth) {
+    left = param.point.x - toolTipMargin - toolTipWidth;
+  }
+  let top = param.point.y + toolTipMargin;
+  if (top > container.clientHeight - toolTipHeight) {
+    top = param.point.y - toolTipHeight - toolTipMargin;
+  }
+  toolTip.style.left = left + 'px';
+  toolTip.style.top = top + 'px';
+});
+
+chart.timeScale().fitContent();
+</script>
+</body>
+</html>

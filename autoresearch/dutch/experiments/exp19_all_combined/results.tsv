@@ -1,0 +1,3 @@
+asset	timeframe	avg_pair_cost	avg_profit	total_profit	matched_ratio	fill_rate	correct_side_pct	budget_util	sell_ratio	max_dd_pct	bars_evaluated
+BTC	15m	0.9239	0.3513	33.7202	0.1169	0.8743	0.6105	0.0275	0.0000	28.31	96
+ALL	ALL	0.9239	0.3513	33.7202	0.1169	0.8743	0.6105	0.0275	0.0000	28.31	96

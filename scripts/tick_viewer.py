@@ -112,7 +112,7 @@ def list_candles(asset: str, tf: str, date: str) -> list[dict]:
     for i, row in enumerate(rows):
         ws = row["window_start"]
         we = row["window_end"]
-        bar_id = int(we.timestamp())
+        bar_id = int(ws.timestamp())
         cid = row["condition_id"] or ""
         # Next candle's condition_id (for resolution of THIS candle)
         next_cid = rows[i + 1]["condition_id"] if i + 1 < len(rows) else None

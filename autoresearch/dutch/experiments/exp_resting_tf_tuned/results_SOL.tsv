@@ -1,0 +1,5 @@
+asset	timeframe	avg_pair_cost	avg_profit	total_profit	matched_ratio	fill_rate	correct_side_pct	budget_util	sell_ratio	max_dd_pct	bars_evaluated
+SOL	5m	0.8664	-0.1771	-54.5415	0.1028	0.6630	0.4492	0.0144	0.0000	35.64	308
+SOL	15m	0.8752	0.0884	9.1074	0.0889	0.7396	0.4444	0.0183	0.0000	17.43	103
+SOL	1h	0.0000	0.8899	24.0268	0.0000	0.7562	0.6154	0.0199	0.0000	11.08	27
+ALL	ALL	0.8150	-0.0489	-21.4073	0.0932	0.6868	0.4583	0.0157	0.0000	29.84	438

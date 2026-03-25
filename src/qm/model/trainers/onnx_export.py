@@ -19,7 +19,7 @@ def export_to_onnx(
     seq_len: int,
     n_features: int,
     path: Path,
-    opset_version: int = 17,
+    opset_version: int = 18,
 ) -> None:
     """Export a PyTorch model to ONNX with dynamic batch size.
 
@@ -30,6 +30,9 @@ def export_to_onnx(
         path: Output ``.onnx`` file path.
         opset_version: ONNX opset version.
     """
+    import io
+    import sys
+
     import torch
 
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -39,18 +42,26 @@ def export_to_onnx(
 
     dummy = torch.randn(1, seq_len, n_features)
 
-    torch.onnx.export(
-        model,  # type: ignore[arg-type]
-        dummy,
-        str(path),
-        opset_version=opset_version,
-        input_names=["input"],
-        output_names=["output"],
-        dynamic_axes={
-            "input": {0: "batch_size"},
-            "output": {0: "batch_size"},
-        },
-    )
+    # torch.onnx prints Unicode emoji (✅) that crash on Windows cp1252.
+    # Redirect stdout/stderr to a UTF-8 buffer during export.
+    old_stdout, old_stderr = sys.stdout, sys.stderr
+    sys.stdout = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+    sys.stderr = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+    try:
+        torch.onnx.export(
+            model,  # type: ignore[arg-type]
+            dummy,
+            str(path),
+            opset_version=opset_version,
+            input_names=["input"],
+            output_names=["output"],
+            dynamic_axes={
+                "input": {0: "batch_size"},
+                "output": {0: "batch_size"},
+            },
+        )
+    finally:
+        sys.stdout, sys.stderr = old_stdout, old_stderr
 
     # Validate round-trip
     _validate_onnx_parity(model, path, seq_len, n_features)

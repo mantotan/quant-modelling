@@ -1,0 +1,5 @@
+asset	timeframe	avg_pair_cost	avg_profit	total_profit	matched_ratio	fill_rate	correct_side_pct	budget_util	sell_ratio	max_dd_pct	bars_evaluated
+XRP	5m	0.9973	-0.3983	-115.0988	0.0378	0.5830	0.4309	0.0110	0.0000	67.00	289
+XRP	15m	0.9558	-0.1463	-14.1890	0.1407	0.8255	0.5169	0.0208	0.0000	20.91	97
+XRP	1h	0.7157	0.5120	12.8006	0.0295	0.7400	0.5652	0.0195	0.0000	6.38	25
+ALL	ALL	0.9704	-0.2834	-116.4872	0.0615	0.6498	0.4593	0.0138	0.0000	52.43	411
