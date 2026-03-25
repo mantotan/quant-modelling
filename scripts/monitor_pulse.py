@@ -919,6 +919,7 @@ def _run_inference(
     state._last_inference_partial = partial  # Cache for tick recording
     state._last_inference_btc_partial = btc_partial  # Cache BTC cross-asset for recording
     state._last_inference_features = features  # Full feature vector for parity
+    state._last_inference_elapsed_pct = elapsed_pct  # Exact elapsed_pct at inference time
 
 
 def _dutch_tick(
@@ -979,6 +980,11 @@ def _record_tick(
     is_inf = getattr(state, "_did_infer", False)
     if is_inf:
         state._did_infer = False
+    # On inference ticks: use elapsed_pct from inference time, not tick time
+    if is_inf:
+        inf_elapsed = getattr(state, "_last_inference_elapsed_pct", None)
+        if inf_elapsed is not None:
+            elapsed_pct = inf_elapsed
     # PartialBar + features snapshot on inference ticks (for backtest parity)
     pb = getattr(state, "_last_inference_partial", None) if is_inf else None
     btc_pb = getattr(state, "_last_inference_btc_partial", None) if is_inf else None
