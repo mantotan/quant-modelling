@@ -739,18 +739,26 @@ def run_backtest(
                 if tick["is_inference"]:
                     cal_prob = tick["cal_prob"]
                     last_inference_ts = ts
-            elif (
-                last_inference_ts is None
-                or (ts - last_inference_ts).total_seconds() >= inference_interval
-            ):
-                # Use latest recorded PartialBar if available
-                if live_cadence and _last_recorded_pb is not None:
+            elif live_cadence and tick.get("is_inference"):
+                # Live cadence: only infer when live inferred (same timing)
+                if _last_recorded_pb is not None:
                     partial_for_inf = _last_recorded_pb
-                    # Also use recorded BTC PartialBar for cross-asset
                     if _last_recorded_btc_pb is not None:
                         btc_partial = _last_recorded_btc_pb
                 else:
-                    partial_for_inf = partial if not has_recorded_pct else bar_builder.get_partial_bar(asset_enum, tf_enum, now=ts)
+                    partial_for_inf = bar_builder.get_partial_bar(asset_enum, tf_enum, now=ts)
+                if partial_for_inf is not None:
+                    _raw, cal_prob, _feats = run_inference(
+                        model, calibrator, feat_cache,
+                        partial_for_inf, current_elapsed_pct, btc_partial,
+                    )
+                    last_inference_ts = ts
+            elif not live_cadence and (
+                last_inference_ts is None
+                or (ts - last_inference_ts).total_seconds() >= inference_interval
+            ):
+                # Full cadence: infer on timer (default for researcher)
+                partial_for_inf = partial if partial else bar_builder.get_partial_bar(asset_enum, tf_enum, now=ts)
                 if partial_for_inf is not None:
                     _raw, cal_prob, _feats = run_inference(
                         model, calibrator, feat_cache,
