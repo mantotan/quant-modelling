@@ -959,12 +959,16 @@ def _dutch_tick(
 
 
 def _record_tick(
-    tick_queue, state, ws_feed, elapsed_pct: float,
-    asset_label: str, bar_secs: float,
+    tick_queue, state, book_up, book_dn, elapsed_pct: float,
+    asset_label: str, bar_secs: float, ws_feed=None,
 ) -> None:
-    """Record a tick to Parquet for backtest replay."""
-    rec_up = ws_feed.get_book("up")
-    rec_dn = ws_feed.get_book("down")
+    """Record a tick to Parquet for backtest replay.
+
+    IMPORTANT: book_up/book_dn must be the SAME objects passed to _dutch_tick,
+    not re-read from ws_feed (race condition: WSS may update between calls).
+    """
+    rec_up = book_up
+    rec_dn = book_dn
     if not (rec_up and rec_dn and rec_up.best_bid > 0 and rec_up.best_ask < 1):
         return
     from qm.data.connectors.tick_writer import TickSnapshot
@@ -998,7 +1002,7 @@ def _record_tick(
             depth_bid_dn=rec_dn.bids.get(rec_dn.best_bid, 0.0),
             depth_ask_dn=rec_dn.asks.get(rec_dn.best_ask, 0.0),
             is_heartbeat=False,
-            is_stale=not ws_feed._connected.is_set(),
+            is_stale=not ws_feed._connected.is_set() if ws_feed else False,
             spot_price=getattr(state, "last_spot", float("nan")),
             window_start=rec_ws, window_end=rec_we,
             elapsed_pct=elapsed_pct,
@@ -1496,10 +1500,11 @@ async def main_loop(args: argparse.Namespace) -> None:
                         _dutch_tick(state, elapsed_pct, book_up, book_dn, args,
                                     state.current_bar_id)
 
-                        # Record tick to Parquet
+                        # Record tick to Parquet (same book objects engine saw)
                         if tick_queue is not None:
-                            _record_tick(tick_queue, state, ws_feed, elapsed_pct,
-                                         asset_label, bar_secs)
+                            _record_tick(tick_queue, state, book_up, book_dn,
+                                         elapsed_pct, asset_label, bar_secs,
+                                         ws_feed=ws_feed)
 
         # -- Display at cadence (cycle through TFs) ----------------
         now_disp = time.time()
