@@ -24,6 +24,7 @@ from datetime import UTC, date as date_type, datetime
 from pathlib import Path
 
 import lightgbm as lgb
+import numpy as np
 import polars as pl
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -741,18 +742,36 @@ def run_backtest(
                     last_inference_ts = ts
             elif live_cadence and tick.get("is_inference"):
                 # Live cadence: only infer when live inferred (same timing)
-                if _last_recorded_pb is not None:
-                    partial_for_inf = _last_recorded_pb
-                    if _last_recorded_btc_pb is not None:
-                        btc_partial = _last_recorded_btc_pb
-                else:
-                    partial_for_inf = bar_builder.get_partial_bar(asset_enum, tf_enum, now=ts)
-                if partial_for_inf is not None:
-                    _raw, cal_prob, _feats = run_inference(
-                        model, calibrator, feat_cache,
-                        partial_for_inf, current_elapsed_pct, btc_partial,
-                    )
+                # Use recorded feature vector if available (100% feature parity)
+                recorded_features = tick.get("features_json")
+                if recorded_features:
+                    import json as _json
+                    feat_list = _json.loads(recorded_features)
+                    features_arr = np.array(feat_list, dtype=np.float64)
+                    raw_prob = float(model.predict(features_arr.reshape(1, -1))[0])
+                    cal_prob = raw_prob
+                    if calibrator:
+                        cal_prob = float(
+                            calibrator.transform(
+                                np.array([raw_prob]),
+                                np.array([current_elapsed_pct]),
+                            )[0]
+                        )
                     last_inference_ts = ts
+                else:
+                    # Fallback: recompute from PartialBar
+                    if _last_recorded_pb is not None:
+                        partial_for_inf = _last_recorded_pb
+                        if _last_recorded_btc_pb is not None:
+                            btc_partial = _last_recorded_btc_pb
+                    else:
+                        partial_for_inf = bar_builder.get_partial_bar(asset_enum, tf_enum, now=ts)
+                    if partial_for_inf is not None:
+                        _raw, cal_prob, _feats = run_inference(
+                            model, calibrator, feat_cache,
+                            partial_for_inf, current_elapsed_pct, btc_partial,
+                        )
+                        last_inference_ts = ts
             elif not live_cadence and (
                 last_inference_ts is None
                 or (ts - last_inference_ts).total_seconds() >= inference_interval

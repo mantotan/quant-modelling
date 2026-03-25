@@ -59,6 +59,9 @@ TICK_SCHEMA = {
     "btc_trade_count": pl.Int64,
     "btc_elapsed_s": pl.Float64,
     "btc_remaining_s": pl.Float64,
+    # Full feature vector + raw_prob (inference ticks only)
+    "raw_prob": pl.Float64,
+    "features_json": pl.Utf8,
 }
 
 
@@ -107,6 +110,8 @@ class TickSnapshot:
     btc_trade_count: int | None = None
     btc_elapsed_s: float | None = None
     btc_remaining_s: float | None = None
+    raw_prob: float | None = None
+    features_json: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -149,6 +154,8 @@ class TickSnapshot:
             "btc_trade_count": self.btc_trade_count,
             "btc_elapsed_s": self.btc_elapsed_s,
             "btc_remaining_s": self.btc_remaining_s,
+            "raw_prob": self.raw_prob,
+            "features_json": self.features_json,
         }
 
 

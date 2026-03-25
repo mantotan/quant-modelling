@@ -910,7 +910,7 @@ def _run_inference(
         btc_partial = btc_bar_builder.get_partial_bar(Asset.BTC, state.tf)
 
     t0 = time.perf_counter_ns()
-    state.raw_prob, state.cal_prob, _features = run_inference(
+    state.raw_prob, state.cal_prob, features = run_inference(
         state.model, state.calibrator, state.feat_cache,
         partial, elapsed_pct, btc_partial,
     )
@@ -918,6 +918,7 @@ def _run_inference(
     state.last_model_time = time.time()
     state._last_inference_partial = partial  # Cache for tick recording
     state._last_inference_btc_partial = btc_partial  # Cache BTC cross-asset for recording
+    state._last_inference_features = features  # Full feature vector for parity
 
 
 def _dutch_tick(
@@ -974,9 +975,14 @@ def _record_tick(
     is_inf = getattr(state, "_did_infer", False)
     if is_inf:
         state._did_infer = False
-    # PartialBar snapshot on inference ticks (for backtest feature parity)
+    # PartialBar + features snapshot on inference ticks (for backtest parity)
     pb = getattr(state, "_last_inference_partial", None) if is_inf else None
     btc_pb = getattr(state, "_last_inference_btc_partial", None) if is_inf else None
+    feat_arr = getattr(state, "_last_inference_features", None) if is_inf else None
+    feat_json = None
+    if feat_arr is not None:
+        import json as _json
+        feat_json = _json.dumps([round(float(v), 8) for v in feat_arr])
     try:
         tick_queue.put_nowait(TickSnapshot(
             ts=datetime.now(UTC),
@@ -1014,6 +1020,8 @@ def _record_tick(
             btc_trade_count=btc_pb.trade_count if btc_pb else None,
             btc_elapsed_s=btc_pb.elapsed_seconds if btc_pb else None,
             btc_remaining_s=btc_pb.remaining_seconds if btc_pb else None,
+            raw_prob=state.raw_prob if is_inf else None,
+            features_json=feat_json,
         ))
     except asyncio.QueueFull:
         pass  # Non-fatal: drop tick if queue full
