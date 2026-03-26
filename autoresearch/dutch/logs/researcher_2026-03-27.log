@@ -123,3 +123,6 @@
 2026-03-27T15:30:00Z iter=47 pair=XRP_1h status=DISCARD param=max_onesided_cost=5.0(baseline) 5.0->5.0(no_change)
   eval: pair_cost=0.8120 profit=$-0.1366/bar total=$-4.7821 max_dd=9.81% bars=35
   hypothesis: "Baseline at onesided=5.0 (post-DISCARD restore state) to compare vs iter23 reference. pair_cost=0.812 IDENTICAL to iter23, avg_profit negative. Fails KEEP on avg_profit>0. Confirms onesided=5.0 is baseline state. Next: max_onesided_cost 5.0->2.0 per audit Tier2 item4 to cap one-sided accumulation and force tighter pair matching."
+2026-03-27T15:45:00Z iter=48 pair=BTC_5m status=SKIP param=HOLD_SKIP ->
+  eval: pair_cost=- profit=- max_dd=- bars=-
+  hypothesis: "HOLD per strategy.md rotation-4 directive (still active in rotation 5): BTC_5m has 4 consecutive zero-pair baselines (gate=0.08/0.04/0.02/0.0 all fail); outcome sparsity structural (40/420 bars = 9.5% resolution); gate exhaustion complete. Do NOT run experiments until auditor lifts escalation. Auditor is due at next dispatch iteration (iters_since_auditor will reach 24). pace_urgency_lo=0.30 pre-staged for when unblocked. Advancing rotation to BTC_15m."

@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_5m",
+  "current_pair": "BTC_15m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 0,
-  "last_updated": "2026-03-27T15:30:00Z",
+  "pair_index": 1,
+  "last_updated": "2026-03-27T15:45:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T02:00:00Z",
   "last_strategist_at": 36,
   "last_auditor_at": 24,
-  "total_iterations": 47,
-  "last_exit_reason": "RESEARCHER iter=47 XRP_1h DISCARD: onesided=5.0 baseline pair_cost=0.812 identical to iter23; avg_profit=-0.14/bar negative; fails KEEP; next: max_onesided_cost 5.0->2.0 staged in knobs; advanced rotation to BTC_5m"
+  "total_iterations": 48,
+  "last_exit_reason": "RESEARCHER iter=48 BTC_5m SKIP: HOLD per strategy.md rotation-4+5 directive; 4 consecutive zero-pair baselines gate exhausted; outcome sparsity 9.5%; do not experiment until auditor lifts escalation; auditor due at next dispatch (iters_since_auditor=24); advanced rotation to BTC_15m"
 }

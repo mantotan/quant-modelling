@@ -1,6 +1,9 @@
-iter=47 pair=XRP_1h timestamp=2026-03-27T15:20:00Z role=RESEARCHER
-Status: BACKTEST MODE — rotation 4 — XRP_1h BASELINE at onesided=5.0 running
-Strategy: BASELINE at current knobs (onesided=5.0, gate=0.04, pace=0.35) — compare vs iter 23 (pair_cost=0.812)
-Per strategy.md rotation-4 priority #4: onesided=5.0 not yet baselined; post-DISCARD restore put knobs to 5.0.
-Prior best: iter 23 BASELINE pair_cost=0.812 (gate=0.04). Reference for KEEP: pair_cost < 0.812 AND avg_profit > 0.
-pace_urgency_lo=0.35 confirmed floor (iter 35 DISCARD at 0.30). No knobs change before baseline.
+iter=48 pair=BTC_5m timestamp=2026-03-27T15:45:00Z role=RESEARCHER
+Status: BACKTEST MODE — rotation 5 — BTC_5m HOLD_SKIP
+Strategy: HOLD per strategy.md rotation-4 directive (still active until auditor lifts escalation).
+  BTC_5m has 4 consecutive zero-pair baselines (gate=0.08/0.04/0.02/0.0 all fail).
+  Outcome sparsity structural (40/420 outcomes = 9.5% resolution).
+  Gate exhaustion complete. Do NOT run experiments until auditor resolves escalation.
+  pace_urgency_lo=0.30 staged in knobs for when escalation resolves.
+  iters_since_auditor = 23 (auditor triggers at 24 — will run next dispatch).
+Advancing pair rotation to BTC_15m.

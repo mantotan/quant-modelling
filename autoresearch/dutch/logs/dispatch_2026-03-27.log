@@ -38,3 +38,5 @@
 2026-03-27T14:30:00Z iter=43 pair=SOL_15m role=RESEARCHER outcome=FROZEN_SKIP: auditor freeze active correct_side=45.5pct below 50pct; model directionally wrong; skip all experiments; advanced to SOL_1h
 2026-03-27T14:35:00Z iter=44 pair=SOL_1h role=RESEARCHER outcome=SKIP: SOL_1h HOLD per rotation-4 strategy directive; outcome sparsity structural (3/35=8.6%); gate exhausted; knobs fix magnitude_gate=0.0 applied; advanced to XRP_5m
 2026-03-27T15:10:00Z iter=46 pair=XRP_15m role=RESEARCHER outcome=DISCARD gate=0.0 yields identical pair_cost=0.950 to gate=0.04 baseline; gate exhausted; cheap_threshold 0.1->0.05 staged; advanced to XRP_1h
+2026-03-27T15:30:00Z iter=47 pair=XRP_1h role=RESEARCHER outcome=DISCARD: onesided=5.0 baseline pair_cost=0.8120 identical to iter23; avg_profit=-0.14/bar negative; next=max_onesided_cost 5.0->2.0 staged; advanced rotation to BTC_5m
+2026-03-27T15:45:00Z iter=48 pair=BTC_5m role=RESEARCHER outcome=HOLD_SKIP: rotation-5 BTC_5m gate exhausted (4x zero-pair), outcome sparsity 9.5%; auditor due next dispatch (iters_since_auditor=24); advanced rotation to BTC_15m
