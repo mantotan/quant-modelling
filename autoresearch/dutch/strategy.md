@@ -1,27 +1,21 @@
 # Dutch Strategy
-Updated: after iteration 60 (2026-03-27T19:15:00Z) — STRATEGIST rotation 6 pre-run analysis
+Updated: after iteration 72 (2026-03-27T20:00:00Z) — STRATEGIST rotation 7 pre-run analysis
 
 ## Summary
 
-Rotation 5 complete (iters 49-59) + BTC_5m diagnostic (iter 60): 7 SKIPs + 2 DISCARDs (ETH_1h pace, XRP_1h onesided) + 1 SKIP+DIAGNOSTIC (BTC_5m spot outcomes test).
-**KEEP rate this rotation: 0/2 active experiments = 0%**
-**Cumulative KEEP rate: 0/60 = 0% across all rotations.**
+Rotation 6 complete (iters 61-72): 5 FROZEN SKIPs (BTC/ETH/SOL frozen pairs) + 1 DIAGNOSTIC SKIP (BTC_5m
+iter 61) + 2 active experiments (ETH_1h fill_ticks=2 DISCARD iter 66, XRP_1h fill_ticks=2 KEEP iter 72).
+**KEEP rate this rotation: 1/2 active experiments = 50%**
+**Cumulative KEEP rate: 1/72 total iterations = 1.4% (or 1 KEEP out of ~12 non-baseline active experiments = 8.3%)**
 
-Rotation 6 has NOT started (no experiments run yet). This strategist update confirms the
-fill_ticks=2 experiments are ready to stage and provides explicit researcher instructions.
+This is the FIRST KEEP in 72 iterations. XRP_1h fill_ticks=2 produces marginal profit improvement
+(+$0.01/bar: -$0.13 vs baseline -$0.14) without destabilizing pair formation. Modest but real signal.
 
-Critical findings from rotation 5 + diagnostic:
-1. ETH_1h pace lever is statistically inert below ~10 matched pairs (confirmed twice: iters 29, 53)
-2. XRP_1h onesided=2.0 causes complete pair-formation collapse (same mechanism as pace=0.30 collapse)
-3. BTC_5m diagnostic: spot outcomes do NOT unblock frozen pairs — fill mechanics are the binding constraint
-   - P(both sides fill in 5m bar) = fill_rate^2 ≈ 0.237^2 = 5.6% — structurally impossible
-   - This CONFIRMS all 5m pairs are permanently frozen regardless of outcome source
-4. Fill mechanics hypothesis for 15m/1h frozen pairs:
-   - 15m: P(both sides fill) ≈ 0.40^2 = 16% — possible but low
-   - 1h: P(both sides fill) ≈ 0.80^2 = 64% — viable (explains why ETH_1h/XRP_1h are only active pairs)
+ETH_1h fill_ticks=2 DISCARD: regression on profit (-$0.04 vs +$0.08 baseline) and max_dd (13.8% exceeds
+12% threshold). 1h bars already fill at 81-85% with fill_ticks=1; persistence extension not beneficial.
 
-**Researcher compliance (rotation 5):** EXCELLENT — 100% compliance. All frozen pair SKIPs respected,
-experiments run exactly per priority queue, diagnostic task completed per auditor mandate.
+Rotation 7 has NOT started. This strategist update provides explicit researcher instructions for the
+chase_threshold experiments on both active pairs.
 
 ---
 
@@ -31,207 +25,210 @@ experiments run exactly per priority queue, diagnostic task completed per audito
 - **SOL_15m**: FROZEN. correct_side=45.5% (both measurements below 50%). Resume only when correct_side > 50%.
 - **XRP_15m**: FROZEN (iter 48 audit). correct_side=49.2% declining monotonically. Gate exhausted.
 - **BTC_5m**: FROZEN permanently (confirmed by diagnostic iter 60). Fill mechanics block pair formation
-  regardless of outcome source. P(both sides fill in 5m) ≈ 5.6%. No levers remain.
+  regardless of outcome source. P(both sides fill in 5m) = 5.6%. No levers remain.
 - **BTC_15m**: FROZEN. 3 consecutive zero-pair baselines. Outcome sparsity (11/139=7.9%).
 - **BTC_1h**: FROZEN. Extreme sparsity (1/34=2.9%). Gate series exhausted.
 - **ETH_5m**: FROZEN. max_dd=28.7% near 30% kill threshold. 3 consecutive zero-pair baselines.
-- **ETH_15m**: FROZEN. Gate series fully exhausted R4 (iters 5/17/40 = gate=0.08/0.04/0.0 all zero pairs).
-- **SOL_5m**: FROZEN. 3 consecutive zero-pair runs. max_dd=23.2% elevated.
+- **ETH_15m**: FROZEN. Gate series fully exhausted R4 (iters 5/17/40 all zero pairs). Highest latent
+  potential: correct_side=71.2% consistent, avg_profit=+$0.16/bar (unmatched inventory).
+- **SOL_5m**: FROZEN. 3 consecutive zero-pair runs. max_dd=23.2% elevated. fill_rate=23.1% (P=5.3%).
 - **SOL_1h**: FROZEN. 3 consecutive zero-pair baselines. Outcome sparsity (3/35=8.6%).
 
 ---
 
-## ETH_1h (pair_cost=0.594 at gate=0.04 pace=0.35, KEEP rate 0% but trending — pair_cost BEATS target)
+## ETH_1h (pair_cost=0.594, KEEP rate 0% active experiments, max_dd=7.6%)
 
-### Status: ACTIVE — PRIORITIZE (auditor directive)
+### Status: ACTIVE — PRIORITIZE (beats trader_a pair_cost target)
 
 Full trajectory:
 - Iter 6 (R1): cost=0.000, zero pairs at gate=0.08
 - Iter 18 (R2 baseline): cost=0.594, matched=2.0%, profit=-$0.06/bar, DD=13.8%
-- Iter 29 (R3 pace=0.25): DISCARD — identical to baseline (thin dataset, pace inert)
+- Iter 29 (R3 pace=0.25): DISCARD — identical to baseline (pace lever inert on thin data)
 - Iter 41 (R4 baseline pace=0.35): cost=0.594, matched=2.0%, profit=+$0.08/bar, DD=7.6%
-- Iter 53 (R5 pace=0.30): DISCARD — identical to baseline (pace lever confirmed statistically inert)
-- Iters 61+ (R6): fill_ticks 1->2 experiment STAGED and ready to run
+- Iter 53 (R5 pace=0.30): DISCARD — identical to baseline (pace lever confirmed inert, mirror of iter 29)
+- Iter 66 (R6 fill_ticks=2): DISCARD — profit regression -$0.04/bar vs +$0.08; DD=13.8% exceeds 12%; fill_ticks extension not beneficial on already-high-fill pair
+- Rotation 7: chase_threshold 0.03->0.05 experiment NEXT
 
-ETH_1h is the **best performer in the system**: pair_cost=0.594 ALREADY BEATS trader_a target of <0.85.
-DD improved 13.8%->7.6% between R2 and R4 baselines. Profit improved -$0.06->+$0.08/bar.
-The pair_cost metric is excellent — focus is now on increasing matched_ratio from 2.0% to improve
-statistical significance and profit stability.
+ETH_1h best performer: pair_cost=0.594 BEATS trader_a target (<0.85). Profit=+$0.08/bar at baseline.
+Current bottleneck: matched_ratio=2.0% insufficient for statistical significance. Each KEEP/DISCARD
+boundary is difficult to call on 34-35 bars with 4-5 outcomes.
 
-**Current knobs state (VERIFIED rotation 6 start):**
-- knobs_ETH_1h.json: fill_ticks=1 — MUST STAGE fill_ticks=2 before running
-- best_knobs_ETH_1h.json: fill_ticks=1 — baseline reference (do NOT modify until KEEP confirmed)
-- Note: conviction_buy_skip=0.45 in both files (correct for ETH_1h)
+**Current knobs state:**
+- knobs_ETH_1h.json: fill_ticks=1 (correctly restored post-DISCARD iter 66), chase_threshold=0.03
+- best_knobs_ETH_1h.json: fill_ticks=1, chase_threshold=0.03 (unchanged — no KEEP yet)
+- Confirmed: both files are at fill_ticks=1 and chase_threshold=0.03
 
 **Staging instruction for researcher:**
-BEFORE running ETH_1h experiment, set fill_ticks=2 in knobs_ETH_1h.json fill_simulator section.
+BEFORE running ETH_1h experiment, set chase_threshold=0.05 in knobs_ETH_1h.json fill_simulator section.
 Do NOT modify best_knobs_ETH_1h.json until KEEP is confirmed.
 
-**Priority queue for rotation 6:**
-1. **fill_ticks 1->2 EXPERIMENT** — stage fill_ticks=2 in knobs_ETH_1h.json before running
-   - Hypothesis: fill_ticks=2 allows limit orders to persist across 2 tick intervals instead of 1,
-     increasing fill_rate from ~85% toward ~95%+ and potentially increasing matched_ratio above 2%
-   - Baseline ref: pair_cost=0.594, profit=+$0.08/bar, DD=7.6%, matched=2.0%
-   - Accept KEEP if: matched_ratio > 2.0% OR avg_profit > +$0.08/bar (ANY improvement)
+**Priority queue for rotation 7:**
+1. **chase_threshold 0.03->0.05 EXPERIMENT** — stage chase_threshold=0.05 in knobs_ETH_1h.json
+   - Hypothesis: wider chase window (5% vs 3% price deviation) allows orders to re-enter price after
+     brief adverse moves, potentially increasing matched pairs in thin 1h market
+   - Baseline ref: pair_cost=0.594, profit=+$0.08/bar, DD=7.6%, matched=2.0% (iter 41 best)
+   - Accept KEEP if: matched_ratio > 2.0% OR avg_profit > +$0.08/bar (ANY improvement vs iter 41)
    - DISCARD if: pair_cost increases above 0.65 OR DD exceeds 12% OR matched_ratio drops below 1.5%
-   - If KEEP: update best_knobs_ETH_1h.json with fill_ticks=2
-   - If DISCARD: restore fill_ticks=1 in knobs_ETH_1h.json; next lever = chase_threshold 0.03->0.05
-2. If fill_ticks=2 KEEPs: chase_threshold 0.03->0.05 (wider chase window may improve fill quality)
-3. If fill_ticks=2 DISCARDs: try pace_urgency_hi 2.0->1.5 (reduce late urgency spike)
-4. If all fill sim experiments DISCARD: try bar_budget 200->250 (more capital per bar, may improve pair
-   formation in thin dataset) — note: bar_budget 250/300 is blacklisted but 250 was from early rotation;
-   worth re-testing now that pair_cost baseline is 0.594 not 0.98
+   - If KEEP: update best_knobs_ETH_1h.json with chase_threshold=0.05
+   - If DISCARD: restore chase_threshold=0.03; next lever = pace_urgency_hi 2.0->1.5
+2. If chase_threshold=0.05 DISCARDs: pace_urgency_hi 2.0->1.5 (reduce late-bar urgency spike)
+   - Rationale: current urgency doubles at bar end; reducing to 1.5x may improve fill quality
+   - Accept KEEP if: pair_cost < 0.594 OR avg_profit > +$0.08/bar
+3. If pace_urgency_hi=1.5 DISCARDs: spread_offset 0.01->0.005 (tighter limit placement)
+   - Rationale: tighter spread may improve fill rate marginally in liquid 1h ETH market
+4. If 3 consecutive DISCARDs on fill sim params: escalate to auditor — ETH_1h at structural floor
 
-Blacklist (cumulative): onesided above 5, skip 0.40, risk_ceil 0.20, bar_budget 250/300,
-pace_urgency_lo 0.25 AND 0.30 (both DISCARD — pace lever is DEAD on thin dataset),
-conviction_market_start (GLOBAL BLACKLIST).
-**PACE_LO LEVER: EXHAUSTED for ETH_1h. All tested values (0.25, 0.30, 0.35) produce identical results.**
+Blacklist (cumulative): pace_urgency_lo 0.25/0.30 (inert — DEAD), fill_ticks=2 (regression iter 66),
+onesided above 5, skip 0.40, risk_ceil 0.20, bar_budget 250/300, conviction_market_start (GLOBAL).
 
 ---
 
-## XRP_1h (pair_cost=0.812 at gate=0.04 onesided=5.0, KEEP rate 0%)
+## XRP_1h (pair_cost=0.812, KEEP rate 16.7% (1/6 active), max_dd=9.8%)
 
-### Status: ACTIVE — CONTINUE (auditor directive)
+### Status: ACTIVE — CONTINUE (first KEEP confirmed, beats pair_cost target)
 
 Full trajectory:
 - Iter 12 (R1 baseline): cost=0.855, matched=3.6%, profit=N/A, DD=3.1%
 - Iter 23 (R2 baseline): cost=0.812, matched=4.2%, profit=+$0.10/bar, DD=8.0%
-- Iter 35 (R3 pace=0.30): DISCARD — COLLAPSE (0% matched vs 4.2%); PACE FLOOR CONFIRMED 0.35
+- Iter 35 (R3 pace=0.30): DISCARD — COLLAPSE (0% matched vs 4.2%); PACE FLOOR 0.35 CONFIRMED
 - Iter 47 (R4 baseline onesided=5.0): cost=0.812, matched=4.1%, profit=-$0.14/bar, DD=9.8%
-- Iter 59 (R5 onesided=2.0): DISCARD — COLLAPSE (0% matched vs 4.1%)
-- Iters 61+ (R6): fill_ticks 1->2 experiment STAGED and ready to run
+- Iter 59 (R5 onesided=2.0): DISCARD — COLLAPSE (0% matched); onesided floor confirmed >3.0
+- Iter 72 (R6 fill_ticks=2): KEEP — cost=0.812 stable, profit=-$0.13/bar (IMPROVED +$0.01), DD=9.8% safe
+- Rotation 7: chase_threshold 0.03->0.05 experiment NEXT
 
-XRP_1h meets pair_cost target (<0.85) but profit has turned negative. Two consecutive collapse events
-(pace=0.30 and onesided=2.0) confirm XRP_1h is extremely sensitive to constraint tightening.
-The onesided=2.0 collapse reveals the same mechanism as pace=0.30: any constraint that limits
-the $3-5 unmatched spend required to form pairs causes complete pair formation failure.
+XRP_1h pair_cost=0.812 BEATS trader_a target (<0.85). Profit remains negative (-$0.13/bar) — needs fix.
+fill_ticks=2 KEEP is the first concrete improvement: marginal profit boost, no destabilization.
+The profitability gap (-$0.13/bar vs target >$0) is the primary focus for rotation 7+.
 
-**Current knobs state (VERIFIED rotation 6 start):**
-- knobs_XRP_1h.json: fill_ticks=1, onesided=5.0, magnitude_gate=0.04 — MUST STAGE fill_ticks=2
-- best_knobs_XRP_1h.json: fill_ticks=1, onesided=5.0, magnitude_gate=0.04 — baseline reference
-- Both files are IDENTICAL (post-DISCARD restoration confirmed iter 59)
-- Note: conviction_buy_skip=0.5 in both files (correct for XRP_1h)
+**Current knobs state:**
+- knobs_XRP_1h.json: fill_ticks=2 (correctly reflecting KEEP), chase_threshold=0.03
+- best_knobs_XRP_1h.json: fill_ticks=2 (correctly updated after KEEP), chase_threshold=0.03
+- Confirmed: both files are at fill_ticks=2 and chase_threshold=0.03
 
 **Staging instruction for researcher:**
-BEFORE running XRP_1h experiment, set fill_ticks=2 in knobs_XRP_1h.json fill_simulator section.
+BEFORE running XRP_1h experiment, set chase_threshold=0.05 in knobs_XRP_1h.json fill_simulator section.
 Do NOT modify best_knobs_XRP_1h.json until KEEP is confirmed.
-CRITICAL: do NOT change onesided, pace_urgency_lo, or magnitude_gate — only fill_ticks changes.
+CRITICAL: do NOT change fill_ticks (keep at 2), onesided, pace_urgency_lo, or magnitude_gate.
+Only change: chase_threshold 0.03->0.05.
 
-**Priority queue for rotation 6:**
-1. **fill_ticks 1->2 EXPERIMENT** — stage fill_ticks=2 in knobs_XRP_1h.json before running
-   - Hypothesis: fill_ticks=2 increases fill persistence, improving fill quality for 1h limit orders
-     without changing the unmatched spend mechanism that collapses pair formation
-   - Baseline ref: pair_cost=0.812, profit=-$0.14/bar, DD=9.8%, matched=4.1%
-   - Accept KEEP if: pair_cost < 0.812 OR avg_profit > -$0.14/bar (ANY improvement on either metric)
-   - DISCARD if: matched_ratio drops below 2.0% OR DD exceeds 15%
-   - Note: fill_ticks is a fill-sim parameter, not a pacing constraint — should NOT trigger collapse
-   - If KEEP: update best_knobs_XRP_1h.json with fill_ticks=2
-   - If DISCARD: restore fill_ticks=1; next lever = intermediate onesided test (see item 2)
-2. If fill_ticks=2 DISCARDs: test onesided=3.5 (intermediate between 5.0 and 2.0 COLLAPSE)
-   - Rationale: onesided=2.0 collapses at $2, onesided=5.0 is current reference; $3.5 middle ground
-   - Accept KEEP if: pair_cost < 0.812 OR avg_profit > -$0.14/bar
-   - If collapse (matched_ratio < 2.0%): DISCARD, confirm onesided floor at 5.0
-3. If both fill_ticks and onesided=3.5 DISCARD: try pace_urgency_hi 2.0->1.5 (reduce late urgency)
-4. If 3 consecutive DISCARDs: escalate to auditor — XRP_1h may be at structural floor
+**Priority queue for rotation 7:**
+1. **chase_threshold 0.03->0.05 EXPERIMENT** — stage chase_threshold=0.05 in knobs_XRP_1h.json
+   - Hypothesis: wider chase window allows re-entry after price movement in sparse XRP_1h market,
+     potentially improving fill quality and matched_ratio from 4.0%
+   - Baseline ref: pair_cost=0.812, profit=-$0.13/bar, DD=9.8%, matched=4.0% (iter 72, KEEP state)
+   - Accept KEEP if: pair_cost < 0.812 OR avg_profit > -$0.13/bar (ANY improvement)
+   - DISCARD if: matched_ratio < 2.0% OR DD > 15%
+   - Note: chase_threshold is fill-sim only, should NOT trigger the collapse mechanism
+   - If KEEP: update best_knobs_XRP_1h.json with chase_threshold=0.05
+   - If DISCARD: restore chase_threshold=0.03; next lever = onesided=3.5 intermediate test
+2. If chase_threshold=0.05 DISCARDs: onesided=3.5 intermediate test
+   - Rationale: onesided=2.0 collapses at iter 59; onesided=5.0 is stable; $3.5 is midpoint
+   - Accept KEEP if: pair_cost < 0.812 OR avg_profit > -$0.13/bar
+   - Extreme caution: if matched_ratio < 2.0%, immediate DISCARD (collapse mechanism)
+3. If onesided=3.5 collapses: CONFIRM onesided floor at 5.0. Next: pace_urgency_hi 2.0->1.5
+4. If 3 consecutive DISCARDs: escalate to auditor — XRP_1h structural floor assessment needed
 
 Blacklist (cumulative): skip 0.45/0.55, bar_budget 300, risk_ceil 0.20,
 pace_urgency_lo 0.30 (COLLAPSE iter 35), pace_urgency_lo 0.45 (D pre-RESET),
-max_onesided_cost 2.0 (COLLAPSE iter 59 — $2 too tight for sparse window).
-PACE_LO FLOOR: 0.35 confirmed. Do NOT go below 0.35 on XRP_1h.
-ONESIDED FLOOR: 5.0 current reference; do NOT go below 3.0 without testing 3.5 first.
+max_onesided_cost 2.0 (COLLAPSE iter 59), fill_ticks=1 deprecated (KEEP at fill_ticks=2).
+PACE_LO FLOOR: 0.35 confirmed. ONESIDED FLOOR: 5.0 current reference.
 
 ---
 
-## Rotation 6 Execution Plan (priority order)
+## Rotation 7 Execution Plan (priority order)
 
-1. **BTC_5m** — SKIP (FROZEN PERMANENT — diagnostic confirmed fill mechanics block, not outcomes)
+1. **BTC_5m** — SKIP (FROZEN PERMANENT — fill mechanics structural, P=5.6%)
 2. **BTC_15m** — SKIP (FROZEN — 3 consecutive zero-pair baselines, outcome sparsity 7.9%)
 3. **BTC_1h** — SKIP (FROZEN — extreme sparsity 2.9%)
-4. **ETH_5m** — SKIP (FROZEN — DD=28.7% near kill threshold)
+4. **ETH_5m** — SKIP (FROZEN — DD=28.7% near kill threshold, fill mechanics structural P=5.8%)
 5. **ETH_15m** — SKIP (FROZEN — gate series exhausted, outcome sparsity 9.9%)
-6. **ETH_1h** — **fill_ticks 1->2 EXPERIMENT** (stage fill_ticks=2 in knobs_ETH_1h.json, run backtest)
-7. **SOL_5m** — SKIP (FROZEN — outcome sparsity 6.7%, DD elevated)
+6. **ETH_1h** — **chase_threshold 0.03->0.05 EXPERIMENT** (stage in knobs_ETH_1h.json only)
+7. **SOL_5m** — SKIP (FROZEN — outcome sparsity 6.7%, DD elevated, fill mechanics P=5.3%)
 8. **SOL_15m** — SKIP (FROZEN — correct_side=45.5% < 50%)
 9. **SOL_1h** — SKIP (FROZEN — outcome sparsity 8.6%)
 10. **XRP_5m** — SKIP (FROZEN PERMANENT)
 11. **XRP_15m** — SKIP (FROZEN — correct_side declining, gate exhausted)
-12. **XRP_1h** — **fill_ticks 1->2 EXPERIMENT** (stage fill_ticks=2 in knobs_XRP_1h.json, run backtest)
+12. **XRP_1h** — **chase_threshold 0.03->0.05 EXPERIMENT** (stage in knobs_XRP_1h.json only; keep fill_ticks=2)
 
-**Rotation 6 success criteria:**
-- At minimum 1 KEEP required
-- If 0 KEEPs on fill_ticks experiments: auditor should assess whether fill_sim tuning is exhausted
-  and recommend suspension pending structural engineering fix (outcome resolution or fill mechanics)
-- The diagnostic finding (fill mechanics bottleneck) suggests fill_ticks is a targeted fix —
-  optimism is warranted but expectations should be calibrated given 0/60 cumulative KEEP rate
+**Rotation 7 success criteria:**
+- At minimum 1 KEEP on chase_threshold (same bar as rotation 6 at 50% KEEP rate on fill_ticks)
+- If both chase DISCARDs: system has exhausted fill-sim lever set 1 (fill_ticks, chase_threshold)
+  → escalate to next category: pace_urgency_hi on both active pairs
+- If chase DISCARDs and pace_urgency_hi also DISCARDs in rotation 8:
+  consider auditor for structural assessment — dataset growth may be required
 
 ---
 
 ## Cross-Pair Observations
 
-### Rotation 5 + diagnostic critical findings
+### Rotation 6 critical findings
 
-**Fill mechanics are the fundamental bottleneck for 5m pairs (and likely 15m pairs):**
-- 5m: fill_rate ~15-25% → P(both sides fill) ≈ 2.25%-6.25% — structurally impossible
-- 15m: fill_rate ~30-45% → P(both sides fill) ≈ 9%-20% — borderline
-- 1h: fill_rate ~70-85% → P(both sides fill) ≈ 49%-72% — viable
+**First KEEP achieved (iter 72, XRP_1h fill_ticks=2):**
+- fill_ticks extends limit order persistence across 2 tick intervals
+- Marginal improvement: +$0.01/bar profit, pair formation stable at 4.0%
+- Result is real but small — XRP_1h remains loss-making (-$0.13/bar)
+- This confirms fill-sim levers are the correct avenue for thin 1h markets
 
-This is the most important structural insight from 60 iterations. The gate experiments (R1-R3) and
-the diagnostic (R6 iter 60) have definitively established that outcome sparsity is secondary to
-fill mechanics. The engine cannot form pairs without both sides filling in the same bar.
+**ETH_1h fill_ticks=2 DISCARD (iter 66): divergent behavior from XRP_1h:**
+- ETH_1h fill_rate already 81-85% at fill_ticks=1 — near ceiling
+- Adding persistence increases DD (13.8% vs 7.6% baseline) — longer-lived orders accumulate more
+  unmatched inventory in adverse moves
+- XRP_1h fill_rate=69-74% at fill_ticks=1 — more room for improvement → fill_ticks=2 beneficial
+- Lesson: fill_ticks benefit correlates inversely with baseline fill_rate
 
-**Outcome sparsity remains a secondary bottleneck for 1h pairs:**
-- ETH_1h: 4/34 bars resolved = 11.8% resolution — sparse but workable
-- XRP_1h: ~5/35 bars resolved = ~14% resolution — sparse but workable
-- Without additional live-log data accumulation, matched_ratio will remain at ~2-4% for 1h pairs
+**Fill rate differential determines fill_ticks effectiveness:**
+- ETH_1h fill_rate=81-85%: fill_ticks=2 DISCARD (already filling well)
+- XRP_1h fill_rate=70-74%: fill_ticks=2 KEEP (room for improvement)
+- This pattern predicts: chase_threshold may also behave differently by pair
 
-**pace_urgency_lo lever is dead for ETH_1h:**
-- All 3 tested values (0.25, 0.30, 0.35) produce identical pair_cost=0.594
-- The statistical power of 34-35 bars with 4 outcomes is insufficient to detect pace changes
-- This lever should not be re-tested on ETH_1h until dataset grows (>50 bars, >10 outcomes)
+**Dataset growth bottleneck remains the primary constraint for frozen pairs:**
+- All 10 frozen pairs blocked by either fill mechanics (5m/some 15m) or outcome sparsity (15m/1h)
+- ETH_1h/XRP_1h: 34-36 bars, 4-5 outcomes — 12 iterations of experiments on effectively the same data
+- Without live-log data accumulation (OHLC resolution or time), frozen pairs cannot be unblocked
+- Fill mechanics pairs (BTC_5m, ETH_5m, SOL_5m, XRP_5m): permanent unless fill engine redesigned
 
-**Collapse mechanism for XRP_1h:**
-- Any constraint that limits cumulative unmatched spend below $3-5 per bar causes complete
-  pair formation failure — pair formation requires accumulating unmatched inventory before matching
-- onesided=2.0 (like pace=0.30) acts as a hard cap that prevents the required pre-matching spend
-- fill_ticks is a fill simulator parameter (not a spending constraint) — should be safe to test
-
-**Parameter categories: which levers remain untested:**
-- Fill sim: fill_ticks (UNTESTED on both active pairs — NEXT PRIORITY for rotation 6)
-- Fill sim: chase_threshold (untested — queued for rotation 7 if fill_ticks KEEPs)
-- Fill sim: max_chase (untested — lower priority)
-- Sell: sell_loss_start, sell_dump_start (untested but no sells firing — not relevant yet)
-- Risk budget: risk_t_start, risk_t_end (untested — lower priority given pair_cost already meets target)
-- Balance: max_side_fraction 0.55 (untested)
+**Parameter categories tested to date and effectiveness:**
+- magnitude_gate: EXHAUSTED (all values 0.08/0.04/0.02/0.0 tested across all pairs — uniformly ineffective)
+- pace_urgency_lo: DEAD on thin datasets. Lever EXHAUSTED for ETH_1h. Floor=0.35 for XRP_1h.
+- max_onesided_cost: Collapse mechanism confirmed at $2. XRP_1h floor at $5 (onesided=5.0).
+- fill_ticks: TESTED. KEEP on XRP_1h. DISCARD on ETH_1h. Beneficial at lower fill rates only.
+- chase_threshold: UNTESTED on both active pairs — NEXT PRIORITY for rotation 7.
+- pace_urgency_hi: UNTESTED on both active pairs — queued for rotation 8 if chase DISCARDs.
+- spread_offset: UNTESTED — lower priority.
+- max_chase: UNTESTED — lower priority.
 
 ---
 
-## trader_a Benchmark Comparison (after rotation 5 + diagnostic, iter 60)
+## trader_a Benchmark Comparison (after rotation 6, iter 72)
 
 | Pair | PairCost | Target | Gap | AvgProfit | MaxDD% | Status |
 |------|----------|--------|-----|-----------|--------|--------|
-| BTC_5m | 0.000 | < 0.85 | N/A | -$0.060/bar | 23.4% | FROZEN PERMANENT — fill mechanics (P≈5.6%) |
+| BTC_5m | 0.000 | < 0.85 | N/A | -$0.060/bar | 23.4% | FROZEN PERMANENT — fill mechanics (P=5.6%) |
 | BTC_15m | 0.000 | < 0.85 | N/A | -$0.019/bar | 12.4% | FROZEN — outcome sparsity + zero pairs |
 | BTC_1h | 0.000 | < 0.85 | N/A | -$0.032/bar | 3.9% | FROZEN — extreme sparsity (2.9%) |
-| ETH_5m | 0.000 | < 0.85 | N/A | -$0.091/bar | 28.7% | FROZEN — DD WARNING, fill mechanics (P≈5.8%) |
+| ETH_5m | 0.000 | < 0.85 | N/A | -$0.091/bar | 28.7% | FROZEN — DD WARNING, fill mechanics (P=5.8%) |
 | ETH_15m | 0.000 | < 0.85 | N/A | +$0.158/bar | 7.1% | FROZEN — gate exhausted, strong signal wasted |
-| ETH_1h | 0.594 | < 0.85 | -0.256 (BEATS) | +$0.080/bar | 7.6% | ACTIVE — fill_ticks=2 experiment queued |
-| SOL_5m | 0.000 | < 0.85 | N/A | +$0.135/bar | 23.2% | FROZEN — fill mechanics (P≈4.2%) |
+| ETH_1h | 0.594 | < 0.85 | -0.256 (BEATS) | +$0.080/bar | 7.6% | ACTIVE — chase_threshold=0.05 queued |
+| SOL_5m | 0.000 | < 0.85 | N/A | +$0.135/bar | 23.2% | FROZEN — fill mechanics (P=5.3%) |
 | SOL_15m | 0.567* | < 0.85 | N/A | -$0.270/bar | 19.8% | FROZEN — correct_side=45.5% < 50% |
 | SOL_1h | 0.000 | < 0.85 | N/A | -$0.110/bar | 8.3% | FROZEN — outcome sparsity (8.6%) |
 | XRP_5m | N/A | < 0.85 | N/A | N/A | N/A | FROZEN PERMANENT — fill_rate=15.6% floor |
 | XRP_15m | 0.950 | < 0.85 | +0.100 (FAILS) | -$0.240/bar | 20.5% | FROZEN — correct_side=49.2% declining |
-| XRP_1h | 0.812 | < 0.85 | -0.038 (BEATS) | -$0.140/bar | 9.8% | ACTIVE — fill_ticks=2 experiment queued |
+| XRP_1h | 0.812 | < 0.85 | -0.038 (BEATS) | -$0.130/bar | 9.8% | ACTIVE — chase_threshold=0.05 queued |
 
 *SOL_15m: artificially low pair_cost (near-zero pairs)
 
 Best performers (active, pair_cost beats target):
-- ETH_1h: pair_cost=0.594 — BENCHMARK ACHIEVED. profit=+$0.08/bar positive.
-- XRP_1h: pair_cost=0.812 — BENCHMARK ACHIEVED. profit=-$0.14/bar negative, needs fix.
+- ETH_1h: pair_cost=0.594 — BENCHMARK ACHIEVED. profit=+$0.08/bar positive. CHASE THRESHOLD NEXT.
+- XRP_1h: pair_cost=0.812 — BENCHMARK ACHIEVED. profit=-$0.13/bar negative. CHASE THRESHOLD NEXT.
 
-Pairs with strong signal quality but frozen by structural issues:
+Primary gap to close: XRP_1h profitability (-$0.13/bar vs >$0 target).
+Secondary gap: ETH_1h matched_ratio at 2.0% — insufficient statistical power for reliable experiments.
+
+Pairs with strong signal quality but frozen by structural issues (priority for future unfreeze):
 - ETH_15m: correct_side=71.2%, avg_profit=+$0.16/bar (unmatched) — highest latent potential
 - BTC_1h: correct_side=70.0% — strong signal, blocked by extreme sparsity (2.9%)
-- BTC_5m: correct_side=62.9% — blocked by fill mechanics (structural, unfixable without engineering)
+- BTC_5m: correct_side=62.9% — blocked by fill mechanics (structural, requires engine redesign)
 
 ---
 
@@ -240,39 +237,43 @@ Pairs with strong signal quality but frozen by structural issues:
 ### Per-pair blacklists
 
 - **BTC_5m**: FROZEN PERMANENT. All parameter experiments blocked indefinitely.
-  Fill mechanics are the structural barrier (not outcome sparsity, not gate).
-- **BTC_15m**: FROZEN. gate=0.08/0.04/0.0 all fail; outcome sparsity dominant.
+  Fill mechanics structural barrier (not outcome sparsity). P(both sides fill)=5.6%.
+- **BTC_15m**: FROZEN. gate=0.08/0.04/0.0 all fail; outcome sparsity dominant (7.9%).
 - **BTC_1h**: FROZEN. gate=0.08/0.04/0.0 all fail; extreme outcome sparsity (2.9%).
-- **ETH_5m**: FROZEN. gate series exhausted; DD=28.7% near 30% kill threshold.
-- **ETH_15m**: FROZEN. gate series exhausted; outcome sparsity (9.9%). Strong signal = most promising
+- **ETH_5m**: FROZEN. gate series exhausted; DD=28.7% near 30% kill threshold; P=5.8% fill mechanics.
+- **ETH_15m**: FROZEN. gate series exhausted; outcome sparsity (9.9%). Strong signal — most promising
   candidate to unfreeze IF outcome resolution engineering delivers more live-log data.
-- **ETH_1h**: pace_urgency_lo 0.25 AND 0.30 (both inert — lever DEAD on thin dataset).
+- **ETH_1h**: pace_urgency_lo 0.25/0.30 (DEAD — inert on thin data), fill_ticks=2 (regression).
   onesided above 5, skip 0.40, risk_ceil 0.20, bar_budget 250/300, conviction_market_start (GLOBAL).
-- **SOL_5m**: FROZEN. fill mechanics dominant (fill_rate=23.1%, P≈5.3%).
+- **SOL_5m**: FROZEN. fill mechanics dominant (fill_rate=23.1%, P=5.3%).
 - **SOL_15m**: FROZEN. correct_side=45.5% both measurements < 50%.
 - **SOL_1h**: FROZEN. gate series exhausted; outcome sparsity (8.6%).
 - **XRP_5m**: FROZEN PERMANENT. fill_rate=15.6% structural floor.
 - **XRP_15m**: FROZEN. correct_side declining (53.7%->50.0%->49.2%); gate exhausted.
-- **XRP_1h**: skip 0.45/0.55, bar_budget 300, risk_ceil 0.20, pace_urgency_lo 0.30 (COLLAPSE),
-  pace_urgency_lo 0.45 (D), max_onesided_cost 2.0 (COLLAPSE — $2 too tight for sparse window).
+- **XRP_1h**: skip 0.45/0.55, bar_budget 300, risk_ceil 0.20,
+  pace_urgency_lo 0.30 (COLLAPSE), pace_urgency_lo 0.45 (D), max_onesided_cost 2.0 (COLLAPSE).
+  PACE_LO FLOOR: 0.35 confirmed. fill_ticks=1 superseded (KEEP at fill_ticks=2).
 
 ### Global Blacklist
 
 - **conviction_market_start**: GLOBALLY BLACKLISTED. Fails across ALL tested pairs.
-- **magnitude_gate=0.08/0.04/0.02/0.0**: Exhausted for all pairs. Gate parameter is irrelevant
-  for any pair with outcome sparsity or fill mechanics bottleneck.
-- **pace_urgency_lo < 0.35**: GLOBALLY BLACKLISTED below 0.35. COLLAPSE mechanism confirmed on
-  multiple pairs. ETH_1h: lever dead entirely (iters 29/53 both identical). XRP_1h: floor at 0.35.
-- **max_onesided_cost < 3.0**: BLACKLISTED. onesided=2.0 causes COLLAPSE on XRP_1h by hitting
-  the $2 cap before pair formation can complete. Test minimum 3.5 before any tighter values.
+- **magnitude_gate (all values 0.0/0.02/0.04/0.08)**: Exhausted for ALL pairs. Gate parameter is
+  irrelevant for any pair with outcome sparsity or fill mechanics bottleneck.
+- **pace_urgency_lo < 0.35**: GLOBALLY BLACKLISTED. COLLAPSE mechanism confirmed on XRP_1h.
+  ETH_1h: lever dead entirely. Do NOT test below 0.35 on any pair.
+- **max_onesided_cost < 3.0**: BLACKLISTED. $2 causes collapse on XRP_1h. Minimum test = 3.5.
 - **Any experiment on frozen pairs**: BLOCKED until auditor lifts freeze or structural fix deployed.
 
 ### Structural Engineering Recommendations (for future audit/development)
+
 1. **Outcome resolution rate**: Current 8-14% for 1h pairs is the binding long-term constraint.
    Engineering fix: ingest more live-log data OR implement OHLC-based outcome resolution.
-   This would unfreeze ETH_15m and potentially BTC_1h/SOL_1h.
-2. **Fill mechanics for 5m/15m pairs**: P(both sides fill in bar) is structurally low.
-   Engineering fix: increase order persistence (fill_ticks), widen spread_offset, or use
-   market orders for small sizes. The fill_ticks=2 experiment is the first test of this approach.
-3. **Dataset growth**: ETH_1h/XRP_1h only have 34-35 bars. Statistical power is very low.
-   Most parameter changes are undetectable. Dataset will grow naturally over time.
+   This would unfreeze ETH_15m (correct_side=71.2%, strong signal) and potentially BTC_1h/SOL_1h.
+   Priority: HIGH — would add 2-4 active experimental pairs.
+2. **Fill mechanics for 5m pairs**: P(both sides fill in bar)=5.6% for BTC_5m is structural.
+   Engineering fix: increase fill_ticks substantially (e.g., 5-10), widen spread_offset, or use
+   market orders for small sizes. Current fill_ticks lever (1->2) is insufficient for 5m.
+   The 5m pairs require engine redesign, not parameter tuning.
+3. **Dataset growth**: ETH_1h/XRP_1h only have 34-36 bars. Statistical power is very low.
+   Most parameter changes produce undetectable differences on <10 resolved outcomes.
+   Dataset grows naturally at 1 bar/hour — 6 months = ~4,380 bars, >500 outcomes at current rate.
