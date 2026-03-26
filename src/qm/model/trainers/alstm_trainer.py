@@ -190,16 +190,22 @@ class ALSTMTrainer:
         model.to(device)
         return model
 
-    def _predict_with_model(self, model: Any, X_seq: np.ndarray) -> np.ndarray:
-        """Run inference on 3-D sequence array."""
+    def _predict_with_model(
+        self, model: Any, X_seq: np.ndarray, batch_size: int = 4096,
+    ) -> np.ndarray:
+        """Run batched inference on 3-D sequence array."""
         import torch
 
         device = self._get_device()
         model.eval()
+        all_probs = []
         with torch.no_grad():
-            t = torch.tensor(X_seq, dtype=torch.float32).to(device)
-            probs = model(t).cpu().numpy()
-        return probs
+            for i in range(0, len(X_seq), batch_size):
+                batch = torch.tensor(
+                    X_seq[i : i + batch_size], dtype=torch.float32,
+                ).to(device)
+                all_probs.append(model(batch).cpu().numpy())
+        return np.concatenate(all_probs)
 
     def fit(
         self,
