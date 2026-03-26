@@ -1,6 +1,7 @@
-iter=25 pair=BTC_15m timestamp=2026-03-27T10:20:00Z status=running
+iter=26 pair=BTC_1h timestamp=2026-03-27T11:00:00Z status=running
 Mode: BACKTEST (replay_available)
-Action: Testing magnitude_gate=0.0 (disable gate) for BTC_15m per strategy.md item #1 + audit onesided=2.0 already staged.
-Gate history: gate=0.08 (iter 2) = 0 pairs, gate=0.04 (iter 14) = 0 pairs — gate alone cannot fix BTC_15m.
-Current knobs: magnitude_gate=0.0 (staging now), max_onesided_cost=2.0 (pre-staged), pace_urgency_lo=0.35.
-Hypothesis: Disabling magnitude_gate should restore pair formation on BTC_15m. Pre-RESET best_knobs had no gate (0.0) and onesided=5.0. Combined gate=0.0+onesided=2.0 serves as baseline for rotation 3.
+Action: BTC_1h rotation-3 baseline — fixing risk_ceil 0.20->0.15 (auditor directive) + setting magnitude_gate=0.0 (strategy queue item 1 for BTC_1h rotation 3).
+Gate history: gate=0.08 (iter 3) = 0 pairs, gate=0.04 (iter 15) = 0 pairs. Gate alone cannot fix BTC_1h.
+Current knobs pre-fix: magnitude_gate=0.04, risk_ceil=0.20 (stale), pace_urgency_lo=0.45 (pre-staged).
+Hypothesis: gate=0.0 may enable pair formation (1h bars have enough movement). risk_ceil fix is mandatory before any experiment.
+Also fixing best_knobs_BTC_1h.json: risk_ceil 0.20->0.15 per auditor finding #6.

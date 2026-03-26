@@ -59,3 +59,6 @@
 2026-03-27T09:25:00Z iter=24 pair=BTC_5m status=DISCARD param=magnitude_gate 0.04->0.02
   eval: pair_cost=0.0000 profit=-$0.03 max_dd=22.98% bars=411 matched_ratio=0.0%
   hypothesis: "gate=0.02 still zero pairs (3rd gate tested: 0.08/0.04/0.02 all collapse). magnitude_gate is not the root bottleneck. Pre-RESET pair_cost=0.922 used gate disabled (0.0 = best_knobs state). Next: magnitude_gate=0.0 (explicit disable) to restore pre-RESET pair formation behavior on BTC_5m."
+2026-03-27T11:00:00Z iter=26 pair=BTC_1h status=BASELINE param=risk_ceil=0.20->0.15(fix)+magnitude_gate=0.04->0.0 0.04->0.0
+  eval: pair_cost=0.0000 profit=$-0.03 max_dd=3.88% bars=34 matched_ratio=0% correct_side=70.0%
+  hypothesis: "BTC_1h rotation-3 baseline with auditor risk_ceil fix (0.20->0.15 in both knobs files) and magnitude_gate disabled (0.0). Zero pairs formed AGAIN — 3rd consecutive zero-pair result (gate=0.08 iter3, gate=0.04 iter15, gate=0.0 iter26). Only 1 live-log outcome loaded (vs 34 bars, 2.9% resolution) confirms extreme outcome sparsity as structural bottleneck, not the gate. correct_side=70.0% strong signal quality. max_dd=3.9% very safe (unmatched inventory minimal). fill_rate=58.8%. Gate disabled but no improvement: pair formation on BTC_1h requires outcome resolution, not gate tuning. Escalate to auditor."

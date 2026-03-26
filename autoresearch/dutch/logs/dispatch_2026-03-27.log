@@ -22,3 +22,4 @@
 2026-03-27T09:25:00Z iter=24 pair=BTC_5m role=RESEARCHER outcome=DISCARD gate=0.02 still_zero_pairs matched_ratio=0% correct_side=62.9% max_dd=23.0%; magnitude_gate=0.0(disabled) staged next_pair=BTC_15m
 2026-03-27T10:00:00Z iter=24 pair=BTC_15m role=auditor outcome=FREEZE BTC_5m+SOL_15m+XRP_5m; PRIORITIZE XRP_1h; CONTINUE x8; 2 knobs fixes required (ETH_15m pace revert, BTC_1h risk_ceil)
 2026-03-27T10:15:00Z iter=24 pair=BTC_15m role=strategist outcome=rotation-2-analysis-complete: 0/12 KEEP (all baselines); 7 pairs zero-formation (gate=0.0 needed); XRP_1h prioritized (pair_cost=0.812); ETH_1h active (pair_cost=0.594); BTC_5m+SOL_15m frozen; BTC_1h risk_ceil fix needed
+2026-03-27T11:00:00Z iter=26 pair=BTC_1h role=RESEARCHER outcome=BASELINE risk_ceil_fixed+gate=0.0_still_zero_pairs matched_ratio=0% correct_side=70.0% max_dd=3.88% bars=34; auditor escalation flagged; advancing to ETH_5m
