@@ -1,174 +1,194 @@
 # Dutch Audit Report
-After iteration 24 (2026-03-27T10:00:00Z)
+After iteration 48 (2026-03-27T16:00:00Z)
 
 ## Directives
 
-- FREEZE XRP_5m — PERMANENT FREEZE maintained from iter 119 audit; structural dead-end confirmed across 2 full rotations (max_dd=69%, fill_rate structural floor); skip in all rotations
-- FREEZE BTC_5m — pair formation structurally blocked at gate=0.08, 0.04, 0.02 across 3 consecutive experiments (iters 1, 13, 24); magnitude_gate alone cannot fix BTC_5m; knobs already at gate=0.0 (correct); rotation 3 must run gate=0.0 baseline as FIRST priority; no other experiments until non-zero matched_ratio confirmed
-- FREEZE SOL_15m — correct_side=45.5% at gate=0.04 (below 50%), worsening from 47.7% at gate=0.08; model directionally wrong on this pair more than right; pair formation near-zero (0.3%); must confirm correct_side recovers above 50% at gate=0.04 BASELINE before ANY experiments; hold all experiments pending next baseline
-- CONTINUE BTC_15m — gate=0.04 baseline shows zero pairs (iter 14); rotation 3 MUST run max_onesided_cost 5.0->2.0 as the primary untested lever; knobs correctly pre-staged at onesided=2.0; if DISCARD then re-FREEZE
-- CONTINUE BTC_1h — gate=0.04 baseline: zero pairs (iter 15); pair formation requires gate experiment series; knobs has pace_urgency_lo=0.45 (staged per prior audit); thin dataset (34 bars) limits experiment validity; run pace_urgency_lo=0.45 experiment in rotation 3
-- CONTINUE ETH_5m — gate=0.04 baseline: zero pairs (iter 16); knobs has onesided=1.5, pace_urgency_lo=0.30 (pre-staged one step ahead); rotation 3: run gate=0.04 baseline first properly (zero pairs means baseline is invalid for experiment comparison); check if pace_urgency is the blocking variable
-- CONTINUE ETH_15m — gate=0.04 baseline: zero pairs BUT correct_side=71.0% strong signal, avg_profit positive; knobs pre-staged at pace_urgency_lo=0.25 (two steps from best_knobs 0.35); rotation 3: test pace_urgency_lo 0.35->0.30 first (match strategy queue), not 0.25 directly
-- CONTINUE ETH_1h — gate=0.04 restored pair formation: 2.0% matched_ratio, pair_cost=0.594 (best post-RESET); knobs correctly at pace_urgency_lo=0.30, onesided=5.0; rotation 3: pace_urgency_lo 0.35->0.30 experiment (knobs already staged; confirm this is the change being applied vs baseline 0.35)
-- CONTINUE SOL_5m — gate=0.04 baseline: zero pairs (iter 19); knobs at pace_urgency_lo=0.30, onesided=2.0; same collapse pattern as BTC_5m; pair formation may require gate=0.0 like BTC_5m; rotation 3: test gate=0.0 ONLY IF BTC_5m gate=0.0 shows positive results; otherwise hold
-- CONTINUE SOL_1h — gate=0.04 baseline: zero pairs (iter 21); stale bar_budget FIXED (300 confirmed); correct_side=55.0%, fill_rate=57.4%; rotation 3: run with best_knobs as true baseline; dataset extremely thin (34 bars)
-- CONTINUE XRP_15m — gate=0.04 restored pair formation: 0.72% matched_ratio, pair_cost=0.950; knobs at pace_urgency_lo=0.30 (correctly matching best_knobs); rotation 3: pace_urgency_lo 0.30->0.25 per strategy queue (XRP_15m showed 18% gain with 0.35->0.30)
-- PRIORITIZE XRP_1h — gate=0.04 improved: 4.2% matched_ratio, pair_cost=0.812 (vs 0.855 at gate=0.08); correct_side=70.4% consistent; knobs pre-staged at onesided=2.0; rotation 3: run onesided=2.0 experiment; highest avg_profit potential in system (+$1.08/bar pre-RESET)
+- FREEZE XRP_5m — PERMANENT (maintained from all prior audits): structural microstructure dead-end
+- FREEZE SOL_15m — MAINTAINED: correct_side=45.5% at gate=0.04 (iter 20), 47.7% at gate=0.08 (iter 8), both below 50%; model directionally wrong; do NOT run experiments
+- FREEZE XRP_15m — NEW: correct_side dropped to 49.2% at gate=0.0 (iter 46), below 50% threshold; matches SOL_15m signal degradation pattern; gate series fully exhausted (iter 22 gate=0.04, iter 46 gate=0.0 identical cost=0.950); no viable experiments remain; FREEZE pending signal quality investigation
+- FREEZE BTC_5m — MAINTAINED: 4 consecutive zero-pair baselines (gate=0.08/0.04/0.02/0.0 all fail); outcome sparsity structural (40/420 = 9.5%); all parameter levers exhausted; FREEZE pending structural resolution
+- FREEZE BTC_15m — NEW: 3 consecutive zero-pair baselines (gate=0.08/0.04/0.0 all fail, iters 2/14/25); outcome sparsity structural (11/139 = 7.9%); gate and onesided experiments both exhausted; no viable experiments remain within current outcome window; FREEZE pending structural resolution
+- FREEZE BTC_1h — NEW: 3 consecutive zero-pair baselines (gate=0.08/0.04/0.0 all fail, iters 3/15/26); outcome sparsity extreme (1/34 = 2.9%); virtually impossible to form pairs; FREEZE pending structural resolution
+- FREEZE ETH_5m — NEW: 3 consecutive zero-pair baselines (gate=0.08/0.04/0.0 all fail, iters 4/16/27); outcome sparsity structural (36/414 = 8.7%); max_dd=28.7% dangerously close to 30% kill threshold from unmatched inventory accumulation; FREEZE to prevent DD blowup; resume only with outcome window fix
+- FREEZE ETH_15m — NEW: 3 consecutive zero-pair baselines (gate=0.08/0.04/0.0 all fail, iters 5/17/40); outcome sparsity structural (14/142 = 9.9%); gate series formally exhausted in rotation 4; FREEZE pending structural resolution
+- FREEZE SOL_5m — NEW: 3 consecutive zero-pair runs (gate=0.08/0.04/0.04+pace all fail, iters 7/19/30); outcome sparsity structural (28/417 = 6.7%); max_dd=23.2% elevated; FREEZE pending structural resolution
+- FREEZE SOL_1h — NEW: 3 consecutive zero-pair baselines (gate=0.08/0.04/0.0 all fail, iters 9/21/32); outcome sparsity structural (3/35 = 8.6%); FREEZE pending structural resolution
+- PRIORITIZE ETH_1h — highest priority active pair; pair_cost=0.594 already beats trader_a target; DD improved 13.8%->7.6% over rotation 4; profit improving to +$0.08/bar; next lever: pace_urgency_lo 0.35->0.30 (knobs already staged)
+- CONTINUE XRP_1h — second active pair; pair_cost=0.812, closest to trader_a target among non-ETH_1h; onesided=2.0 experiment is the pending next step (knobs pre-staged); pace floor confirmed at 0.35
+
+## Critical Structural Finding: Outcome Sparsity Universal Bottleneck
+
+**All 7 HOLD/FREEZE pairs share the same root cause.** In the backtest window, only 3-10% of bars have resolved outcomes from the live-log source. Pair formation requires BOTH sides to have resolved outcomes within the same evaluation window. With 3-10% resolution, the probability of two matching outcomes = (0.03-0.10)^2 ≈ 0.09-1% per bar, explaining near-zero matched_ratio across all these pairs.
+
+This is NOT a parameter problem. No combination of magnitude_gate, pace_urgency, max_onesided_cost, or other knobs can fix outcome sparsity. The bottleneck is the data source feeding resolved outcomes into the backtest.
+
+**Structural resolution options (auditor directive for researcher):**
+1. OUTCOME_SOURCE_CHANGE: Investigate whether the backtest can use OHLC-based outcome resolution (e.g., bar close above/below mid-price at open) rather than live-log events. This would give 100% outcome resolution and is the most likely path to unblocking 7 frozen pairs.
+2. WINDOW_EXPANSION: If live-log must be used, determine whether extending the backtest window to include a longer historical period with more live-log data would materially increase resolution rate above 10%.
+3. DECLARE_DEAD_END: If OHLC resolution is incompatible with Dutch strategy design, formally declare BTC_5m/15m/1h, ETH_5m/15m, SOL_5m/1h as structural dead-ends and focus all future research on ETH_1h and XRP_1h exclusively.
+
+**For rotation 5 the researcher must NOT run any experiments on the 10 frozen pairs.** The only active pairs requiring experiments are ETH_1h and XRP_1h. The structural question above should be investigated by the researcher as a diagnostic task BEFORE running ETH_1h/XRP_1h experiments if possible.
 
 ## Per-Pair Assessment
 
-| Pair | BestCost (pre-RESET) | R2 Baseline Cost | MatchedRatio | CorrectSide | MaxDD% | KnobsStatus | Trajectory | Action |
-|------|---------------------|-----------------|--------------|-------------|--------|-------------|------------|--------|
-| BTC_5m | 0.922 | 0.000 (gate=0.02, iter 24) | 0% | 62.9% | 23.0% | gate=0.0 staged | BLOCKED — 3 gates all zero pairs | FREEZE (gate=0.0 baseline needed) |
-| BTC_15m | 0.933 | 0.000 (gate=0.04, iter 14) | 0% | 56.5% | 22.1% | onesided=2.0 staged | Baseline only; onesided test needed | CONTINUE |
-| BTC_1h | 0.799 | 0.000 (gate=0.04, iter 15) | 0% | 68.4% | 4.8% | pace_urgency_lo=0.45 staged | Thin dataset (34 bars); blocked | CONTINUE |
-| ETH_5m | 0.633 | 0.000 (gate=0.04, iter 16) | 0% | 52.0% | 29.2% | onesided=1.5, pace=0.30 staged | High DD from unmatched; blocked | CONTINUE |
-| ETH_15m | 0.560 | 0.000 (gate=0.04, iter 17) | 0% | 71.0% | 7.1% | pace=0.25 (2 steps ahead) | Strong signal; need true baseline | CONTINUE |
-| ETH_1h | 0.706 | 0.594 (gate=0.04, iter 18) | 2.0% | 62.1% | 13.8% | pace=0.30 staged (vs best=0.35) | BEST post-RESET; improving | CONTINUE |
-| SOL_5m | 0.676 | 0.000 (gate=0.04, iter 19) | 0% | 56.4% | 20.0% | pace=0.30 staged | Same collapse as BTC_5m | CONTINUE |
-| SOL_15m | 0.696 | 0.567 (gate=0.04, iter 20) | 0.3% | 45.5% | 19.8% | pace=0.30 staged | correct_side BELOW 50% and worsening | FREEZE (wait for signal recovery) |
-| SOL_1h | 0.655 | 0.000 (gate=0.04, iter 21) | 0% | 55.0% | 7.3% | bar_budget=300 fixed | Thin dataset; need true baseline | CONTINUE |
-| XRP_5m | 0.909 | N/A (FROZEN) | 0% | 57.8% | 13.4% | FROZEN | PERMANENT FREEZE | FREEZE |
-| XRP_15m | 0.638 | 0.950 (gate=0.04, iter 22) | 0.72% | 50.0% | 19.3% | pace=0.30 (matches best) | Pairs returned; pace series next | CONTINUE |
-| XRP_1h | 0.674 | 0.812 (gate=0.04, iter 23) | 4.24% | 70.4% | 8.0% | onesided=2.0 staged | BEST trajectory; pair cost dropping | PRIORITIZE |
+| Pair | Best Post-RESET Cost | R4 Cost | MatchedRatio | CorrectSide | MaxDD% | KEEP Rate | Trajectory | Action |
+|------|---------------------|---------|--------------|-------------|--------|-----------|------------|--------|
+| BTC_5m | 0.000 (gate=0.0 all fail) | 0.000 | 0% | 62.9% | 23.4% | 0% (4 baselines) | BLOCKED — 4x gate exhaustion | FREEZE |
+| BTC_15m | 0.000 (gate=0.0 iter25) | 0.000 | 0% | 60.7% | 12.4% | 0% (3 baselines) | BLOCKED — gate+onesided exhausted | FREEZE |
+| BTC_1h | 0.000 (gate=0.0 iter26) | 0.000 | 0% | 70.0% | 3.9% | 0% (3 baselines) | BLOCKED — extreme sparsity (2.9%) | FREEZE |
+| ETH_5m | 0.000 (gate=0.0 iter27) | 0.000 | 0% | 52.9% | 28.7% | 0% (3 baselines) | BLOCKED + DD WARNING | FREEZE |
+| ETH_15m | 0.000 (gate=0.0 iter40) | 0.000 | 0% | 71.2% | 7.1% | 0% (3 baselines) | BLOCKED — gate formally exhausted R4 | FREEZE |
+| ETH_1h | 0.594 (gate=0.04 iter18/41) | 0.594 | 2.0% | 65.5% | 7.6% | 1/4 valid | IMPROVING — DD down, profit up | PRIORITIZE |
+| SOL_5m | 0.000 (3x gate fail) | 0.000 | 0% | 56.2% | 23.2% | 0% (3 runs) | BLOCKED | FREEZE |
+| SOL_15m | 0.567 (few pairs) | FROZEN | 0.3% | 45.5% | 19.8% | 0% (freeze) | FROZEN — correct_side below 50% | FREEZE |
+| SOL_1h | 0.000 (3x gate fail) | 0.000 | 0% | 54.5% | 8.3% | 0% (3 baselines) | BLOCKED | FREEZE |
+| XRP_5m | FROZEN | N/A | 0% | 57.8% | 13.4% | N/A (frozen) | PERMANENT FREEZE | FREEZE |
+| XRP_15m | 0.950 (iters 22/46) | 0.950 | 0.7% | 49.2% | 20.5% | 0% R3+R4 | DEGRADING — correct_side < 50% | FREEZE |
+| XRP_1h | 0.812 (iters 23/47) | 0.812 | 4.1% | 66.7% | 9.8% | 0% R3+R4 | STABLE — onesided=2.0 untested | CONTINUE |
 
 ## trader_a Gap Analysis
 
-| Pair | R2 Cost | Pre-RESET Best | Target | Cost Gap | Profit | DD | ETA (rotations) |
-|------|---------|----------------|--------|----------|--------|----|-----------------|
-| XRP_1h | 0.812 | 0.674 | <0.85 | -4.5% (BEATS) | +$0.10/bar | 8.0% | 1-2 |
-| ETH_1h | 0.594 | 0.706 | <0.85 | -30% (BEATS) | -$0.06/bar | 13.8% | 2-3 |
-| SOL_15m | 0.567* | 0.696 | <0.85 | -33%* (misleading) | -$0.27/bar | 19.8% | blocked |
-| XRP_15m | 0.950 | 0.638 | <0.85 | +11.8% (FAILS) | -$0.23/bar | 19.3% | 3-4 |
-| ETH_5m | N/A | 0.633 | <0.85 | N/A | N/A | N/A | blocked |
-| BTC_1h | N/A | 0.799 | <0.85 | N/A | N/A | N/A | blocked |
-| ETH_15m | N/A | 0.560 | <0.85 | N/A | N/A | N/A | blocked |
-| SOL_1h | N/A | 0.655 | <0.85 | N/A | N/A | N/A | blocked |
-| SOL_5m | N/A | 0.676 | <0.85 | N/A | N/A | N/A | blocked |
-| BTC_5m | N/A | 0.922 | <0.85 | N/A | N/A | N/A | blocked |
-| BTC_15m | N/A | 0.933 | <0.85 | N/A | N/A | N/A | blocked |
-| XRP_5m | FROZEN | 0.909 | <0.85 | FROZEN | -$0.32/bar | 13.4% | never |
+| Pair | R4 Cost | Pre-RESET Best | Target | Cost Gap | Profit | DD | Status |
+|------|---------|----------------|--------|----------|--------|----|--------|
+| ETH_1h | 0.594 | 0.706 | <0.85 | -30% (BEATS) | +$0.08/bar | 7.6% | ACTIVE, approaching profitability |
+| XRP_1h | 0.812 | 0.674 | <0.85 | -4.5% (BEATS) | -$0.14/bar | 9.8% | ACTIVE, cost meets target, profit negative |
+| XRP_15m | 0.950 | 0.638 | <0.85 | +11.8% (FAILS) | -$0.24/bar | 20.5% | FREEZE — correct_side degraded |
+| SOL_15m | 0.567* | 0.696 | <0.85 | N/A (misleading) | -$0.27/bar | 19.8% | FREEZE — correct_side degraded |
+| All others | N/A | varies | <0.85 | N/A | N/A | N/A | FREEZE — outcome sparsity |
 
-*SOL_15m: pair_cost=0.567 artificially low (only 0.3% matched_ratio — very few pairs)
+*SOL_15m: artificially low (0.3% matched_ratio — near-zero pairs)
 
-**Only 2 pairs with meaningful baseline costs post-RESET (ETH_1h and XRP_1h).** 9 others blocked due to pair formation collapse at gate=0.04. This is the defining challenge of rotation 3.
+**System status: Only ETH_1h meets pair_cost target AND has improving profit/DD. XRP_1h meets pair_cost target but profit is negative.**
 
-## Critical Findings from Rotation 2 (iters 13-24)
+## Trajectory Analysis (rotations 1-4)
 
-### 1. Pair formation collapse is STRUCTURAL for most 5m pairs
+### ETH_1h — Improving
+- Iter 6 (R1 baseline): cost=0.000, zero pairs at gate=0.08
+- Iter 18 (R2 baseline): cost=0.594, 2.0% matched, profit=-$0.06, DD=13.8%
+- Iter 29 (R3 pace=0.25): DISCARD — identical to baseline (thin dataset)
+- Iter 41 (R4 baseline pace=0.35): cost=0.594, 2.0% matched, profit=+$0.08, DD=7.6%
 
-BTC_5m has now tested gate=0.08 (iter 1), gate=0.04 (iter 13), and gate=0.02 (iter 24) with 0% matched_ratio across all three. This confirms magnitude_gate alone cannot enable pair formation for BTC_5m. The pre-RESET baseline with gate=0.0 (disabled) achieved pair_cost=0.922 — gate is actively preventing pair formation by filtering out ALL bar movements on 5m timeframes. The researcher correctly advanced knobs to gate=0.0.
+Trajectory: STABLE cost, IMPROVING profit (+$0.14/bar swing), IMPROVING DD (-6.2%). The pace experiment in R3 was correctly discarded. The R4 baseline confirmed pace=0.35 is a solid floor. Next pace=0.30 experiment is the right move.
 
-SOL_5m shows the identical pattern (gate=0.08 iter 7, gate=0.04 iter 19 both 0%). ETH_5m also zero at both gate levels (iters 4, 16).
+### XRP_1h — Stable but profit negative
+- Iter 12 (R1 baseline): cost=0.855, 3.6% matched, profit N/A, DD=3.1%
+- Iter 23 (R2 baseline): cost=0.812, 4.2% matched, profit=+$0.10, DD=8.0%
+- Iter 35 (R3 pace=0.30): DISCARD — complete collapse (0% matched vs 4.2%)
+- Iter 47 (R4 baseline onesided=5.0): cost=0.812, 4.1% matched, profit=-$0.14, DD=9.8%
 
-Implication: ALL 5m pairs may require gate=0.0 (disabled). This is a systemic finding about 5m price magnitude in Polymarket — 5m bars simply do not move enough to clear a 2-4% gate.
+Trajectory: STABLE cost (0.812 confirmed across 2 measurements), WORSENING profit (iter23=+$0.10 → iter47=-$0.14). The profit regression is concerning. The onesided=5.0 vs 2.0 question is still open — iter47 used onesided=5.0 in knobs and iter23 used onesided=2.0 (best_knobs at that time was 5.0, but knobs file showed 2.0 per strategy notes). This needs to be resolved: current knobs_XRP_1h.json shows max_onesided_cost=2.0 (already staged!), which is correct for the next experiment.
 
-### 2. 1h pairs uniquely benefit from magnitude_gate
+### XRP_15m — Degrading (new FREEZE)
+- Iter 11 (R1 baseline): cost=0.000, 0% matched, correct_side=53.7%
+- Iter 22 (R2 baseline): cost=0.950, 0.72% matched, correct_side=50.0%
+- Iter 34 (R3 pace=0.25): DISCARD — identical (pace undetectable at 0.72%)
+- Iter 46 (R4 gate=0.0): cost=0.950, 0.70% matched, correct_side=49.2%
 
-XRP_1h formed pairs at both gate=0.08 (3.6%) and gate=0.04 (4.24%). ETH_1h: zero at gate=0.08 but 2.0% at gate=0.04 — gate=0.04 is the right value for ETH_1h. 1h bars have sufficient movement to clear the gate.
-
-For 15m pairs: XRP_15m returned pair formation at gate=0.04 (0.72% vs 0% at gate=0.08). ETH_15m zero at both — may also need gate=0.0.
-
-### 3. SOL_15m signal quality alarm — below-50% correct_side
-
-SOL_15m correct_side: 47.7% at gate=0.08 (iter 8) and now 45.5% at gate=0.04 (iter 20). This is the only pair in the system where lower gate threshold WORSENS direction quality. The model is consistently wrong on SOL_15m direction when pairs form. This pair should be FROZEn until signal quality investigation can determine if this is a dataset window issue or structural model weakness. Do not run experiments on SOL_15m in rotation 3.
-
-### 4. ETH_1h is the star of rotation 2 — pair_cost=0.594 at baseline
-
-ETH_1h post-RESET baseline at gate=0.04: pair_cost=0.594, matched_ratio=2.0%, fill_rate=83.3%, max_dd=13.8%. This is BETTER than its pre-RESET best of 0.706. The RESET + fresh dataset window appears to have improved ETH_1h significantly. This pair is already beating the trader_a target of <0.85 at baseline. Aggressive optimization here can push below 0.55.
-
-### 5. Knobs drift detected — multiple pairs pre-staged beyond queue
-
-- BTC_15m knobs: max_onesided_cost=2.0 (pre-staged, not yet run) vs best_knobs=5.0. This is the correct next experiment (strategy queue #1 for rotation 3). Acceptable staging.
-- ETH_15m knobs: pace_urgency_lo=0.25 but best_knobs=0.35. Queue says run 0.35->0.30 first, then 0.30->0.25. Knobs jumped TWO steps ahead. Must revert to 0.35 for first pace test, then stage 0.30 after KEEP.
-- ETH_1h knobs: pace_urgency_lo=0.30 vs best_knobs=0.35. The strategy specified "test 0.35->0.30" — knobs correctly staged at 0.30 for that experiment.
-- SOL_15m knobs: pace_urgency_lo=0.30 vs best_knobs=0.35. Same correct staging for 0.35->0.30 test.
-- XRP_1h knobs: max_onesided_cost=2.0 vs best_knobs=5.0. Correct staging for onesided test.
-
-**Action required**: ETH_15m researcher must revert knobs_ETH_15m.json pace_urgency_lo from 0.25 to 0.35 (matching best_knobs), then apply 0.35->0.30 as first experiment.
-
-### 6. BTC_1h has stale risk_ceil in best_knobs
-
-best_knobs_BTC_1h.json shows risk_ceil=0.2, but the previous auditor (iter 119) identified this as stale — iter 80 DISCARD confirmed risk_ceil=0.20 fails, correct floor is 0.15. The best_knobs_BTC_1h.json needs updating. However knobs_BTC_1h.json also shows risk_ceil=0.2 — researcher should set this to 0.15 in both files before running BTC_1h experiments.
-
-### 7. Researcher compliance — good but one ETH_15m staging error
-
-Rotation 2 compliance: GOOD overall. Researcher correctly:
-- Ran all 11 active pairs in sequence (skipping frozen XRP_5m)
-- Fixed SOL_1h bar_budget before baseline
-- Ran gate=0.02 experiment on BTC_5m when gate=0.04 also yielded zero pairs
-- Advanced to gate=0.0 in BTC_5m knobs (correct inference)
-- Maintained XRP_5m FREEZE
-
-Single error: ETH_15m knobs staged two steps ahead (0.25 vs required 0.35 start). Minor issue — easy to correct.
+Three measurements: correct_side 53.7% → 50.0% → 49.2% — a monotonic decline across every rotation. This mirrors the SOL_15m pattern exactly. FREEZE is the correct action.
 
 ## Risk Flags
 
-- **BTC_5m, SOL_5m, ETH_5m pair formation**: All 3 five-minute pairs have zero pairs at gate=0.04. If gate=0.0 does not restore pair formation on SOL_5m and ETH_5m, these pairs are structurally unable to form pairs in the current dataset window. A 5m regime change may have occurred.
+- **ETH_5m max_dd=28.7%**: With magnitude_gate=0.0 in knobs and zero pairs, the unmatched inventory continues to accumulate. If run again, DD may exceed 30% kill threshold. FREEZE prevents this risk.
 
-- **SOL_15m correct_side below 50%**: Two consecutive baselines at 47.7% and 45.5%. Running optimization experiments on a pair where the model is directionally wrong yields meaningless results. The SOL_15m model quality issue must be diagnosed before further experimentation.
+- **XRP_15m correct_side declining monotonically**: 53.7% → 50.0% → 49.2% across 3 rotations. Same pattern as SOL_15m (47.7% → 45.5%). Both pairs have the model predicting directionally wrong more than right when pairs form. The Pulse model quality on 15m timeframes may be degrading or was never reliable.
 
-- **XRP_15m matched_ratio critically low**: 0.72% at gate=0.04 with pair_cost=0.950. Pair formation is barely active. The pace_urgency_lo=0.30->0.25 experiment carries meaningful collapse risk. Accept KEEP only if matched_ratio stays above 0.3%.
+- **10 of 12 pairs now frozen**: Only ETH_1h and XRP_1h are active. This is a concentration risk — if either pair deteriorates, the Dutch autoresearch system has no productive pairs. The structural outcome sparsity issue must be investigated urgently.
 
-- **Thin datasets on all 1h pairs**: BTC_1h (34 bars), SOL_1h (34 bars), ETH_1h (33 bars), XRP_1h (34 bars). High variance per experiment result. No single experiment should be treated as definitive on 1h pairs — prefer consistency across 2 experiments.
+- **XRP_1h profit regression**: From +$0.10/bar (iter23) to -$0.14/bar (iter47). Both measurements used identical gate=0.04 and similar matched_ratio (~4%). The profit decline may be due to different bar windows being sampled (dataset is expanding as more live data comes in). Monitor carefully — if the next experiment (onesided=2.0) also shows negative profit, investigate whether the backtest window has changed.
 
-- **BTC_1h best_knobs_BTC_1h.json has stale risk_ceil=0.20**: Must be corrected to 0.15 before any BTC_1h experiment to prevent incorrect baseline comparison.
+- **Knobs state issue in ETH_1h**: knobs_ETH_1h.json has pace_urgency_lo=0.30 (staged for next experiment) while best_knobs_ETH_1h.json has 0.35. This is correct staging — the next experiment IS pace=0.30. No fix needed. But the researcher must NOT restore best_knobs after this experiment if it is a KEEP.
 
-## Recommendations for Rotation 3 (iters 25-36)
+- **SOL_15m knobs stale**: risk_ceil=0.2 (should be 0.15), max_onesided_cost=5.0 (vs best_knobs 5.0 — OK), pace=0.30 (pre-staged). Since frozen, these stale values are harmless but should be fixed when freeze lifts.
 
-### Tier 1 — Gate=0.0 unlock experiments (CRITICAL — 5 pairs blocked)
+## Researcher Compliance Assessment — Rotation 4 (iters 37-48)
 
-1. **BTC_5m**: magnitude_gate=0.0 BASELINE. Knobs already staged. This is the ONLY experiment for BTC_5m in rotation 3. Accept as baseline (not KEEP/DISCARD). Expected: pair formation should return (pre-RESET had pair_cost=0.922 at gate=0.0).
+Rotation 4 compliance: EXCELLENT.
+- Correctly executed all HOLDs for 6 escalated pairs (BTC_15m/1h, ETH_5m/15m, SOL_5m/1h)
+- Correctly ran ETH_15m gate=0.0 baseline per rotation-4 plan (iter 40)
+- Correctly ran ETH_1h baseline at pace=0.35 per rotation-4 plan (iter 41)
+- Correctly ran XRP_15m gate=0.0 baseline per rotation-4 plan (iter 46)
+- Correctly ran XRP_1h baseline at onesided=5.0 per rotation-4 plan (iter 47)
+- Applied knobs fixes (ETH_5m magnitude_gate=0.0, SOL_1h magnitude_gate=0.0) per strategy directives
+- Maintained SOL_15m and XRP_5m FREEZE
+- Correctly identified iters_since_auditor=24 and flagged auditor due
 
-2. **SOL_5m**: After BTC_5m gate=0.0 result — if BTC_5m shows non-zero pairs, test SOL_5m with gate=0.0 as BASELINE. If BTC_5m also fails at gate=0.0: investigate dataset window (may need outcome resolution refresh).
+One correction needed: iter 37 ran BTC_15m as a SKIP (correct), but the pair rotation in dispatch_state.json shows current_pair=BTC_15m for rotation 5. This is fine — the rotation advanced correctly.
 
-3. **ETH_5m**: Same gate=0.0 test after BTC_5m and SOL_5m results. Zero pairs at gate=0.04 with only 27 outcomes loaded vs 406 bars suggests outcome resolution is the actual bottleneck — magnitude_gate may be irrelevant if outcomes aren't loading. Investigate outcome source.
+Compliance rate: 12/12 = 100% for rotation 4.
 
-### Tier 2 — Active optimization on pairs with pair formation (HIGH VALUE)
+## Recommendations for Rotation 5 (iters 49-60)
 
-4. **XRP_1h**: max_onesided_cost 5.0->2.0. Knobs pre-staged at onesided=2.0. pair_cost=0.812 at baseline; onesided cap historically drives cost down on pairs with good signal. DD=8% provides headroom. Most promising experiment in rotation 3.
+### IMMEDIATE ACTION: Structural Investigation (must precede or run alongside experiments)
 
-5. **ETH_1h**: pace_urgency_lo 0.35->0.30. Knobs at 0.30 (correctly staged). pair_cost=0.594 already excellent — pace optimization can push further. XRP_15m showed 18% gain with this move.
+The researcher must investigate the outcome resolution mechanism as a DIAGNOSTIC task:
 
-6. **XRP_15m**: pace_urgency_lo 0.30->0.25. Knobs at 0.30 (correctly matching best_knobs). Continue the series that gave 18% gain at 0.30. Risk: matched_ratio=0.72% may collapse at 0.25.
+**Diagnostic Task A** — Check outcome source statistics:
+- How many live-log resolved outcomes exist in the backtest data window across all pairs?
+- What is the outcome resolution rate if OHLC close is used instead of live-log?
+- Document findings in researcher_ack.txt before running experiments.
 
-### Tier 3 — Baseline-required pairs
+**Diagnostic Task B** — If OHLC-based outcomes are feasible:
+- Test BTC_5m with OHLC outcomes (not live-log) as a NEW BASELINE
+- If pair_cost improves significantly and matched_ratio exceeds 5%, this unlocks 7 frozen pairs
+- Report result — auditor will reassess all frozen pairs if this works
 
-7. **BTC_15m**: max_onesided_cost 5.0->2.0. Knobs pre-staged. Zero pairs at gate=0.04 — but strategy notes BTC_15m had 12% matched_ratio pre-RESET (the highest in the system). Run the experiment; if it unlocks pair formation, this is a significant result.
+### Tier 1 — Active pair optimization (run regardless of diagnostic results)
 
-8. **BTC_1h**: pace_urgency_lo 0.35->0.45. Knobs pre-staged at 0.45. FIRST: fix risk_ceil in both knobs_BTC_1h.json and best_knobs_BTC_1h.json from 0.20 to 0.15. Then run pace experiment.
+1. **ETH_1h** — pace_urgency_lo 0.35->0.30 experiment
+   - Knobs already staged at pace=0.30 in knobs_ETH_1h.json
+   - Baseline: pair_cost=0.594, profit=+$0.08/bar, DD=7.6%, matched=2.0%
+   - Accept KEEP if: pair_cost <= 0.594 AND avg_profit >= -$0.02/bar AND max_dd <= 10%
+   - DISCARD if: pair_cost increases OR matched_ratio drops below 1.0% OR DD exceeds 12%
 
-9. **ETH_15m**: FIRST fix knobs_ETH_15m.json pace_urgency_lo from 0.25 back to 0.35 (matching best_knobs). Then run pace_urgency_lo 0.35->0.30 as rotation 3's experiment.
+2. **XRP_1h** — max_onesided_cost 5.0->2.0 experiment
+   - Knobs already staged at onesided=2.0 in knobs_XRP_1h.json
+   - Baseline: pair_cost=0.812, profit=-$0.14/bar, DD=9.8%, matched=4.1%
+   - Accept KEEP if: pair_cost < 0.812 OR avg_profit > -$0.14/bar (any improvement on either metric)
+   - DISCARD if: matched_ratio drops below 2.0% OR DD exceeds 15%
+   - Note: iter23 was at onesided=2.0 and showed profit=+$0.10 — if this result is reproducible, KEEP is likely
 
-10. **SOL_1h**: Run with best_knobs (bar_budget=300, pace_urgency_lo=0.35, gate=0.04) as true baseline. Bar_budget stale fix confirmed. Expect zero pairs — same gate=0.04 blocked pattern.
+### Tier 2 — If OHLC outcome resolution works (diagnostic-dependent)
 
-### Tier 4 — Hold
+3. **BTC_5m** — OHLC-based NEW BASELINE (highest priority among frozen pairs)
+   - Only attempt if Diagnostic Task B confirms OHLC outcomes are feasible
+   - Expected: matched_ratio should approach historical matched_ratio from pre-RESET
+   - Pre-RESET reference: pair_cost=0.922
 
-11. **SOL_15m**: HOLD all experiments. correct_side=45.5% is disqualifying. Researcher must monitor if the next baseline at gate=0.04 shows recovery. Do not run experiments on a pair where the model is directionally wrong.
+4. **ETH_15m** — OHLC-based NEW BASELINE (second priority; correct_side=71.2% very strong)
+   - Only attempt after BTC_5m OHLC baseline shows positive results
+   - Pre-RESET reference: pair_cost=0.560
 
-12. **XRP_5m**: PERMANENT FREEZE. No experiments.
+### Tier 3 — Do NOT attempt in rotation 5
 
-### Pair experiment order for rotation 3
+- All other frozen pairs: BTC_15m, BTC_1h, ETH_5m, SOL_5m, SOL_1h
+  - Only unfreeze if OHLC outcome resolution is confirmed working
+- SOL_15m: FROZEN — correct_side must recover above 50% before any experiment
+- XRP_15m: FROZEN (new) — correct_side below 50% confirmed
+- XRP_5m: PERMANENT FREEZE
 
-Recommended sequence: BTC_5m (gate=0.0 baseline), BTC_15m (onesided=2.0), BTC_1h (pace=0.45), ETH_5m (gate=0.0 baseline), ETH_15m (fix+pace=0.30), ETH_1h (pace=0.30), SOL_5m (gate=0.0 baseline), SOL_15m (SKIP), SOL_1h (baseline), XRP_15m (pace=0.25), XRP_1h (onesided=2.0)
+### Required knobs state for rotation 5
 
-### Required knobs fixes before experiments
+| Pair | File | Current Value | Required | Action |
+|------|------|---------------|----------|--------|
+| ETH_1h | knobs_ETH_1h.json | pace_urgency_lo=0.30 | pace_urgency_lo=0.30 | CORRECT — no change needed |
+| ETH_1h | best_knobs_ETH_1h.json | pace_urgency_lo=0.35 | pace_urgency_lo=0.35 | CORRECT — reference baseline |
+| XRP_1h | knobs_XRP_1h.json | max_onesided_cost=2.0 | max_onesided_cost=2.0 | CORRECT — already staged |
+| XRP_1h | best_knobs_XRP_1h.json | max_onesided_cost=5.0 | max_onesided_cost=5.0 | CORRECT — reference baseline |
+| SOL_15m | knobs_SOL_15m.json | risk_ceil=0.2 | risk_ceil=0.15 | FIX when freeze lifts |
 
-| Pair | File | Current Value | Must Be | Reason |
-|------|------|---------------|---------|--------|
-| BTC_1h | knobs_BTC_1h.json | risk_ceil=0.20 | risk_ceil=0.15 | Stale — iter 80 DISCARD |
-| BTC_1h | best_knobs_BTC_1h.json | risk_ceil=0.20 | risk_ceil=0.15 | Same stale value |
-| ETH_15m | knobs_ETH_15m.json | pace_urgency_lo=0.25 | pace_urgency_lo=0.35 | Jumped 2 steps ahead; revert to best_knobs baseline |
+All other knobs files are in correct state for their frozen status.
 
-## Researcher Compliance Assessment
+## System-Level Assessment
 
-Rotation 2 (iters 13-24): GOOD with one correction needed.
-- Correctly ran all 11 active pairs in order (XRP_5m skipped per FREEZE)
-- Correctly fixed SOL_1h bar_budget=300 before baseline (iter 21)
-- Correctly inferred gate=0.0 needed for BTC_5m after 3 failures (gate=0.08, 0.04, 0.02)
-- Correctly maintained XRP_5m FREEZE directive
-- ERROR: ETH_15m knobs pre-staged at pace_urgency_lo=0.25 (two steps ahead — correct queue is 0.35->0.30 first)
-- No dangerous experiments run on frozen/blocked pairs
+**Overall KEEP rate (all rotations):**
+- Rotation 1 (iters 1-12): 0/12 = 0% (all baselines, no experiments)
+- Rotation 2 (iters 13-24): 0/11 = 0% (baselines and first experiments, all fail or DISCARD)
+- Rotation 3 (iters 25-36): 0/10 = 0% (experiments all fail; 2 SKIPs)
+- Rotation 4 (iters 37-48): 0/7 = 0% (5 SKIPs, 1 BASELINE, 2 DISCARDs; ETH_1h baseline improved but is reference not KEEP)
+- Cumulative KEEP rate: 0/48 = 0%
 
-Compliance rate: 10/11 correct = 91%. One staging error to fix before rotation 3.
+This 0% KEEP rate across 48 iterations is the strongest evidence that the current experiment space (parameter knobs) is exhausted for most pairs, and the structural bottleneck is the outcome resolution mechanism. The autoresearch system cannot make progress until the outcome sparsity is resolved.
+
+**The two genuinely productive pairs (ETH_1h, XRP_1h) have never produced a KEEP** — they have been in baseline-establishment and DISCARD mode. The next rotation must attempt true optimization experiments on these pairs and must produce at least one KEEP to validate that the system can make progress.
+
+**If rotation 5 produces 0 KEEPs on ETH_1h and XRP_1h**, the auditor recommends suspending autoresearch and focusing engineering effort on fixing the outcome resolution mechanism before continuing.
