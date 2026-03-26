@@ -68,3 +68,10 @@
 2026-03-27T05:10:00Z iter=30 pair=SOL_5m status=DISCARD param=pace_urgency_lo=0.35->0.30(pre-staged) -> magnitude_gate=0.0(next)
   eval: pair_cost=0.0000 profit=+$0.135 max_dd=23.18% bars=417
   hypothesis: "pace_urgency_lo=0.30 was pre-staged from prior rotation but provides no benefit when matched_ratio=0% at gate=0.04. 3rd consecutive zero-pair run for SOL_5m (gate=0.08 iter7, gate=0.04 iter19, gate=0.04+pace=0.30 iter30). Gate is the blocking variable, not pace. Knobs restored to best_knobs (pace=0.35). Next experiment: magnitude_gate=0.0 (disable gate entirely) per rotation-3 strategy queue item 1 — pre-RESET pair_cost=0.676 was achieved at gate=0.0."
+2026-03-27T12:10:00Z iter=33 pair=XRP_5m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=$- max_dd=-% bars=-
+  hypothesis: "XRP_5m permanently frozen per audit.md — structural dead-end; fill_rate=15.6% microstructure floor; zero pairs at all tested gates; skip and advance to XRP_15m"
+
+2026-03-27T12:10:00Z iter=34 pair=XRP_15m status=DISCARD param=pace_urgency_lo 0.30->0.25
+  eval: pair_cost=0.9500 profit=$-0.2286 max_dd=19.27% bars=141
+  hypothesis: "pace_urgency_lo 0.30->0.25 per strategy queue rotation-3 item #1 -- XRP_15m showed 18% gain from 0.35->0.30 pre-RESET; series continuation to 0.25 expected to further reduce pair_cost. Result: zero effect -- pair_cost=0.9500 IDENTICAL to baseline 0.950 (iter 22); matched_ratio=0.70% unchanged (13 outcomes in 141 bars = 9.2% resolution); pace parameter undetectable at this thin formation level. Next: magnitude_gate=0.0 staged in knobs to expand pair formation pool."
