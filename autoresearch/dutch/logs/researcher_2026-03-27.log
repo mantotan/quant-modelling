@@ -47,3 +47,6 @@
   eval: pair_cost=0.5668 profit=$-37.03 max_dd=19.8% bars=138
   hypothesis: "SOL_15m rotation-2 baseline at gate=0.04. Near-zero pair formation (0.3%) identical to gate=0.08 baseline (iter 8). Only 10 live-log outcomes vs 138 bars confirms extreme outcome sparsity. correct_side=45.5% below 50% -- model directionally weak on SOL_15m. Gate reduction alone insufficient to improve pair formation. Staged pace_urgency_lo 0.35->0.30 per strategy queue #2 (XRP_15m 18% gain pattern)."
   next_experiment: pace_urgency_lo 0.35->0.30 (knobs updated, advancing to SOL_1h in rotation)
+2026-03-27T08:00:00Z iter=21 pair=SOL_1h status=BASELINE param=bar_budget=300(fix)+magnitude_gate=0.04(baseline) 400->300
+  eval: pair_cost=0.0000 profit=$-0.16 max_dd=7.3% bars=34
+  hypothesis: "Rotation-2 BASELINE for SOL_1h. CRITICAL: fixed stale bar_budget=400->300 per strategy.md directive (confirmed KEEP iter 86 pre-RESET). magnitude_gate=0.04 BASELINE to establish new baseline. Only 1 live-log outcome (vs 34 bars) confirms extreme sparsity pattern for SOL_1h 1h. zero pairs formed at gate=0.04 same as gate=0.08; correct_side=55.0% up from gate=0.08 iter 9 68.4% fluctuation; max_dd=7.3% safe. Gate alone insufficient for 1h pair formation. Next experiment: bar_budget 300->400 (avg_profit=+$1.49/bar pre-RESET excellent foundation) per strategy queue item #3."

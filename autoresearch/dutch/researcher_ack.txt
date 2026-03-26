@@ -1,6 +1,7 @@
-iter=20 pair=SOL_15m timestamp=2026-03-27T07:00:00Z status=running
+iter=21 pair=SOL_1h timestamp=2026-03-27T08:00:00Z status=running
 Mode: BACKTEST (replay_available)
-Action: Running magnitude_gate=0.04 BASELINE for SOL_15m (rotation 2, item #8)
-Goal: Establish gate=0.04 baseline; prior gate=0.08 baseline (iter 8) showed near-zero 0.3% matched_ratio, pair_cost=0.567 (few pairs), correct_side=47.7% (below 50%)
-Note: knobs_SOL_15m.json has magnitude_gate=0.04, bar_budget=300 (confirmed correct per strategy.md), pace_urgency_lo=0.35
-Strategy queue item #1 for SOL_15m: magnitude_gate=0.04 BASELINE — confirms if gate=0.04 restores pair formation quality
+Action: FIXING STALE KNOBS (bar_budget 400->300 per strategy.md directive), then running magnitude_gate=0.04 BASELINE for SOL_1h
+Goal: Establish gate=0.04 baseline; prior gate=0.08 baseline (iter 9) showed 0% matched_ratio, pair_cost=0.000, correct_side=68.4%; expecting pair formation to recover at gate=0.04
+Note: strategy.md mandates bar_budget=300 BEFORE any SOL_1h experiment (confirmed KEEP iter 86 pre-RESET)
+Note: best_knobs_SOL_1h.json confirms bar_budget=300, magnitude_gate absent (pre-RESET), pace_urgency_lo=0.35
+Strategy queue item #1 for SOL_1h: Fix bar_budget=300, then BASELINE at gate=0.04

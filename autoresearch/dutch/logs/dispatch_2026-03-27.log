@@ -16,3 +16,4 @@
 2026-03-27T06:00:00Z iter=18 pair=ETH_1h role=researcher outcome=BASELINE gate=0.04 pair_cost=0.594 matched_ratio=2.0pct max_dd=13.8pct staged:pace_urgency_lo=0.30 advancing_to=SOL_5m
 2026-03-27T06:10:00Z iter=19 pair=SOL_5m role=RESEARCHER outcome=BASELINE gate=0.04 pair_cost=0.000 matched_ratio=0% correct_side=56.4% max_dd=20.0% bars=407; staged pace_urgency_lo 0.35->0.30; advancing to SOL_15m
 2026-03-27T07:00:00Z iter=20 pair=SOL_15m role=researcher outcome=BASELINE gate=0.04 matched_ratio=0.3% pair_cost=0.567 correct_side=45.5% max_dd=19.8% staged pace_urgency_lo 0.35->0.30
+2026-03-27T08:00:00Z iter=21 pair=SOL_1h role=researcher outcome=BASELINE gate=0.04 + bar_budget stale fix (400->300): 0 pairs matched_ratio=0% correct_side=55% max_dd=7.3% bars=34
