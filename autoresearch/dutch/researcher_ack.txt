@@ -1,5 +1,5 @@
-iter=15 pair=BTC_1h timestamp=2026-03-27T00:00:00Z status=starting
+iter=16 pair=ETH_5m timestamp=2026-03-27T05:00:00Z status=starting
 Mode: BACKTEST (replay_available)
-Action: Running magnitude_gate=0.04 BASELINE for BTC_1h (rotation 2, item #1)
-Goal: Establish gate=0.04 baseline performance; prior gate=0.08 baseline showed 0% matched_ratio
-Note: knobs_BTC_1h.json already has magnitude_gate=0.04 (pace_urgency_lo=0.45 from pre-staged experiment)
+Action: Running magnitude_gate=0.04 BASELINE for ETH_5m (rotation 2, item #4)
+Goal: Establish gate=0.04 baseline performance; prior gate=0.08 baseline showed 0% matched_ratio (iter 4)
+Note: knobs_ETH_5m.json has magnitude_gate=0.04, skip=0.45, max_onesided_cost=1.5 (pre-RESET KEEPs)
