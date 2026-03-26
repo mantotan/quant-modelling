@@ -1,5 +1,5 @@
-iter=13 pair=BTC_5m timestamp=2026-03-26T20:59:59Z status=starting
+iter=14 pair=BTC_15m timestamp=2026-03-26T21:03:41Z status=starting
 Mode: BACKTEST (replay_available)
-Action: Running magnitude_gate=0.04 BASELINE for BTC_5m (rotation 2, knobs already at gate=0.04)
+Action: Running magnitude_gate=0.04 BASELINE for BTC_15m (rotation 2, item #1)
 Goal: Establish gate=0.04 baseline performance; prior gate=0.08 baseline showed 0% matched_ratio
-Note: knobs_BTC_5m.json already has magnitude_gate=0.04 -- no param change needed before backtest
+Note: knobs_BTC_15m.json currently has magnitude_gate=0.0 -- setting to 0.04 before backtest
