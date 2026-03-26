@@ -1,8 +1,5 @@
-iter=44 pair=SOL_1h timestamp=2026-03-27T14:35:00Z role=RESEARCHER
-Status: BACKTEST MODE — rotation 4 — SOL_1h HOLD_SKIP
-Reason: Strategy.md rotation-4 priority queue item 1 = HOLD (escalated to auditor).
-        3 consecutive zero-pair results (gate=0.08 iter9, gate=0.04 iter21, gate=0.0 iter32).
-        Only 3/35 outcomes (8.6% resolution) — outcome sparsity confirmed structural bottleneck.
-        Gate series fully exhausted. No experiments until auditor clears escalation.
-        Knobs fix applied: added magnitude_gate=0.0 (key was absent from knobs_SOL_1h.json).
-        Advancing pair rotation to XRP_5m (next in rotation, will SKIP as permanently frozen).
+iter=46 pair=XRP_15m timestamp=2026-03-27T15:05:00Z role=RESEARCHER
+Status: BACKTEST MODE — rotation 4 — XRP_15m gate=0.0 BASELINE running
+Strategy: gate=0.0 BASELINE (first formal gate=0.0 test for XRP_15m per rotation 4 priority #1)
+Prior baselines at gate=0.04 (iter 22, pair_cost=0.950) and gate=0.04 (iter 34, pace DISCARD).
+magnitude_gate=0.0 already in knobs_XRP_15m.json — no knobs change needed before baseline.

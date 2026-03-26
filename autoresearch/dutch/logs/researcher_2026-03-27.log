@@ -113,3 +113,10 @@
 2026-03-27T14:35:00Z iter=44 pair=SOL_1h status=SKIP param=magnitude_gate=0.0(fix)+HOLD_SKIP ->(knobs fix only)
   eval: pair_cost=0.000 profit=$-0.11/bar max_dd=8.3% bars=35
   hypothesis: "Strategy rotation-4 HOLD directive active for SOL_1h. Outcome sparsity confirmed structural: only 3/35 outcomes (8.6% resolution). Gate series fully exhausted (gate=0.08 iter9, gate=0.04 iter21, gate=0.0 iter32). No experiments until auditor clears escalation. Applied knobs fix: added magnitude_gate=0.0 (key was absent from knobs_SOL_1h.json and best_knobs_SOL_1h.json). Advancing rotation to XRP_5m (permanently frozen, will SKIP next iteration)."
+2026-03-27T15:00:00Z iter=45 pair=XRP_5m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=$- max_dd=-% bars=-
+  hypothesis: "XRP_5m permanently frozen per audit.md + strategy.md — fill_rate=15.6% structural floor; zero pairs at all gates; skip in all rotations; advancing to XRP_15m"
+
+2026-03-27T15:10:00Z iter=46 pair=XRP_15m status=DISCARD param=magnitude_gate 0.0->restored
+  eval: pair_cost=0.9500 profit=$-0.24 max_dd=20.5% bars=144
+  hypothesis: "gate=0.0 BASELINE for XRP_15m (first formal test): pair_cost=0.9500 IDENTICAL to gate=0.04 iter22 baseline; matched_ratio=0.70% vs 0.72% (no improvement); correct_side=49.2% below 50% (down from 50.0% at gate=0.04); gate series now formally EXHAUSTED for XRP_15m; 15/144 outcomes (10.4% resolution) confirms outcome sparsity; knobs restored to best_knobs; next experiment staged: cheap_threshold 0.1->0.05 to expand buy activity and matched_ratio"
