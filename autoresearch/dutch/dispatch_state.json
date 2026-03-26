@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_5m",
+  "current_pair": "SOL_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 0,
-  "last_updated": "2026-03-27T20:00:00Z",
-  "last_role": "strategist",
+  "pair_index": 6,
+  "last_updated": "2026-03-27T20:35:00Z",
+  "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 72,
   "last_auditor_at": 60,
-  "total_iterations": 72,
-  "last_exit_reason": "STRATEGIST rotation-7 analysis after iter 72: first KEEP confirmed (XRP_1h fill_ticks=2 iter 72, +$0.01/bar improvement). ETH_1h fill_ticks=2 DISCARD (regression). Rotation-7 plan: chase_threshold 0.03->0.05 on both active pairs (ETH_1h, XRP_1h). 10 pairs remain frozen. fill_ticks lever effectiveness inversely correlated with baseline fill_rate."
+  "total_iterations": 78,
+  "last_exit_reason": "RESEARCHER rotation-7 iter 78: ETH_1h chase_threshold 0.03->0.05 KEEP -- pair_cost=0.577 improved (vs 0.594 baseline), avg_profit=+$0.18/bar strongly improved (+125% vs +$0.08 baseline), max_dd=11.2% safe. 5 frozen pairs skipped (BTC_5m/15m/1h, ETH_5m/15m). Advancing to SOL_5m for next iteration."
 }

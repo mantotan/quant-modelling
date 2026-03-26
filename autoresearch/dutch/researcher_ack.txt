@@ -1,21 +1,22 @@
-iter=67-71 (skips) + 72 (XRP_1h fill_ticks=2 experiment)
-pair=SOL_5m->SOL_15m->SOL_1h->XRP_5m->XRP_15m->XRP_1h
-timestamp=2026-03-27T00:00:00Z
+iter=73-78 (skips for frozen BTC_5m->BTC_15m->BTC_1h->ETH_5m->ETH_15m) + 78 ETH_1h chase_threshold experiment
+pair=BTC_5m->BTC_15m->BTC_1h->ETH_5m->ETH_15m->ETH_1h
+timestamp=2026-03-27T20:30:00Z
 mode=BACKTEST (replay_available)
-status=Processing rotation-6 continued: skipping 5 frozen pairs (iters 67-71), running fill_ticks=2 on XRP_1h (iter 72)
+status=Processing rotation-7: skipping 5 frozen pairs (iters 73-77), running chase_threshold=0.05 on ETH_1h (iter 78)
 
-ROTATION-6 FROZEN SKIPS (67-71):
-  67: SOL_5m  FROZEN (3 consecutive zero-pair runs, fill mechanics P=4.2%, DD=23.2%)
-  68: SOL_15m FROZEN (correct_side=45.5% both measurements below 50%)
-  69: SOL_1h  FROZEN (3 consecutive zero-pair baselines, outcome sparsity 8.6%)
-  70: XRP_5m  FROZEN PERMANENT (fill_rate=15.6% structural floor, zero pairs at all gates)
-  71: XRP_15m FROZEN (correct_side declining 53.7%->50.0%->49.2%, gate exhausted)
+ROTATION-7 FROZEN SKIPS (73-77):
+  73: BTC_5m  FROZEN PERMANENT (diagnostic iter 60 confirmed fill mechanics structural, P=5.6%)
+  74: BTC_15m FROZEN (3 consecutive zero-pair baselines, outcome sparsity 7.9%)
+  75: BTC_1h  FROZEN (extreme sparsity 2.9%, gate series exhausted)
+  76: ETH_5m  FROZEN (DD=28.7% near 30% kill threshold, fill mechanics structural P=5.8%)
+  77: ETH_15m FROZEN (gate series fully exhausted R4, outcome sparsity 9.9%)
 
-XRP_1h EXPERIMENT (iter 72):
-  Hypothesis: fill_ticks=2 extends limit order persistence across 2 tick intervals without
-  changing the unmatched spend mechanism; should NOT trigger the collapse mechanism seen
-  with pace=0.30 or onesided=2.0 (those were spending constraints, this is fill sim only)
-  Change: fill_simulator.fill_ticks 1->2 in knobs_XRP_1h.json
-  Baseline ref: pair_cost=0.812, profit=-$0.14/bar, DD=9.8%, matched=4.1%
-  KEEP if: pair_cost < 0.812 OR avg_profit > -$0.14/bar (ANY improvement on either metric)
-  DISCARD if: matched_ratio < 2.0% OR DD > 15%
+ETH_1h EXPERIMENT (iter 78):
+  Hypothesis: wider chase window (5% vs 3% price deviation) allows orders to re-enter price
+  after brief adverse moves, potentially increasing matched pairs in thin 1h ETH market.
+  chase_threshold controls the maximum price deviation at which a limit order will chase the
+  market -- wider window means more order re-placement attempts, potentially better fill quality.
+  Change: fill_simulator.chase_threshold 0.03->0.05 in knobs_ETH_1h.json only
+  Baseline ref (iter 41 best): pair_cost=0.594, profit=+$0.08/bar, DD=7.6%, matched=2.0%
+  KEEP if: matched_ratio > 2.0% OR avg_profit > +$0.08/bar (ANY improvement vs iter 41)
+  DISCARD if: pair_cost > 0.65 OR DD > 12% OR matched_ratio < 1.5%
