@@ -8,3 +8,5 @@
 2026-03-27T14:00:00Z iter=8 pair=SOL_15m role=RESEARCHER outcome=BASELINE pair_cost=0.5668 matched=0.3% fill=31.9% correct=47.7% total_profit=-$27.94 near-collapse(magnitude_gate=0.08) knobs->magnitude_gate=0.04 next_pair=SOL_1h
 2026-03-27T14:10:00Z iter=9 pair=SOL_1h role=RESEARCHER outcome=BASELINE magnitude_gate=0.08->0.04 pair_cost=0.0000 max_dd=5.25% bars=33
 2026-03-27T00:00:00Z iter=11 pair=XRP_15m role=RESEARCHER outcome=BASELINE pair_cost=0.0000 matched=0% fill=39.7% correct=53.7% total_profit=-$21.03 collapse(magnitude_gate=0.08) knobs->magnitude_gate=0.04 next_pair=XRP_1h
+2026-03-27T03:52:55Z iter=12 pair=XRP_1h role=RESEARCHER outcome=BASELINE pair_cost=0.8546 matched=3.6% fill=64.1% correct=82.6% DD=3.1% partial-formation(magnitude_gate=0.08) knobs->magnitude_gate=0.04 next_pair=BTC_5m
+2026-03-27T04:10:00Z iter=12 pair=BTC_5m role=strategist outcome=rotation1_post_RESET_analysis_all12_need_gate0.04_baselines_XRP_1h_best_correct_side_82.6pct_SOL_1h_stale_knobs_flagged
