@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 1,
-  "last_updated": "2026-03-27T16:00:00Z",
-  "last_role": "auditor",
+  "last_updated": "2026-03-27T16:30:00Z",
+  "last_role": "strategist",
   "last_monitor_at": "2026-03-27T02:00:00Z",
-  "last_strategist_at": 36,
+  "last_strategist_at": 48,
   "last_auditor_at": 48,
   "total_iterations": 48,
-  "last_exit_reason": "AUDITOR iter=48 directives: FREEZE XRP_15m(new)+BTC_15m(new)+BTC_1h(new)+ETH_5m(new)+ETH_15m(new)+SOL_5m(new)+SOL_1h(new)+XRP_5m(perm)+SOL_15m+BTC_5m(maintained); PRIORITIZE ETH_1h; CONTINUE XRP_1h; 0% KEEP rate across 48 iters; structural bottleneck=outcome sparsity; diagnostic task: OHLC outcome resolution investigation required"
+  "last_exit_reason": "STRATEGIST iter=48 KEEP_rate=0% best_pair=ETH_1h(0.594) worst_pair=all-frozen; rotation-5 plan: ETH_1h pace=0.30 + XRP_1h onesided=2.0 + diagnostic(outcome-resolution); 10/12 pairs FROZEN; auditor mandate: diagnostic task required before experiments"
 }
