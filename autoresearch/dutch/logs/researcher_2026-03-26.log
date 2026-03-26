@@ -14,3 +14,6 @@
   eval: pair_cost=0.000 profit=-0.019/bar total=-2.67 max_dd=12.4% bars=139 fill_rate=40.3% correct_side=60.7%
   hypothesis: Disable magnitude_gate (0.04->0.0) combined with pre-staged onesided=2.0 to test if gate is the blocker for BTC_15m pair formation. Gate=0.08 (iter2), gate=0.04 (iter14), gate=0.0 (iter25) all show 0% matched_ratio -- gate is NOT the bottleneck. Only 11/139 outcome resolutions (7.9%) confirms structural outcome sparsity as root cause. Escalate to auditor for outcome resolution investigation.
 
+2026-03-26T21:55:03Z iter=27 pair=ETH_5m status=DISCARD param=magnitude_gate 0.04->0.0
+  eval: pair_cost=0.0000 profit=$-0.09 max_dd=28.70% bars=414
+  hypothesis: "gate=0.04 collapses ETH_5m pair formation (iters 4+16 both 0 pairs); disabling gate (0.0) expected to restore pair formation per pre-RESET behavior; RESULT: still 0 pairs -- outcome sparsity (36/414=8.7% resolution) confirmed as structural bottleneck; gate is not the blocking variable; ETH_5m pair formation impossible in current dataset window; escalate to auditor"
