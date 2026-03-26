@@ -1,9 +1,7 @@
-iter=33 pair=XRP_5m timestamp=2026-03-27T12:00:00Z
-STATUS: SKIPPED — PERMANENT FREEZE ACTIVE
-Reason: XRP_5m permanently frozen per audit.md directive. Structural dead-end: fill_rate=15.6% (microstructure floor), zero pairs at all tested gates.
-Action: Advancing pair rotation. Running XRP_15m as next pair in this invocation.
-
---- XRP_15m ---
-iter=33 pair=XRP_15m timestamp=2026-03-27T12:00:00Z
-STATUS: Running pace_urgency_lo 0.30->0.25 experiment per strategist queue rotation-3 item #1
-Hypothesis: XRP_15m achieved 18% gain from pace_urgency_lo 0.35->0.30 pre-RESET; continuation to 0.25 may further reduce avg_pair_cost below 0.950 baseline (iter 22).
+iter=35 pair=XRP_1h timestamp=2026-03-27T12:15:00Z
+Mode: BACKTEST (replay_available)
+Experiment: pace_urgency_lo 0.35->0.30
+Hypothesis: Earlier urgency threshold reduces pair_cost below 0.812 baseline (iter 23).
+XRP_15m showed 18% gain from 0.35->0.30 pre-RESET. XRP_1h at 4.2% matched_ratio has room to improve pair quality.
+Best known cost for XRP_1h: 0.812 (iter 23 baseline, gate=0.04, onesided=2.0).
+KEEP threshold: pair_cost < 0.796 (>2% improvement) AND avg_profit > 0 AND max_dd < 30%.

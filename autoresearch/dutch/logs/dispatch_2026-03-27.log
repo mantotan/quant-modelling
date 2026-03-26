@@ -25,3 +25,4 @@
 2026-03-27T11:00:00Z iter=26 pair=BTC_1h role=RESEARCHER outcome=BASELINE risk_ceil_fixed+gate=0.0_still_zero_pairs matched_ratio=0% correct_side=70.0% max_dd=3.88% bars=34; auditor escalation flagged; advancing to ETH_5m
 2026-03-27T14:30:00Z iter=29 pair=ETH_1h role=RESEARCHER outcome=DISCARD pace_urgency_lo=0.25 gave pair_cost=0.5941 identical to baseline; staged max_onesided_cost=5.0->2.0 next
 2026-03-27T12:10:00Z iter=34 pair=XRP_15m role=RESEARCHER outcome=DISCARD pace_urgency_lo=0.30->0.25 pair_cost=0.9500 max_dd=19.3% (XRP_5m SKIP: permanent freeze)
+2026-03-27T12:20:00Z iter=35 pair=XRP_1h role=RESEARCHER outcome=DISCARD pace_urgency_lo=0.35->0.30 collapsed pairs (0% vs 4.24% baseline); pace floor confirmed at 0.35; next=BTC_5m
