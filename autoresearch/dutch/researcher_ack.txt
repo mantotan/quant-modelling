@@ -1,7 +1,7 @@
-iter=41 pair=ETH_1h timestamp=2026-03-27T14:00:00Z role=RESEARCHER
-Status: BACKTEST MODE — rotation 4 — ETH_1h BASELINE at current knobs (pace=0.35, gate=0.04, onesided=2.0)
-Reason: strategy.md rotation-4 priority #1 for ETH_1h:
-        Establish clean BASELINE at current knobs (pace=0.35, gate=0.04, onesided=2.0).
-        Iter 18 baseline ran with pace=0.30 (pre-staged). Iter 29 DISCARD restored to best_knobs.
-        After restore, current knobs has pace=0.35 — this configuration has never been formally baselined.
-        No knobs changes needed. Running backtest as-is to establish pace=0.35 reference.
+iter=42 pair=SOL_5m timestamp=2026-03-27T14:15:00Z role=RESEARCHER
+Status: BACKTEST MODE — rotation 4 — SOL_5m HOLD_SKIP
+Reason: strategy.md rotation-4 priority queue item 1 = HOLD pending auditor escalation.
+        3 consecutive zero-pair baselines exhausted gate series: gate=0.08 (iter7), gate=0.04 (iter19), gate=0.04+pace=0.30 (iter30).
+        28/417 outcomes (6.7% resolution) = structural outcome sparsity bottleneck confirmed.
+        max_dd=23.2% elevated from unmatched inventory. Knobs clean: magnitude_gate=0.0 correct.
+        Advancing rotation to SOL_15m.
