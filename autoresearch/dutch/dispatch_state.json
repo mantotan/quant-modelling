@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 1,
-  "last_updated": "2026-03-27T18:00:00Z",
-  "last_role": "researcher",
+  "last_updated": "2026-03-27T18:35:00Z",
+  "last_role": "strategist",
   "last_monitor_at": "2026-03-27T02:00:00Z",
-  "last_strategist_at": 48,
+  "last_strategist_at": 60,
   "last_auditor_at": 48,
   "total_iterations": 60,
-  "last_exit_reason": "RESEARCHER iter=60 BTC_5m SKIP DIAGNOSTIC: spot outcome source tested -- NEGATIVE (0% matched at fill_rate=23.7%); bottleneck confirmed fill mechanics not outcome sparsity; 5m pair freeze PERMANENT; auditor diagnostic complete; advancing to BTC_15m"
+  "last_exit_reason": "STRATEGIST iter=60 rotation-5 post-analysis: 0/2 KEEPs (ETH_1h pace DISCARD + XRP_1h onesided DISCARD); diagnostic confirmed fill mechanics = primary bottleneck for 5m pairs; rotation-6 priority = fill_ticks 1->2 for ETH_1h and XRP_1h; pace_urgency_lo lever DEAD on ETH_1h; onesided floor confirmed >= 5.0 on XRP_1h"
 }
