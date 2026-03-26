@@ -3,3 +3,4 @@
 2026-03-27T08:24:31Z iter=3 pair=BTC_1h role=RESEARCHER outcome=BASELINE magnitude_gate=0.08 zero pairs formed; next experiment magnitude_gate 0.08->0.04
 2026-03-27T09:00:00Z iter=4 pair=ETH_5m role=RESEARCHER outcome=BASELINE pair_cost=0.0000 matched=0% collapse(magnitude_gate=0.08) next_pair=ETH_15m
 2026-03-26T20:30:50Z iter=5 pair=ETH_15m role=RESEARCHER outcome=BASELINE pair_cost=0.0000 matched=0% correct_side=73.2% collapse(magnitude_gate=0.08) knobs->magnitude_gate=0.04 next_pair=ETH_1h
+2026-03-27T12:00:00Z iter=6 pair=ETH_1h role=RESEARCHER outcome=BASELINE pair_cost=0.0000 matched=0% fill=81.2% correct=70.4% collapse(magnitude_gate=0.08) knobs->magnitude_gate=0.04 next_pair=SOL_5m

@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_5m",
+  "current_pair": "SOL_15m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 6,
-  "last_updated": "2026-03-27T12:00:00Z",
+  "pair_index": 7,
+  "last_updated": "2026-03-26T20:37:21Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T02:00:00Z",
   "last_strategist_at": 0,
   "last_auditor_at": 0,
-  "total_iterations": 6,
+  "total_iterations": 7,
   "last_exit_reason": "RESET: magnitude_gate added to knobs, fresh baselines needed"
 }
