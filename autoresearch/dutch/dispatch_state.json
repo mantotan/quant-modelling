@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 0,
-  "last_updated": "2026-03-27T06:30:00Z",
-  "last_role": "researcher",
+  "last_updated": "2026-03-27T19:00:00Z",
+  "last_role": "auditor",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 0,
-  "last_auditor_at": 0,
-  "total_iterations": 0,
+  "last_auditor_at": 60,
+  "total_iterations": 60,
   "last_exit_reason": "RESET: TF-specific fill simulator params (5m: chase=0.02/offset=0.02/max_chase=4, 15m: chase=0.025/offset=0.015/max_chase=3)"
 }
