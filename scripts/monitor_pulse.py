@@ -188,6 +188,10 @@ def parse_args() -> argparse.Namespace:
         "--dutch-vwap-tol", type=float, default=0.10,
         help="Price improvement tolerance vs avg fill (default: 0.10)",
     )
+    p.add_argument(
+        "--magnitude-gate", type=float, default=0.0,
+        help="Skip ticks where |cal_prob - 0.5| < threshold (default: 0 = disabled)",
+    )
     # --dutch-max-hedge-ask removed in V6 (no hedge tier)
     return p.parse_args()
 
@@ -934,10 +938,17 @@ def _dutch_tick(
 
     # Only process when model has run this bar
     if state.last_model_time > 0:
-        orders, fills = process_tick(
-            elapsed_pct, state.cal_prob, book_up, book_dn,
-            state.dutch_engine, state.dutch_sim,
-        )
+        # Magnitude gate: skip low-confidence ticks
+        mag_gate = getattr(args, "magnitude_gate", 0.0)
+        if mag_gate > 0 and abs(state.cal_prob - 0.5) < mag_gate:
+            # Skip this tick — same as sweep replay behavior.
+            # Engine still processes sells on non-gated ticks.
+            orders, fills = [], []
+        else:
+            orders, fills = process_tick(
+                elapsed_pct, state.cal_prob, book_up, book_dn,
+                state.dutch_engine, state.dutch_sim,
+            )
     else:
         orders, fills = [], []
 
