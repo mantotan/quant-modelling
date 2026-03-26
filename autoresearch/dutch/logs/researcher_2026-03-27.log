@@ -120,3 +120,6 @@
 2026-03-27T15:10:00Z iter=46 pair=XRP_15m status=DISCARD param=magnitude_gate 0.0->restored
   eval: pair_cost=0.9500 profit=$-0.24 max_dd=20.5% bars=144
   hypothesis: "gate=0.0 BASELINE for XRP_15m (first formal test): pair_cost=0.9500 IDENTICAL to gate=0.04 iter22 baseline; matched_ratio=0.70% vs 0.72% (no improvement); correct_side=49.2% below 50% (down from 50.0% at gate=0.04); gate series now formally EXHAUSTED for XRP_15m; 15/144 outcomes (10.4% resolution) confirms outcome sparsity; knobs restored to best_knobs; next experiment staged: cheap_threshold 0.1->0.05 to expand buy activity and matched_ratio"
+2026-03-27T15:30:00Z iter=47 pair=XRP_1h status=DISCARD param=max_onesided_cost=5.0(baseline) 5.0->5.0(no_change)
+  eval: pair_cost=0.8120 profit=$-0.1366/bar total=$-4.7821 max_dd=9.81% bars=35
+  hypothesis: "Baseline at onesided=5.0 (post-DISCARD restore state) to compare vs iter23 reference. pair_cost=0.812 IDENTICAL to iter23, avg_profit negative. Fails KEEP on avg_profit>0. Confirms onesided=5.0 is baseline state. Next: max_onesided_cost 5.0->2.0 per audit Tier2 item4 to cap one-sided accumulation and force tighter pair matching."
