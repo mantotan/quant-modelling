@@ -110,3 +110,6 @@
 2026-03-27T14:30:00Z iter=43 pair=SOL_15m status=SKIP param=FROZEN_SKIP -
   eval: pair_cost=- profit=hBc max_dd=-% bars=-
   hypothesis: "AUDITOR FREEZE ACTIVE — correct_side=45.5% (iter 20, gate=0.04) and 47.7% (iter 8, gate=0.08) both below 50%. Two consecutive below-50% results confirm model is directionally wrong on SOL_15m. Strategy.md rotation-4 priority queue: HOLD all experiments. No parameter change applied. Advancing rotation to SOL_1h."
+2026-03-27T14:35:00Z iter=44 pair=SOL_1h status=SKIP param=magnitude_gate=0.0(fix)+HOLD_SKIP ->(knobs fix only)
+  eval: pair_cost=0.000 profit=$-0.11/bar max_dd=8.3% bars=35
+  hypothesis: "Strategy rotation-4 HOLD directive active for SOL_1h. Outcome sparsity confirmed structural: only 3/35 outcomes (8.6% resolution). Gate series fully exhausted (gate=0.08 iter9, gate=0.04 iter21, gate=0.0 iter32). No experiments until auditor clears escalation. Applied knobs fix: added magnitude_gate=0.0 (key was absent from knobs_SOL_1h.json and best_knobs_SOL_1h.json). Advancing rotation to XRP_5m (permanently frozen, will SKIP next iteration)."

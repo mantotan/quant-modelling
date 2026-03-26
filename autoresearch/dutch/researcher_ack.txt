@@ -1,8 +1,8 @@
-iter=43 pair=SOL_15m timestamp=2026-03-27T14:30:00Z role=RESEARCHER
-Status: BACKTEST MODE — rotation 4 — SOL_15m FROZEN_SKIP
-Reason: AUDITOR FREEZE ACTIVE per audit.md directive.
-        correct_side=45.5% at gate=0.04 (iter 20), down from 47.7% at gate=0.08 (iter 8).
-        Two consecutive below-50% correct_side results confirm model directionally wrong on SOL_15m.
-        Strategy.md rotation-4 priority queue item 1 = HOLD (freeze active, no experiments).
-        Known knobs issues (to fix when freeze lifts): risk_ceil=0.20->0.15, max_onesided_cost=5.0 floor confirmed.
-        Advancing pair rotation to SOL_1h.
+iter=44 pair=SOL_1h timestamp=2026-03-27T14:35:00Z role=RESEARCHER
+Status: BACKTEST MODE — rotation 4 — SOL_1h HOLD_SKIP
+Reason: Strategy.md rotation-4 priority queue item 1 = HOLD (escalated to auditor).
+        3 consecutive zero-pair results (gate=0.08 iter9, gate=0.04 iter21, gate=0.0 iter32).
+        Only 3/35 outcomes (8.6% resolution) — outcome sparsity confirmed structural bottleneck.
+        Gate series fully exhausted. No experiments until auditor clears escalation.
+        Knobs fix applied: added magnitude_gate=0.0 (key was absent from knobs_SOL_1h.json).
+        Advancing pair rotation to XRP_5m (next in rotation, will SKIP as permanently frozen).

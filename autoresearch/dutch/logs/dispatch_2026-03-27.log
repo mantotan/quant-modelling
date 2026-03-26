@@ -36,3 +36,4 @@
 2026-03-27T14:00:00Z iter=41 pair=ETH_1h role=RESEARCHER outcome=BASELINE pair_cost=0.5941 avg_profit=+$0.08 max_dd=7.6% staged=pace_urgency_lo->0.30 next=SOL_5m
 2026-03-27T14:15:00Z iter=42 pair=SOL_5m role=RESEARCHER outcome=HOLD_SKIP: strategy.md rotation-4 HOLD gate series exhausted advanced to SOL_15m
 2026-03-27T14:30:00Z iter=43 pair=SOL_15m role=RESEARCHER outcome=FROZEN_SKIP: auditor freeze active correct_side=45.5pct below 50pct; model directionally wrong; skip all experiments; advanced to SOL_1h
+2026-03-27T14:35:00Z iter=44 pair=SOL_1h role=RESEARCHER outcome=SKIP: SOL_1h HOLD per rotation-4 strategy directive; outcome sparsity structural (3/35=8.6%); gate exhausted; knobs fix magnitude_gate=0.0 applied; advanced to XRP_5m
