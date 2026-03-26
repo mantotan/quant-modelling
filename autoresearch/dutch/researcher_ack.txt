@@ -1,6 +1,6 @@
-iter=24 pair=BTC_5m timestamp=2026-03-27T09:20:00Z status=running
+iter=25 pair=BTC_15m timestamp=2026-03-27T10:20:00Z status=running
 Mode: BACKTEST (replay_available)
-Action: Testing magnitude_gate=0.02 for BTC_5m — zero pairs at gate=0.04 (iter 13) and gate=0.08 (iter 1).
-Gate reduction required before any other lever can be tested (pace_urgency, onesided etc. require non-zero pair formation).
-Current knobs: magnitude_gate=0.02 (staged from iter-13 finding), pace_urgency_lo=0.35, max_onesided_cost=2.0, bar_budget=200.
-Hypothesis: gate=0.02 should allow pairs to form on BTC_5m (5m bars have smaller moves; gate=0.04 still too aggressive).
+Action: Testing magnitude_gate=0.0 (disable gate) for BTC_15m per strategy.md item #1 + audit onesided=2.0 already staged.
+Gate history: gate=0.08 (iter 2) = 0 pairs, gate=0.04 (iter 14) = 0 pairs — gate alone cannot fix BTC_15m.
+Current knobs: magnitude_gate=0.0 (staging now), max_onesided_cost=2.0 (pre-staged), pace_urgency_lo=0.35.
+Hypothesis: Disabling magnitude_gate should restore pair formation on BTC_15m. Pre-RESET best_knobs had no gate (0.0) and onesided=5.0. Combined gate=0.0+onesided=2.0 serves as baseline for rotation 3.

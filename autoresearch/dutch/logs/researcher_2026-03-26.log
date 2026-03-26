@@ -10,3 +10,7 @@
 2026-03-26T21:04:26Z iter=14 pair=BTC_15m status=BASELINE param=magnitude_gate=0.04(baseline) 0.0->0.04
   eval: pair_cost=0.0000 profit=$-0.22 max_dd=22.12% bars=136
   hypothesis: "gate=0.04 baseline still shows 0% matched_ratio (same collapse as gate=0.08). Only 8/136 bars have live-log outcomes — sparse resolution pattern confirmed cross-pair. Correct_side=56.5% moderate signal. Next: max_onesided_cost 5.0->2.0 per strategist queue item #2 — BTC_15m has 12% matched_ratio (highest in system), lowest collapse risk. ETH_5m/SOL_5m/BTC_5m all KEEP at onesided=2.0; high confidence this will KEEP."
+2026-03-27T10:30:00Z iter=25 pair=BTC_15m status=BASELINE param=magnitude_gate=0.04->0.0+onesided=5.0->2.0 0.04->0.0
+  eval: pair_cost=0.000 profit=-0.019/bar total=-2.67 max_dd=12.4% bars=139 fill_rate=40.3% correct_side=60.7%
+  hypothesis: Disable magnitude_gate (0.04->0.0) combined with pre-staged onesided=2.0 to test if gate is the blocker for BTC_15m pair formation. Gate=0.08 (iter2), gate=0.04 (iter14), gate=0.0 (iter25) all show 0% matched_ratio -- gate is NOT the bottleneck. Only 11/139 outcome resolutions (7.9%) confirms structural outcome sparsity as root cause. Escalate to auditor for outcome resolution investigation.
+
