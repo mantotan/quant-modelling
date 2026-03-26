@@ -107,3 +107,6 @@
 2026-03-27T14:15:00Z iter=42 pair=SOL_5m role=RESEARCHER outcome=HOLD_SKIP: strategy.md rotation-4 HOLD; gate series exhausted (3 consecutive zero-pair baselines); outcome sparsity structural (28/417=6.72026-03-27T14:15:00Z iter=42 pair=SOL_5m status=HOLD_SKIP param=none
   eval: pair_cost=- profit=- max_dd=-% bars=-
   hypothesis: "strategy.md rotation-4 HOLD: gate series exhausted (3 zero-pair baselines gate=0.08/0.04/0.0), outcome sparsity structural at 6.7%, advanced rotation to SOL_15m"
+2026-03-27T14:30:00Z iter=43 pair=SOL_15m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=hBc max_dd=-% bars=-
+  hypothesis: "AUDITOR FREEZE ACTIVE — correct_side=45.5% (iter 20, gate=0.04) and 47.7% (iter 8, gate=0.08) both below 50%. Two consecutive below-50% results confirm model is directionally wrong on SOL_15m. Strategy.md rotation-4 priority queue: HOLD all experiments. No parameter change applied. Advancing rotation to SOL_1h."

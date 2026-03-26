@@ -35,3 +35,4 @@
 2026-03-27T13:35:00Z iter=40 pair=ETH_15m role=RESEARCHER outcome=BASELINE gate=0.0 formally exhausts gate series (0 pairs, sparsity 14/142=9.9%, correct_side=71.2%, max_dd=7.1%); escalated to auditor; advanced to ETH_1h
 2026-03-27T14:00:00Z iter=41 pair=ETH_1h role=RESEARCHER outcome=BASELINE pair_cost=0.5941 avg_profit=+$0.08 max_dd=7.6% staged=pace_urgency_lo->0.30 next=SOL_5m
 2026-03-27T14:15:00Z iter=42 pair=SOL_5m role=RESEARCHER outcome=HOLD_SKIP: strategy.md rotation-4 HOLD gate series exhausted advanced to SOL_15m
+2026-03-27T14:30:00Z iter=43 pair=SOL_15m role=RESEARCHER outcome=FROZEN_SKIP: auditor freeze active correct_side=45.5pct below 50pct; model directionally wrong; skip all experiments; advanced to SOL_1h
