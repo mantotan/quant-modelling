@@ -1,6 +1,7 @@
-iter=40 pair=ETH_15m timestamp=2026-03-27T13:30:00Z role=RESEARCHER
-Status: BACKTEST MODE — rotation 4 — ETH_15m gate=0.0 BASELINE (formal confirmation run)
-Reason: strategy.md rotation-4 priority #1: run gate=0.0 BASELINE for ETH_15m.
-        Iter 28 was a pace drift DISCARD, not a clean gate=0.0 baseline. Gate=0.0 is in knobs.
-        pace_urgency_lo=0.35 confirmed in current knobs (audit fix applied, not 0.25).
-        Running backtest now with magnitude_gate=0.0 + pace=0.35 (clean baseline conditions).
+iter=41 pair=ETH_1h timestamp=2026-03-27T14:00:00Z role=RESEARCHER
+Status: BACKTEST MODE — rotation 4 — ETH_1h BASELINE at current knobs (pace=0.35, gate=0.04, onesided=2.0)
+Reason: strategy.md rotation-4 priority #1 for ETH_1h:
+        Establish clean BASELINE at current knobs (pace=0.35, gate=0.04, onesided=2.0).
+        Iter 18 baseline ran with pace=0.30 (pre-staged). Iter 29 DISCARD restored to best_knobs.
+        After restore, current knobs has pace=0.35 — this configuration has never been formally baselined.
+        No knobs changes needed. Running backtest as-is to establish pace=0.35 reference.

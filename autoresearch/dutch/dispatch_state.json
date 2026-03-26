@@ -1,5 +1,5 @@
 {
-  "current_pair": "ETH_1h",
+  "current_pair": "SOL_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 5,
-  "last_updated": "2026-03-27T13:35:00Z",
+  "pair_index": 6,
+  "last_updated": "2026-03-27T14:00:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T02:00:00Z",
   "last_strategist_at": 36,
   "last_auditor_at": 24,
-  "total_iterations": 40,
-  "last_exit_reason": "RESEARCHER iter=40 ETH_15m BASELINE: gate=0.0 formally exhausts gate series (gate=0.08 iter5, gate=0.04 iter17, gate=0.0 iter40); zero pairs, outcome sparsity structural (14/142=9.9%); correct_side=71.2% consistent; max_dd=7.1% safe; escalated to auditor; advanced rotation to ETH_1h"
+  "total_iterations": 41,
+  "last_exit_reason": "RESEARCHER iter=41 ETH_1h BASELINE: pace=0.35 gate=0.04 onesided=2.0; pair_cost=0.5941 identical to iter18 (0.594 at pace=0.30); avg_profit=+$0.08/bar improved vs -$0.06 iter18; max_dd=7.6% improved vs 13.8% iter18; rotation-4 baseline established; staged pace=0.30 for next experiment; advanced rotation to SOL_5m"
 }
