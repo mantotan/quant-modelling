@@ -1,9 +1,5 @@
-iter=29 pair=ETH_1h timestamp=2026-03-27T14:30:00Z status=running
+iter=30 pair=SOL_5m timestamp=2026-03-27T05:10:00Z status=RUNNING
 Mode: BACKTEST (replay_available)
-Action: pace_urgency_lo 0.30->0.25 experiment (rotation-3 strategy queue item #1)
-Hypothesis: ETH_1h baseline (iter 18) showed pair_cost=0.594 at pace=0.30 with matched_ratio=2.0%.
-  Reducing pace_urgency_lo 0.30->0.25 increases buying urgency earlier in the bar,
-  potentially improving pair quality and reducing avg_pair_cost below baseline 0.594.
-  fill_rate=83.3% at baseline (excellent) leaves room for faster pair capture.
-  correct_side=62.1% solid signal. max_dd=13.8% safe. ETH_1h is Tier-2 active pair.
-  Strategy rotation-3 queue item #1: pace_urgency_lo 0.30->0.25 per strategist directive.
+Phase 2: backtest complete -- gate=0.04, pace=0.30, bars=417, pair_cost=0.000 (zero pairs again -- same as iter 19 baseline)
+Phase 3: DISCARD -- pace_urgency_lo pre-staged to 0.30 from prior rotation shows no improvement; zero pairs at gate=0.04 confirmed (3rd consecutive: iter 7 gate=0.08, iter 19 gate=0.04, iter 30); restoring best_knobs (pace=0.35)
+Phase 5: Hypothesis -- magnitude_gate=0.0 (disable gate entirely per rotation-3 strategy queue item #1); pre-RESET pair_cost=0.676 at gate=0.0; gate=0.08/0.04 both collapse SOL_5m; BTC_5m auditor directive also confirmed gate=0.0 needed; gate=0.0 is only remaining gate lever
