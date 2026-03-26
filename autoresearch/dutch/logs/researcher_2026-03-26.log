@@ -26,3 +26,18 @@
 2026-03-26T22:12:57Z iter=32 pair=SOL_1h status=DISCARD param=magnitude_gate 0.04->0.0
   eval: pair_cost=0.000 profit=-0.11/bar total=-3.82 max_dd=8.3pct bars=35
   hypothesis: "Rotation-3 gate=0.0 test for SOL_1h: 3rd consecutive zero-pair result (gate=0.08 iter9 gate=0.04 iter21 gate=0.0 iter32); only 3 live-log outcomes (8.6pct) confirms outcome sparsity as structural bottleneck, not gate threshold; correct_side=54.5pct moderate; avg_profit improved from -0.16 to -0.11/bar but still negative; max_dd=8.3pct safe; gate series exhausted for SOL_1h; escalate to auditor for outcome-sparsity root cause investigation"
+2026-03-26T23:12:03Z iter=49 pair=BTC_15m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=- max_dd=-% bars=-
+  hypothesis: "FROZEN per audit.md: 3 consecutive zero-pair baselines, outcome sparsity structural (11/139=7.9%), skipping"
+2026-03-26T23:12:03Z iter=50 pair=BTC_1h status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=- max_dd=-% bars=-
+  hypothesis: "FROZEN per audit.md: extreme sparsity (1/34=2.9%), gate series exhausted, skipping"
+2026-03-26T23:12:03Z iter=51 pair=ETH_5m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=- max_dd=-% bars=-
+  hypothesis: "FROZEN per audit.md: max_dd=28.7% near kill threshold, 3x zero-pair baselines, skipping"
+2026-03-26T23:12:03Z iter=52 pair=ETH_15m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=- max_dd=-% bars=-
+  hypothesis: "FROZEN per audit.md: gate series exhausted R4, outcome sparsity (14/142=9.9%), skipping"
+2026-03-26T23:12:03Z iter=53 pair=ETH_1h status=DISCARD param=pace_urgency_lo 0.35->0.30
+  eval: pair_cost=0.5941 profit=+$0.08 max_dd=7.6% bars=35
+  hypothesis: "pace=0.30 experiment — knobs pre-staged; baseline=0.5941; DISCARD: pace lever statistically inert on thin 35-bar/4-outcome dataset; identical to baseline (0% cost change); mirrors iter29 pattern; next: fill_ticks 1->2"

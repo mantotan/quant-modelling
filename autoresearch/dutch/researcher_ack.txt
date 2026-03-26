@@ -1,9 +1,21 @@
-iter=48 pair=BTC_5m timestamp=2026-03-27T15:45:00Z role=RESEARCHER
-Status: BACKTEST MODE — rotation 5 — BTC_5m HOLD_SKIP
-Strategy: HOLD per strategy.md rotation-4 directive (still active until auditor lifts escalation).
-  BTC_5m has 4 consecutive zero-pair baselines (gate=0.08/0.04/0.02/0.0 all fail).
-  Outcome sparsity structural (40/420 outcomes = 9.5% resolution).
-  Gate exhaustion complete. Do NOT run experiments until auditor resolves escalation.
-  pace_urgency_lo=0.30 staged in knobs for when escalation resolves.
-  iters_since_auditor = 23 (auditor triggers at 24 — will run next dispatch).
-Advancing pair rotation to BTC_15m.
+iter=53 pair=ETH_1h (after 4 frozen SKIPs: BTC_15m/1h, ETH_5m/15m) timestamp=2026-03-26T23:12:03Z
+Role: RESEARCHER | Mode: BACKTEST (replay_available)
+
+EXPERIMENT: pace_urgency_lo 0.35->0.30
+RESULT: DISCARD
+  pair_cost=0.5941 (baseline=0.5941, identical — no improvement)
+  avg_profit=+$0.08/bar (PASS >= -$0.02)
+  max_dd=7.6% (PASS <= 10%)
+  matched_ratio=1.9% (PASS >= 1.0%)
+  bars_evaluated=35, outcomes=4
+
+KEEP criteria: pair_cost <= 0.594 FAIL (0.5941 not strictly < 0.5941)
+RELAXED criteria: cost improvement > 5% FAIL (0% change)
+DISCARD criteria: pair_cost increases? NO — tied; matched_ratio < 1.0%? NO (1.9%); DD > 12%? NO (7.6%)
+Decision: DISCARD — pace=0.30 produces zero statistical change on thin dataset (4 outcomes)
+Pattern: mirrors iter 29 (pace=0.25 identical) — pace lever is inert below ~10 matched pairs
+
+Knobs: restored knobs_ETH_1h.json to best_knobs_ETH_1h.json (pace=0.35)
+Next experiment for ETH_1h: fill_ticks 1->2 (strategy queue item 3: if pace=0.30 DISCARDs)
+
+Rotation 5 progress: ETH_1h DISCARD. XRP_1h (onesided=2.0) still pending — next active pair.
