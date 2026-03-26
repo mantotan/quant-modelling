@@ -1,1 +1,2 @@
 2026-03-27T00:00:00Z iter=1 pair=BTC_5m role=RESEARCHER outcome=BASELINE magnitude_gate=0.08 collapsed matched_ratio=0%, gate->0.04 staged, advancing to BTC_15m
+2026-03-27T06:00:00Z iter=2 pair=BTC_15m role=RESEARCHER outcome=BASELINE magnitude_gate=0.08 collapsed matched_ratio=0% (133 bars), gate disabled (0.0) for next iter, advancing to BTC_1h
