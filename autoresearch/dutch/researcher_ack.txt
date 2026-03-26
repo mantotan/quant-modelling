@@ -1,8 +1,12 @@
-iter=11 pair=XRP_15m timestamp=2026-03-27T00:00:00Z status=running
+iter=12 pair=XRP_1h timestamp=2026-03-27T03:52:55Z status=BASELINE
 Mode: BACKTEST (replay_available)
-Action: Recording BASELINE for XRP_15m (fresh post-RESET baseline)
-Note: audit.md FREEZE pre-dates RESET; RESET intent is fresh baselines for all 12 pairs
-Knobs state: magnitude_gate=0.08, bar_budget=200, max_onesided_cost=5.0, conviction_buy_skip=0.45
-Plan: BASELINE with current knobs (magnitude_gate=0.08), observe zero-pair collapse pattern
-Expected: matched_ratio=0% (consistent with all 10 prior baselines at gate=0.08)
-Next: reduce magnitude_gate 0.08->0.04 (universal fix confirmed by 10/10 prior baselines)
+Action: Recording BASELINE for XRP_1h (fresh post-RESET baseline with magnitude_gate=0.08)
+Result: avg_pair_cost=0.8546 matched_ratio=3.6% correct_side=82.6% bars=33
+Note: XRP_1h shows partial pair formation at magnitude_gate=0.08 (unlike other pairs which collapsed to 0%)
+  - matched_ratio=3.6% is thin but non-zero (unique behavior vs BTC/ETH/SOL at gate=0.08)
+  - avg_pair_cost=0.855 already below 0.98 threshold; DD=3.1% very safe
+  - correct_side=82.6% is highest signal quality in the system
+Hypothesis: XRP_1h 1h timeframe has more price movement per bar, so fewer ticks fall below gate=0.08
+Next: reduce magnitude_gate 0.08->0.04 to enable more pair formation (follow universal fix pattern)
+  BUT audit.md says onesided=2.0 is the next experiment for XRP_1h (cost improvement lever)
+  Since this is BASELINE round, next experiment will be magnitude_gate 0.08->0.04 to match other pairs
