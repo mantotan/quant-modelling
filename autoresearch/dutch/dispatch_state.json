@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 1,
-  "last_updated": "2026-03-27T10:00:00Z",
-  "last_role": "auditor",
+  "last_updated": "2026-03-27T10:15:00Z",
+  "last_role": "strategist",
   "last_monitor_at": "2026-03-27T02:00:00Z",
-  "last_strategist_at": 12,
+  "last_strategist_at": 24,
   "last_auditor_at": 24,
   "total_iterations": 24,
-  "last_exit_reason": "AUDITOR iter=24: FREEZE BTC_5m (gate=0.0 baseline needed), FREEZE SOL_15m (correct_side=45.5% below 50%), FREEZE XRP_5m (permanent), PRIORITIZE XRP_1h (pair_cost=0.812 improving), CONTINUE x8; ETH_15m knobs fix required (pace_urgency_lo revert 0.25->0.35); BTC_1h risk_ceil fix required (0.20->0.15 in both knobs files)"
+  "last_exit_reason": "STRATEGIST iter=24: rotation 2 analysis complete (0/12 KEEP rate expected — all baselines). 7 pairs still at 0 pair formation — gate=0.0 baseline required for BTC_5m/15m/1h/ETH_5m/15m/SOL_5m/1h. XRP_1h PRIORITIZED (pair_cost=0.812, pace_urgency_lo 0.35->0.30 next). ETH_1h active (pair_cost=0.594). BTC_5m/SOL_15m FROZEN per auditor. BTC_1h risk_ceil fix required (0.20->0.15)."
 }
