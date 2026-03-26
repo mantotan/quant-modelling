@@ -8,7 +8,7 @@
   "min_time_remaining": 30.0,
   "emergency_balance_time": 120.0,
   "spread_offset": 0.0,
-  "pace_urgency_lo": 0.35,
+  "pace_urgency_lo": 0.30,
   "pace_urgency_hi": 2.0,
   "max_side_fraction": 0.55,
   "max_per_prediction": 100.0,

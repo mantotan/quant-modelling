@@ -43,3 +43,7 @@
 2026-03-27T06:10:00Z iter=19 pair=SOL_5m status=BASELINE param=magnitude_gate=0.04(baseline) ->
   eval: pair_cost=0.0000 profit=$+0.14 max_dd=20.00% bars=407 matched_ratio=0.0% correct_side=56.4%
   hypothesis: "magnitude_gate=0.04 BASELINE for SOL_5m — rotation-2 item #7. Zero pair formation at gate=0.04 (same as gate=0.08 iter 7). Only 28 live-log outcomes (vs 407 bars) confirms extreme outcome sparsity universal pattern. correct_side=56.4% (down from 59.8% at gate=0.08 — gate=0.04 admits more marginal predictions). max_dd=20.0% higher than iter7 13.3%. SOL_5m structurally fragile confirmed at both gate values. Staged pace_urgency_lo 0.35->0.30 (knobs updated) for next SOL_5m turn per strategy queue #2. Advancing to SOL_15m."
+2026-03-27T07:00:00Z iter=20 pair=SOL_15m status=BASELINE param=magnitude_gate=0.04 baseline->staged
+  eval: pair_cost=0.5668 profit=$-37.03 max_dd=19.8% bars=138
+  hypothesis: "SOL_15m rotation-2 baseline at gate=0.04. Near-zero pair formation (0.3%) identical to gate=0.08 baseline (iter 8). Only 10 live-log outcomes vs 138 bars confirms extreme outcome sparsity. correct_side=45.5% below 50% -- model directionally weak on SOL_15m. Gate reduction alone insufficient to improve pair formation. Staged pace_urgency_lo 0.35->0.30 per strategy queue #2 (XRP_15m 18% gain pattern)."
+  next_experiment: pace_urgency_lo 0.35->0.30 (knobs updated, advancing to SOL_1h in rotation)
