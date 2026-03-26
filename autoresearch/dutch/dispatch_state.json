@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_15m",
+  "current_pair": "XRP_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 7,
-  "last_updated": "2026-03-27T05:10:00Z",
+  "pair_index": 9,
+  "last_updated": "2026-03-26T22:13:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T02:00:00Z",
   "last_strategist_at": 24,
   "last_auditor_at": 24,
-  "total_iterations": 30,
-  "last_exit_reason": "RESEARCHER iter=30 SOL_5m DISCARD: pace_urgency_lo=0.30 pre-staged gives zero pairs same as iters 7 and 19 (gate=0.04); no improvement; knobs restored to best_knobs (pace=0.35); staged magnitude_gate=0.0 for next SOL_5m experiment per rotation-3 strategy queue item 1; pre-RESET pair_cost=0.676 expected at gate=0.0"
+  "total_iterations": 32,
+  "last_exit_reason": "RESEARCHER iter=32 SOL_1h DISCARD: gate=0.0 experiment gives zero pairs (3rd consecutive: gate=0.08 iter9 gate=0.04 iter21 gate=0.0 iter32); outcome sparsity confirmed structural (3/35 outcomes=8.6%); knobs restored to best_knobs; SOL_15m SKIPPED (auditor freeze: correct_side=45.5% below 50%); advanced 2 pairs this invocation (skip+experiment); next: XRP_5m (permanent freeze skip then XRP_15m)"
 }
