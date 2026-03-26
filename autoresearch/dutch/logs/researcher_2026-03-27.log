@@ -78,3 +78,7 @@
 2026-03-27T12:20:00Z iter=35 pair=XRP_1h status=DISCARD param=pace_urgency_lo 0.35->0.30
   eval: pair_cost=0.0000 profit=$-0.1269 max_dd=5.78% bars=35 matched_ratio=0.00% fill_rate=75.7% correct_side=63.0%
   hypothesis: "pace_urgency_lo=0.35->0.30 should reduce pair cost on XRP_1h (pre-RESET XRP_15m showed 18% gain). XRP_1h at 4.2% matched_ratio has thin pair formation — tested whether earlier urgency improves pair quality. Result: COLLAPSE — matched_ratio dropped from 4.24% to 0%; pace floor is locked at 0.35 for XRP_1h. Next: max_onesided_cost 5.0->2.0 per audit Tier 2 recommendation."
+2026-03-27T12:30:00Z iter=36 pair=BTC_5m status=BASELINE param=magnitude_gate=0.0(baseline) unchanged
+  eval: pair_cost=0.0000 profit=$-0.0312/bar total=$-13.10 max_dd=23.4% bars=420 matched_ratio=0.0% correct_side=62.9%
+  hypothesis: "Gate exhaustion complete -- all 4 gate values (0.08,0.04,0.02,0.0) confirm zero pair formation for BTC_5m. Outcome sparsity (40/420=9.5%) is the structural bottleneck -- not the magnitude gate. Gate reduction cannot fix pair formation when resolved outcomes are absent. Recording gate=0.0 as BASELINE. Staging pace_urgency_lo 0.35->0.30 for next rotation. Escalation to auditor recommended: BTC_5m requires outcome resolution improvement before any parameter tuning can have effect."
+  next_experiment: pace_urgency_lo=0.35->0.30 (staged in knobs for rotation-5)

@@ -26,3 +26,4 @@
 2026-03-27T14:30:00Z iter=29 pair=ETH_1h role=RESEARCHER outcome=DISCARD pace_urgency_lo=0.25 gave pair_cost=0.5941 identical to baseline; staged max_onesided_cost=5.0->2.0 next
 2026-03-27T12:10:00Z iter=34 pair=XRP_15m role=RESEARCHER outcome=DISCARD pace_urgency_lo=0.30->0.25 pair_cost=0.9500 max_dd=19.3% (XRP_5m SKIP: permanent freeze)
 2026-03-27T12:20:00Z iter=35 pair=XRP_1h role=RESEARCHER outcome=DISCARD pace_urgency_lo=0.35->0.30 collapsed pairs (0% vs 4.24% baseline); pace floor confirmed at 0.35; next=BTC_5m
+2026-03-27T12:30:00Z iter=36 pair=BTC_5m role=RESEARCHER outcome=BASELINE gate=0.0 confirms 4th consecutive zero-pair for BTC_5m; outcome sparsity structural; pace_urgency_lo staged 0.35->0.30; advanced to BTC_15m
