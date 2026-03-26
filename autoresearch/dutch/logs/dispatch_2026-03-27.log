@@ -31,3 +31,4 @@
 2026-03-27T13:05:00Z iter=37 pair=BTC_15m role=RESEARCHER outcome=SKIP: HOLD per strategy rotation-4; gate series exhausted (3x zero-pair); outcome sparsity 11/139=7.9%; advanced rotation to BTC_1h
 2026-03-27T13:10:00Z iter=38 pair=BTC_1h role=RESEARCHER outcome=SKIP: BTC_1h HOLD rotation-4 (3x zero-pair gate exhaustion, sparsity 2.9%), advanced to ETH_5m
 2026-03-27T13:20:00Z iter=39 pair=ETH_5m role=RESEARCHER outcome=SKIP: HOLD rotation-4 (outcome sparsity 8.7%, max_dd=28.7% near kill threshold); knobs_fix magnitude_gate=0.0 added; rotation advanced to ETH_15m
+2026-03-27T13:20:00Z iter=39 pair=ETH_5m role=RESEARCHER outcome=SKIP: HOLD escalation (3x zero-pair gate exhaustion, sparsity 8.7%, DD=28.7%); knobs_fix applied (magnitude_gate=0.0 added); advanced to ETH_15m

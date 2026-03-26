@@ -93,3 +93,6 @@
 2026-03-27T13:20:00Z iter=39 pair=ETH_5m status=SKIP param=HOLD_SKIP+knobs_fix (none)→(none)
   eval: pair_cost=- profit=$- max_dd=-% bars=-
   hypothesis: "ETH_5m on HOLD per strategy.md rotation-4: 3 consecutive zero-pair baselines (gate=0.08 iter4, gate=0.04 iter16, gate=0.0 iter27) confirm outcome sparsity (36/414 = 8.7%) as structural bottleneck. max_dd=28.7% dangerously close to 30% kill threshold from unmatched inventory. Knobs fix applied: magnitude_gate=0.0 added to knobs_ETH_5m.json and best_knobs_ETH_5m.json (key was confirmed absent per strategy.md note). No further experiments until auditor resolves escalation. Rotation advanced to ETH_15m."
+2026-03-27T13:20:00Z iter=39 pair=ETH_5m status=SKIP param=HOLD_SKIP+knobs_fix magnitude_gate=absent->0.0
+  eval: pair_cost=- profit=- max_dd=- bars=-
+  hypothesis: "ETH_5m HOLD per rotation-4 escalation. Gate series exhausted (gate=0.08/0.04/0.0 all zero pairs in iters 4/16/27). Outcome sparsity structural (36/414=8.7%). max_dd=28.7% from unmatched inventory near 30% kill threshold. Knobs fix applied: magnitude_gate=0.0 key added (was absent). No experiment until auditor clears escalation."
