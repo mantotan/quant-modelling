@@ -62,6 +62,14 @@ def parse_args() -> argparse.Namespace:
         help="Model architecture to train",
     )
     p.add_argument("--seq-len", type=int, default=20, help="Sequence length for ALSTM/Transformer")
+    p.add_argument(
+        "--alpha", action="store_true",
+        help="Join alpha data (funding rates, derivatives metrics) before feature computation",
+    )
+    p.add_argument("--funding-dir", default="data/raw/funding", help="Funding rate parquet dir")
+    p.add_argument(
+        "--metrics-dir", default="data/raw/metrics", help="Derivatives metrics dir",
+    )
     return p.parse_args()
 
 
@@ -88,11 +96,30 @@ def main() -> None:
                 bars_df["time"].min(), bars_df["time"].max())
 
     # ── 2. Compute features ───────────────────────────────────────────
-    logger.info("Computing features...")
-    pipeline = FeaturePipeline()
-    featured_df = pipeline.compute(bars_df)
-    # Filter to features actually present (alpha groups no-op if data absent)
-    feature_names = [f for f in pipeline.feature_names if f in featured_df.columns]
+    logger.info("Computing features (alpha=%s)...", args.alpha)
+
+    if args.alpha:
+        from qm.features.cross_asset import CrossAssetPipeline
+
+        metrics_store = ParquetStore(base_dir=Path(args.metrics_dir))
+        funding_store = ParquetStore(base_dir=Path(args.funding_dir))
+        cross_pipeline = CrossAssetPipeline(
+            store, timeframe,
+            metrics_store=metrics_store,
+            alpha_stores={"funding": funding_store},
+            alpha_tolerances={"funding": "9h"},
+        )
+        featured_df = cross_pipeline.compute(asset)
+        feature_names = [
+            f for f in cross_pipeline.feature_names(asset)
+            if f in featured_df.columns
+        ]
+        lookback = cross_pipeline.max_lookback
+    else:
+        pipeline = FeaturePipeline()
+        featured_df = pipeline.compute(bars_df)
+        feature_names = [f for f in pipeline.feature_names if f in featured_df.columns]
+        lookback = pipeline.max_lookback
     logger.info("Computed %d features: %s", len(feature_names), feature_names[:5])
 
     # ── 3. Construct targets ──────────────────────────────────────────
@@ -101,7 +128,6 @@ def main() -> None:
     featured_df = featured_df.with_columns(target)
 
     # Drop rows with null target (last row) or null features (warmup period)
-    lookback = pipeline.max_lookback
     clean_df = featured_df.slice(lookback).drop_nulls(subset=["target"])
     logger.info(
         "After cleanup: %d rows (dropped %d warmup + null)",
