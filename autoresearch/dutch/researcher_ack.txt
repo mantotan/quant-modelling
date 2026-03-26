@@ -1,4 +1,5 @@
-iter=1 pair=BTC_5m timestamp=2026-03-27T00:00:00Z
+iter=2 pair=BTC_15m timestamp=2026-03-27T06:00:00Z
 Role: RESEARCHER (BACKTEST MODE)
-Experiment: BASELINE — fresh baseline post-RESET; magnitude_gate=0.08 now in knobs; no param changed
-Hypothesis: RESET added magnitude_gate knob to all pairs. Must establish fresh baselines before optimizing.
+Experiment: BASELINE — fresh baseline for BTC_15m post-RESET; magnitude_gate=0.08 in knobs; no param changed
+Hypothesis: No BASELINE row exists for BTC_15m in results.tsv. Must establish baseline before applying audit directive (onesided=2.0).
+Audit note: FREEZE BTC_15m lifted for onesided=2.0 test; but baseline must come first per researcher spec.
