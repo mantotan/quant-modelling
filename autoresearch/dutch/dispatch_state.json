@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_15m",
+  "current_pair": "BTC_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 1,
-  "last_updated": "2026-03-27T18:35:00Z",
-  "last_role": "strategist",
-  "last_monitor_at": "2026-03-27T02:00:00Z",
-  "last_strategist_at": 60,
-  "last_auditor_at": 48,
-  "total_iterations": 60,
-  "last_exit_reason": "STRATEGIST iter=60 rotation-5 post-analysis: 0/2 KEEPs (ETH_1h pace DISCARD + XRP_1h onesided DISCARD); diagnostic confirmed fill mechanics = primary bottleneck for 5m pairs; rotation-6 priority = fill_ticks 1->2 for ETH_1h and XRP_1h; pace_urgency_lo lever DEAD on ETH_1h; onesided floor confirmed >= 5.0 on XRP_1h"
+  "pair_index": 0,
+  "last_updated": "2026-03-27T06:30:00Z",
+  "last_role": "researcher",
+  "last_monitor_at": "2026-03-27T06:30:00Z",
+  "last_strategist_at": 0,
+  "last_auditor_at": 0,
+  "total_iterations": 0,
+  "last_exit_reason": "RESET: TF-specific fill simulator params (5m: chase=0.02/offset=0.02/max_chase=4, 15m: chase=0.025/offset=0.015/max_chase=3)"
 }
