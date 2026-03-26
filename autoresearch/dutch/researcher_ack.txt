@@ -1,4 +1,4 @@
-iter=127 pair=XRP_1h timestamp=2026-03-23T04:00:00Z
+iter=1 pair=BTC_5m timestamp=2026-03-27T00:00:00Z
 Role: RESEARCHER (BACKTEST MODE)
-Experiment: max_onesided_cost 5.0->2.0 (already staged in knobs_XRP_1h.json=2.0 vs best_knobs=5.0)
-Hypothesis: XRP_1h has DD=6% (system-best) and avg_profit=+$1.08/bar. Onesided cap=2.0 may cap tail costs. Audit confirms: try onesided=2.0 since DD=5% safe.
+Experiment: BASELINE — fresh baseline post-RESET; magnitude_gate=0.08 now in knobs; no param changed
+Hypothesis: RESET added magnitude_gate knob to all pairs. Must establish fresh baselines before optimizing.
