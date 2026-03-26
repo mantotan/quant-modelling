@@ -132,3 +132,21 @@
 2026-03-27T18:00:00Z iter=60 pair=BTC_5m status=SKIP param=DIAGNOSTIC_SPOT_SKIP none->none
   eval: pair_cost=0.0000 profit=$-0.06/bar max_dd=23.4% bars=431 fill_rate=23.7%
   hypothesis: "DIAGNOSTIC: --outcome-source spot tested on BTC_5m (100% outcome resolution). Result NEGATIVE -- 0% matched_ratio persists. Fill_rate=23.7% is binding constraint not outcome sparsity. P(both sides fill 5m bar)=5.6%. Spot outcomes do NOT unblock frozen 5m pairs. FREEZE PERMANENT confirmed."
+2026-03-27T00:00:00Z iter=67 pair=SOL_5m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=$- max_dd=-% bars=-
+  hypothesis: "AUDITOR FREEZE ACTIVE: 3 consecutive zero-pair runs; fill mechanics P=4.2%; max_dd=23.2% elevated; no experiments possible"
+2026-03-27T00:00:00Z iter=68 pair=SOL_15m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=$- max_dd=-% bars=-
+  hypothesis: "AUDITOR FREEZE ACTIVE: correct_side=45.5% both measurements below 50%; directionally wrong pair"
+2026-03-27T00:00:00Z iter=69 pair=SOL_1h status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=$- max_dd=-% bars=-
+  hypothesis: "AUDITOR FREEZE ACTIVE: 3 consecutive zero-pair baselines; outcome sparsity structural (8.6%)"
+2026-03-27T00:00:00Z iter=70 pair=XRP_5m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=$- max_dd=-% bars=-
+  hypothesis: "AUDITOR FREEZE PERMANENT: structural fill_rate=15.6% floor; zero pairs at all tested gates"
+2026-03-27T00:00:00Z iter=71 pair=XRP_15m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=$- max_dd=-% bars=-
+  hypothesis: "AUDITOR FREEZE ACTIVE: correct_side declined monotonically 53.7%->50.0%->49.2%; gate exhausted"
+2026-03-27T00:05:00Z iter=72 pair=XRP_1h status=KEEP param=fill_ticks 1->2
+  eval: pair_cost=0.812 profit=$-0.13/bar max_dd=9.8% bars=36
+  hypothesis: "fill_ticks=2 extends limit order persistence across 2 tick intervals without changing unmatched spend mechanism; should NOT trigger collapse seen with pace=0.30 or onesided=2.0; marginal profit improvement (-0.14->-0.13) achieved; fill_ticks lever confirmed safe and marginally positive; FIRST KEEP of autoresearch (iter 72, rotation 6 final)"

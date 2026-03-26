@@ -1,44 +1,21 @@
-iter=60 pair=BTC_5m (rotation 6 start) timestamp=2026-03-27T18:00:00Z
-Role: RESEARCHER | Mode: BACKTEST (replay_available)
+iter=67-71 (skips) + 72 (XRP_1h fill_ticks=2 experiment)
+pair=SOL_5m->SOL_15m->SOL_1h->XRP_5m->XRP_15m->XRP_1h
+timestamp=2026-03-27T00:00:00Z
+mode=BACKTEST (replay_available)
+status=Processing rotation-6 continued: skipping 5 frozen pairs (iters 67-71), running fill_ticks=2 on XRP_1h (iter 72)
 
-DIAGNOSTIC TASK (mandated by auditor after iter 48):
-  Task A: Check outcome resolution with --outcome-source spot
-  Task B: Run BTC_5m with spot outcomes — test if OHLC unblocks frozen pairs
+ROTATION-6 FROZEN SKIPS (67-71):
+  67: SOL_5m  FROZEN (3 consecutive zero-pair runs, fill mechanics P=4.2%, DD=23.2%)
+  68: SOL_15m FROZEN (correct_side=45.5% both measurements below 50%)
+  69: SOL_1h  FROZEN (3 consecutive zero-pair baselines, outcome sparsity 8.6%)
+  70: XRP_5m  FROZEN PERMANENT (fill_rate=15.6% structural floor, zero pairs at all gates)
+  71: XRP_15m FROZEN (correct_side declining 53.7%->50.0%->49.2%, gate exhausted)
 
-DIAGNOSTIC RESULT: spot outcomes do NOT unblock BTC_5m
-  Outcome source: spot (bar close vs open direction = ~100% resolution)
-  pair_cost=0.0000 (zero pairs — same as all prior baselines)
-  avg_profit=-$0.06/bar
-  matched_ratio=0.0% (SAME as live-log outcomes)
-  fill_rate=23.7% (limit orders rarely fill in 5m window)
-  correct_side=59.8%
-  max_dd=23.4%
-  bars_evaluated=431
-
-ROOT CAUSE REVISION: The bottleneck is NOT outcome sparsity alone.
-  With spot outcomes (100% resolution), BTC_5m still shows 0% matched_ratio.
-  The binding constraint is fill_rate=23.7%:
-    - P(both sides fill in same bar) ≈ 0.237^2 ≈ 5.6% — very low
-    - Even at 5.6%, pair formation requires both sides to fill AND have opposite predictions
-    - The conviction_buy_skip=0.5 and magnitude_gate=0.0 further reduce buying activity
-    - 5m bars are too short for limit orders to fill on both sides
-
-IMPLICATIONS FOR FROZEN PAIRS:
-  - 5m pairs (BTC_5m, ETH_5m, SOL_5m, XRP_5m): Fill_rate structural floor ~15-25%
-    OHLC/spot outcomes do NOT help — pair formation blocked by fill mechanics
-    Freeze verdict: CONFIRMED PERMANENT for 5m pairs
-  - 15m pairs: Fill_rate ~30-45% — marginally higher, but still structural
-    Diagnostic not run on 15m, but outcome sparsity removed from equation
-    These should be re-tested with spot outcomes to confirm
-  - 1h pairs (ETH_1h, XRP_1h): Fill_rate ~70-85% — viable for pair formation
-    Outcome sparsity IS the limiting factor for 1h (fewer bars, fewer outcomes)
-    Continue experiments on ETH_1h and XRP_1h
-
-ROTATION 6 PLAN (updated based on diagnostic):
-  BTC_5m: SKIP (confirmed frozen — spot diagnostic negative)
-  BTC_15m through SOL_1h: SKIP all frozen pairs
-  ETH_1h: Next lever = fill_ticks 1->2 (strategy queue item 3 after pace DISCARD)
-  XRP_1h: Next lever = fill_ticks 1->2 (strategy queue item 3 after onesided DISCARD)
-  Diagnostic finding: document in results.tsv as SKIP+DIAG
-
-STATUS: BTC_5m SKIP confirmed. Advancing rotation to BTC_15m.
+XRP_1h EXPERIMENT (iter 72):
+  Hypothesis: fill_ticks=2 extends limit order persistence across 2 tick intervals without
+  changing the unmatched spend mechanism; should NOT trigger the collapse mechanism seen
+  with pace=0.30 or onesided=2.0 (those were spending constraints, this is fill sim only)
+  Change: fill_simulator.fill_ticks 1->2 in knobs_XRP_1h.json
+  Baseline ref: pair_cost=0.812, profit=-$0.14/bar, DD=9.8%, matched=4.1%
+  KEEP if: pair_cost < 0.812 OR avg_profit > -$0.14/bar (ANY improvement on either metric)
+  DISCARD if: matched_ratio < 2.0% OR DD > 15%

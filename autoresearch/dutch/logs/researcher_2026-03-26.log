@@ -41,3 +41,9 @@
 2026-03-26T23:12:03Z iter=53 pair=ETH_1h status=DISCARD param=pace_urgency_lo 0.35->0.30
   eval: pair_cost=0.5941 profit=+$0.08 max_dd=7.6% bars=35
   hypothesis: "pace=0.30 experiment — knobs pre-staged; baseline=0.5941; DISCARD: pace lever statistically inert on thin 35-bar/4-outcome dataset; identical to baseline (0% cost change); mirrors iter29 pattern; next: fill_ticks 1->2"
+2026-03-26T23:42:00Z iter=61-65 pair=BTC_5m/BTC_15m/BTC_1h/ETH_5m/ETH_15m status=SKIP param=FROZEN_SKIP -
+  eval: skipped (auditor freeze active, rotation 6)
+  hypothesis: "10 pairs remain frozen by structural barriers (fill mechanics or outcome sparsity). Advancing rotation to ETH_1h."
+2026-03-26T23:42:00Z iter=66 pair=ETH_1h status=DISCARD param=fill_ticks 1->2
+  eval: pair_cost=0.5941 profit=-$0.04/bar max_dd=13.8% matched=1.9% fill_rate=81.4% bars=35
+  hypothesis: "fill_ticks=2 increases order persistence in fill simulator, allowing limit orders to remain active across 2 tick intervals instead of 1, potentially improving fill_rate from ~81% toward ~95% and matched_ratio above 2.0%. RESULT: fill_rate=81.4% (identical to baseline), matched_ratio=1.9% (slight regression), avg_profit=-$0.04/bar (regression from +$0.08), max_dd=13.8% (exceeds 12% threshold). REJECTED: 1h limit orders already fill well at fill_ticks=1; extending persistence does not change pair formation outcomes on this thin dataset. DD regression suggests marginally different bar sampling. Next lever: chase_threshold 0.03->0.05."

@@ -6,3 +6,4 @@
 2026-03-26T22:00:00Z iter=28 pair=ETH_15m role=RESEARCHER outcome=DISCARD: gate=0.04+pace=0.25(knobs_drift) zero pairs; pace reverted to 0.35; staged magnitude_gate=0.0 for next experiment
 2026-03-26T22:13:30Z iter=32 pair=SOL_1h role=RESEARCHER outcome=DISCARD gate=0.0 zero_pairs pair_cost=0.000 max_dd=8.3pct; SOL_15m skipped (auditor freeze correct_side<50pct)
 2026-03-26T23:12:03Z iter=53 pair=ETH_1h role=RESEARCHER outcome=DISCARD pace_urgency_lo=0.30->0.35(restored); 4 frozen SKIPs(BTC_15m/1h,ETH_5m/15m); pair_cost=0.5941(identical); pace inert on thin dataset; next_pair=SOL_5m
+2026-03-26T23:42:00Z iter=66 pair=ETH_1h role=researcher outcome=DISCARD fill_ticks=2 regressed: pair_cost=0.5941(stable) profit=-$0.04(vs+$0.08) dd=13.8%(vs7.6%) matched=1.9%(vs2.0%); 5 frozen skips (iters 61-65); next=SOL_5m(idx=6)

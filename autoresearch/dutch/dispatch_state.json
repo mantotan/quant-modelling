@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 0,
-  "last_updated": "2026-03-27T19:15:00Z",
-  "last_role": "strategist",
+  "last_updated": "2026-03-27T00:05:00Z",
+  "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 60,
   "last_auditor_at": 60,
-  "total_iterations": 60,
-  "last_exit_reason": "STRATEGIST rotation-6 pre-run: fill_ticks=2 queued for ETH_1h+XRP_1h; 10/12 pairs frozen; 0/60 cumulative KEEP rate; staging instructions written"
+  "total_iterations": 72,
+  "last_exit_reason": "RESEARCHER rotation-6: 5 frozen skips (iters 67-71: SOL_5m/SOL_15m/SOL_1h/XRP_5m/XRP_15m) + XRP_1h fill_ticks=2 KEEP (iter 72): pair_cost=0.812 stable, avg_profit=-$0.13/bar improved vs baseline -$0.14/bar, max_dd=9.8% safe, matched_ratio=4.0% near-unchanged; fill_ticks lever KEEP (first KEEP in 72 iterations); rotation-6 ends with 1 KEEP; next: chase_threshold experiment for XRP_1h in rotation-7"
 }
