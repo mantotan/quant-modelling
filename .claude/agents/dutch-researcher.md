@@ -156,10 +156,11 @@ Priority chain — first match wins:
 
 | Category | Parameters |
 |----------|-----------|
+| Magnitude gate | magnitude_gate (0.0=disabled, 0.02-0.12 typical, skip ticks where \|cal_prob-0.5\| < gate) |
 | Pair cost | cheap_threshold, max_marginal_pair_cost |
 | Pacing | pace_urgency_lo/hi, max_per_prediction, bar_budget, order_size |
 | Risk budget | risk_floor, risk_ceil, risk_t_start, risk_t_end, risk_exponent |
-| Conviction | conviction_market_start, conviction_market_full |
+| Conviction | conviction_buy_skip, conviction_size_floor, conviction_market_start, conviction_market_full |
 | Unmatched cap | min_unmatched_shares, unmatched_ratio |
 | Balance | max_side_fraction |
 | Sell | sell_loss_start, sell_dump_start, sell_max_fraction, sell_min_shares, rebalance_warmup |

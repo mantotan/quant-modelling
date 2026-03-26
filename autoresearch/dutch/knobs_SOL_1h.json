@@ -45,5 +45,6 @@
     "min_order_usd"
   ],
   "_deprecated": [],
-  "bar_seconds": 3600.0
+  "bar_seconds": 3600.0,
+  "magnitude_gate": 0.08
 }

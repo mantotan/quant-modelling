@@ -47,5 +47,6 @@
   "_deprecated": [],
   "bar_seconds": 3600.0,
   "min_buy_time_pct": 0.15,
-  "flip_kill_after": 4
+  "flip_kill_after": 4,
+  "magnitude_gate": 0.08
 }

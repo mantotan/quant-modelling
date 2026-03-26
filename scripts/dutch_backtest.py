@@ -136,11 +136,12 @@ def _resolve_knobs_path(
 def load_dutch_config(
     knobs_dir: Path | None, knobs_fallback: Path,
     asset: str, tf_label: str, tf: Timeframe,
-) -> tuple[DutchConfig, dict]:
+) -> tuple[DutchConfig, dict, dict]:
     """Load DutchConfig — tries per-pair file first, falls back to shared."""
     knobs_path = _resolve_knobs_path(knobs_dir, knobs_fallback, asset, tf_label)
     kwargs: dict = {"bar_seconds": BAR_SECONDS[tf]}
     sim_kwargs: dict = {}
+    knobs: dict = {}
 
     if knobs_path.exists():
         with open(knobs_path) as f:
@@ -155,7 +156,11 @@ def load_dutch_config(
     else:
         logger.warning("No knobs at %s — using defaults", knobs_path)
 
-    return DutchConfig(**kwargs), sim_kwargs
+    # Extract experimental gates (not in DutchConfig, applied in tick loop)
+    extra_gates = {
+        "magnitude_gate": knobs.get("magnitude_gate", 0.0),
+    }
+    return DutchConfig(**kwargs), sim_kwargs, extra_gates
 
 
 # -- Model loading (mirrors monitor_pulse.py:140-160) ----------------------
@@ -479,9 +484,10 @@ def run_backtest(
     tf_enum = TF_MAP[tf_label]
 
     # -- Config --
-    config, sim_kwargs = load_dutch_config(
+    config, sim_kwargs, extra_gates = load_dutch_config(
         knobs_dir, knobs_fallback, asset, tf_label, tf_enum,
     )
+    magnitude_gate = extra_gates.get("magnitude_gate", 0.0)
 
     # -- Model --
     model, calibrator = load_model(model_dir, asset, tf_label)
@@ -788,10 +794,17 @@ def run_backtest(
             # Reconstruct books from tick BBO
             book_up, book_dn = tick_to_books(tick)
 
-            # Engine → orders → sim → fills (shared code path with live)
-            _orders, _fills = process_tick(
-                current_elapsed_pct, cal_prob, book_up, book_dn, engine, sim,
-            )
+            # Magnitude gate: skip low-confidence ticks
+            if magnitude_gate > 0 and abs(cal_prob - 0.5) < magnitude_gate:
+                # Still process pending fills
+                _fills = sim.on_tick(current_elapsed_pct, book_up, book_dn)
+                for fill in _fills:
+                    engine.on_fill(fill.order, fill.fill_price, fill.filled_shares)
+            else:
+                # Engine → orders → sim → fills (shared code path with live)
+                _orders, _fills = process_tick(
+                    current_elapsed_pct, cal_prob, book_up, book_dn, engine, sim,
+                )
 
         # -- Bar end: cancel + resolve (mirrors monitor_pulse.py:916-947) --
         cancelled = sim.cancel_all()
