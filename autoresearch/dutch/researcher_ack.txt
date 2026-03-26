@@ -1,8 +1,8 @@
-iter=27 pair=ETH_5m timestamp=2026-03-26T21:55:03Z status=running
+iter=28 pair=ETH_15m timestamp=2026-03-26T21:58:59Z status=running
 Mode: BACKTEST (replay_available)
-Action: magnitude_gate=0.04->0.0 (disable gate, rotation-3 strategy queue #1 for ETH_5m)
-Hypothesis: gate=0.04 collapses ETH_5m pair formation (iters 4+16 both 0 pairs, matched_ratio=0%).
-  Disabling gate entirely expected to restore pair formation (mirrors pre-RESET behavior).
-  correct_side=52.0% minimal edge; max_dd=29.2% at gate=0.04 (high from unmatched inventory).
-  Auditor notes: pace_urgency_lo=0.30 pre-staged (best_knobs=0.35 - one step ahead OK).
-  Running gate=0.0 experiment now per rotation-3 strategy queue top priority.
+Action: magnitude_gate=0.04->0.0 + pace_urgency_lo revert 0.25->0.35 (audit fix)
+Hypothesis: gate=0.04 collapses ETH_15m pair formation (iters 5+17 both 0 pairs matched_ratio=0%).
+  Disabling gate entirely (0.0) per rotation-3 strategy queue item #1.
+  Simultaneously fixing audit-flagged knobs drift: pace_urgency_lo was 0.25 (2 steps ahead),
+  reverting to 0.35 to match best_knobs and correct baseline for future pace_urgency experiments.
+  ETH_15m correct_side=71.0% is 2nd highest in system -- high-value pair if pairs can form.

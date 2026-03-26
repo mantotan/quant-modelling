@@ -17,3 +17,6 @@
 2026-03-26T21:55:03Z iter=27 pair=ETH_5m status=DISCARD param=magnitude_gate 0.04->0.0
   eval: pair_cost=0.0000 profit=$-0.09 max_dd=28.70% bars=414
   hypothesis: "gate=0.04 collapses ETH_5m pair formation (iters 4+16 both 0 pairs); disabling gate (0.0) expected to restore pair formation per pre-RESET behavior; RESULT: still 0 pairs -- outcome sparsity (36/414=8.7% resolution) confirmed as structural bottleneck; gate is not the blocking variable; ETH_5m pair formation impossible in current dataset window; escalate to auditor"
+2026-03-26T22:00:00Z iter=28 pair=ETH_15m status=DISCARD param=magnitude_gate=0.04->0.0(staged)+pace_urgency_lo=0.25->0.35(reverted) 
+  eval: pair_cost=0.000 profit=$0.12/bar (+$17.05 total) max_dd=7.1% bars=139 matched_ratio=0.0% correct_side=71.0%
+  hypothesis: "gate=0.04 with pre-staged pace=0.25 (knobs drift 2 steps ahead) confirms zero pairs same as iters 5 and 17. DISCARD the knobs drift; reverted pace to 0.35 (best_knobs). Staged magnitude_gate=0.0 for next experiment -- gate=0.04 is structural blocker for ETH_15m pair formation across 2 full rotations. ETH_15m correct_side=71.0% is 2nd highest in system; disabling gate entirely per audit+strategy rotation-3 directive #1."
