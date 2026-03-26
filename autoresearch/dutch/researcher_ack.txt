@@ -1,6 +1,7 @@
-iter=37 pair=BTC_15m timestamp=2026-03-27T13:05:00Z role=RESEARCHER
-Status: BACKTEST MODE — rotation 4 SKIP — BTC_15m on HOLD per strategy.md escalation
-Reason: 3 consecutive zero-pair baselines (gate=0.08 iter2, gate=0.04 iter14, gate=0.0 iter25).
-        Gate series exhausted. Outcome sparsity confirmed structural (11/139 outcomes = 7.9%).
-        strategy.md rotation-4 queue item 1: "HOLD — escalate to auditor. Do NOT run further gate or pace experiments."
-        Advancing pair rotation to BTC_1h.
+iter=38 pair=BTC_1h timestamp=2026-03-27T13:10:00Z role=RESEARCHER
+Status: BACKTEST MODE — rotation 4 SKIP — BTC_1h on HOLD per strategy.md escalation
+Reason: 3 consecutive zero-pair baselines (gate=0.08 iter3, gate=0.04 iter15, gate=0.0 iter26).
+        Gate series exhausted. Outcome sparsity confirmed structural (1/34 outcomes = 2.9% — extreme).
+        strategy.md rotation-4 queue item 1: "HOLD — escalate to auditor. Extreme outcome sparsity (1/34 = 2.9%)."
+        rotation-4 execution plan item 5: "All 6 HOLD pairs — SKIP until auditor clears escalation."
+        Advancing pair rotation to ETH_5m.
