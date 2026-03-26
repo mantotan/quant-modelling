@@ -1,5 +1,6 @@
-iter=36 pair=BTC_5m timestamp=2026-03-27T12:25:00Z role=RESEARCHER
-Status: BACKTEST MODE — rotation 4 start, running BTC_5m gate=0.0 baseline
-Knobs: magnitude_gate=0.0 (already staged), pace_urgency_lo=0.35, max_onesided_cost=2.0
-Plan: Run gate=0.0 baseline — first gate=0.0 test for BTC_5m (prior tests: 0.08, 0.04, 0.02 all 0 pairs)
-Expected: pair formation should return (pre-RESET had pair_cost=0.922 at gate=0.0)
+iter=37 pair=BTC_15m timestamp=2026-03-27T13:05:00Z role=RESEARCHER
+Status: BACKTEST MODE — rotation 4 SKIP — BTC_15m on HOLD per strategy.md escalation
+Reason: 3 consecutive zero-pair baselines (gate=0.08 iter2, gate=0.04 iter14, gate=0.0 iter25).
+        Gate series exhausted. Outcome sparsity confirmed structural (11/139 outcomes = 7.9%).
+        strategy.md rotation-4 queue item 1: "HOLD — escalate to auditor. Do NOT run further gate or pace experiments."
+        Advancing pair rotation to BTC_1h.

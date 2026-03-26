@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_15m",
+  "current_pair": "BTC_1h",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 1,
-  "last_updated": "2026-03-27T13:00:00Z",
-  "last_role": "strategist",
+  "pair_index": 2,
+  "last_updated": "2026-03-27T13:05:00Z",
+  "last_role": "researcher",
   "last_monitor_at": "2026-03-27T02:00:00Z",
   "last_strategist_at": 36,
   "last_auditor_at": 24,
-  "total_iterations": 36,
-  "last_exit_reason": "STRATEGIST iter=36 rotation-3 post-analysis: 0% KEEP rate; gate=0.0 exhaustion confirmed 6 pairs (BTC_5m/15m/1h, ETH_5m, SOL_5m/1h); XRP_1h pace floor=0.35; ETH_1h pair_cost=0.594 below 0.85 benchmark; rotation-4 plan: ETH_15m gate=0.0 baseline, ETH_1h baseline at pace=0.35, XRP_15m gate=0.0 baseline, XRP_1h baseline at onesided=5.0; 6 pairs HOLD pending auditor escalation"
+  "total_iterations": 37,
+  "last_exit_reason": "RESEARCHER iter=37 BTC_15m SKIP: HOLD per strategy rotation-4 escalation (3x zero-pair gate exhaustion, outcome sparsity 7.9%); advanced rotation to BTC_1h"
 }
