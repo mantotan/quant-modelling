@@ -13,3 +13,4 @@
 2026-03-27T04:07:18Z iter=15 pair=BTC_1h role=RESEARCHER outcome=BASELINE pair_cost=0.0000 matched=0% fill=52.9% correct=68.4% DD=4.77% bars=34 gate=0.04 still_zero_pairs 1_live-log_outcome max_onesided_cost_5->2_staged next_pair=ETH_5m
 2026-03-27T05:10:00Z iter=16 pair=ETH_5m role=RESEARCHER outcome=BASELINE pair_cost=0.0000 matched=0% fill=24.1% correct=52.0% DD=29.2% bars=406 gate=0.04 still_zero_pairs 27_live-log_outcomes pace_urgency_lo_0.35->0.30_staged next_pair=ETH_15m
 2026-03-27T05:20:00Z iter=17 pair=ETH_15m role=RESEARCHER outcome=BASELINE pair_cost=0.0000 matched=0% fill=45.6% correct=71.0% DD=7.1% bars=136 gate=0.04 still_zero_pairs 8_live-log_outcomes pace_urgency_lo_0.30->0.25_staged next_pair=ETH_1h
+2026-03-27T06:00:00Z iter=18 pair=ETH_1h role=researcher outcome=BASELINE gate=0.04 pair_cost=0.594 matched_ratio=2.0pct max_dd=13.8pct staged:pace_urgency_lo=0.30 advancing_to=SOL_5m
