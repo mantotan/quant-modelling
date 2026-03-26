@@ -7,3 +7,6 @@
 2026-03-27T08:24:31Z iter=3 pair=BTC_1h status=BASELINE param=magnitude_gate=0.08(new) ->(next: 0.08->0.04)
   eval: pair_cost=0.0000 profit=$-0.2561 max_dd=4.80% bars=33
   hypothesis: "magnitude_gate=0.08 blocks all pair formation on BTC_1h (matched_ratio=0%, same as BTC_5m and BTC_15m baselines). Next experiment: reduce gate to 0.04 to test if pair formation resumes while still filtering near-50/50 noise."
+2026-03-27T09:00:00Z iter=4 pair=ETH_5m status=BASELINE param=magnitude_gate=0.08(new) ->(next: 0.04)
+  eval: pair_cost=0.0000 profit=$-0.12 max_dd=27.70% bars=397
+  hypothesis: "magnitude_gate=0.08 collapses ETH_5m pair formation to 0% matched_ratio, confirming universal pattern across all 4 tested pairs (BTC_5m/15m/1h/ETH_5m). Gate filters out virtually all ticks where |cal_prob-0.5|<0.08, leaving insufficient qualifying ticks for pair matching. Next experiment: reduce to 0.04 to test partial filtering with pair formation recovery."

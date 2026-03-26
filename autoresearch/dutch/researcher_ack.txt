@@ -1,5 +1,4 @@
-iter=3 pair=BTC_1h timestamp=2026-03-27T08:24:31Z
+iter=4 pair=ETH_5m timestamp=2026-03-27T09:00:00Z
 Role: RESEARCHER (BACKTEST MODE)
-Experiment: BASELINE — fresh baseline for BTC_1h post-RESET with magnitude_gate=0.08; zero pairs formed (matched_ratio=0%); gate too aggressive for BTC_1h, same collapse pattern as BTC_5m/BTC_15m
-Hypothesis: magnitude_gate=0.08 blocks all pair formation (|cal_prob-0.5|<0.08 eliminates nearly all ticks). Next: reduce to magnitude_gate=0.04 to test whether pair formation resumes while still filtering near-50/50 noise.
-Audit note: BTC_1h CONTINUE directive with pace_urgency_lo=0.45 staged — but magnitude_gate collapse must be resolved first.
+Experiment: BASELINE — fresh baseline for ETH_5m post-RESET with magnitude_gate=0.08; all BTC pairs showed zero pair formation (matched_ratio=0%); gate too aggressive; expecting same collapse pattern on ETH_5m
+Hypothesis: magnitude_gate=0.08 blocks all pair formation on ETH_5m too. Will record BASELINE to document collapse, then reduce magnitude_gate on next iter.

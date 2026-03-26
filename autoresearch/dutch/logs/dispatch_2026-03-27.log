@@ -1,2 +1,4 @@
 2026-03-27T00:00:00Z iter=1 pair=BTC_5m role=RESEARCHER outcome=BASELINE magnitude_gate=0.08 collapsed matched_ratio=0%, gate->0.04 staged, advancing to BTC_15m
 2026-03-27T06:00:00Z iter=2 pair=BTC_15m role=RESEARCHER outcome=BASELINE magnitude_gate=0.08 collapsed matched_ratio=0% (133 bars), gate disabled (0.0) for next iter, advancing to BTC_1h
+2026-03-27T08:24:31Z iter=3 pair=BTC_1h role=RESEARCHER outcome=BASELINE magnitude_gate=0.08 zero pairs formed; next experiment magnitude_gate 0.08->0.04
+2026-03-27T09:00:00Z iter=4 pair=ETH_5m role=RESEARCHER outcome=BASELINE pair_cost=0.0000 matched=0% collapse(magnitude_gate=0.08) next_pair=ETH_15m
