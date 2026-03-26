@@ -126,3 +126,6 @@
 2026-03-27T15:45:00Z iter=48 pair=BTC_5m status=SKIP param=HOLD_SKIP ->
   eval: pair_cost=- profit=- max_dd=- bars=-
   hypothesis: "HOLD per strategy.md rotation-4 directive (still active in rotation 5): BTC_5m has 4 consecutive zero-pair baselines (gate=0.08/0.04/0.02/0.0 all fail); outcome sparsity structural (40/420 bars = 9.5% resolution); gate exhaustion complete. Do NOT run experiments until auditor lifts escalation. Auditor is due at next dispatch iteration (iters_since_auditor will reach 24). pace_urgency_lo=0.30 pre-staged for when unblocked. Advancing rotation to BTC_15m."
+2026-03-27T17:15:00Z iter=59 pair=XRP_1h role=RESEARCHER outcome=DISCARD param=max_onesided_cost=2.0(DISCARD)->5.0
+  eval: pair_cost=0.0000 profit=-$0.12 max_dd=5.78% bars=36
+  hypothesis: onesided=2.0 was staged from iter23 profit=+$0.10 recovery test; $2 cap too tight for sparse 5-outcome window; pair formation requires $3-5 unmatched spend before matching outcome; collapse mirrors iter35 pace pattern; onesided=2.0 blacklisted for XRP_1h

@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_5m",
+  "current_pair": "BTC_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 6,
-  "last_updated": "2026-03-26T23:12:03Z",
+  "pair_index": 0,
+  "last_updated": "2026-03-27T17:15:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T02:00:00Z",
   "last_strategist_at": 48,
   "last_auditor_at": 48,
-  "total_iterations": 53,
-  "last_exit_reason": "RESEARCHER iter=53 ETH_1h DISCARD pace=0.30(identical to baseline 0.5941); 4 frozen SKIPs (BTC_15m/1h,ETH_5m/15m); pace lever statistically inert on thin 35-bar/4-outcome dataset; knobs restored to pace=0.35; next: SOL_5m (SKIP FROZEN) -> ... -> XRP_1h onesided=2.0 experiment"
+  "total_iterations": 59,
+  "last_exit_reason": "RESEARCHER iter=59 XRP_1h DISCARD onesided=2.0 COLLAPSE (matched=0% vs baseline 4.1%); cap too tight for sparse window -- same mechanism as iter35 pace collapse; 5 frozen SKIPs (SOL_5m/15m/1h, XRP_5m/15m); rotation-5 complete: 0 KEEPs; knobs restored to onesided=5.0; next: BTC_5m (SKIP FROZEN) -> ... -> ETH_1h fill_ticks experiment"
 }

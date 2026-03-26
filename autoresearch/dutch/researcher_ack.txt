@@ -1,21 +1,52 @@
-iter=53 pair=ETH_1h (after 4 frozen SKIPs: BTC_15m/1h, ETH_5m/15m) timestamp=2026-03-26T23:12:03Z
+iter=59 pair=XRP_1h (after 5 frozen SKIPs: SOL_5m/15m/1h, XRP_5m/15m) timestamp=2026-03-27T17:15:00Z
 Role: RESEARCHER | Mode: BACKTEST (replay_available)
 
-EXPERIMENT: pace_urgency_lo 0.35->0.30
+EXPERIMENT: max_onesided_cost 5.0->2.0
 RESULT: DISCARD
-  pair_cost=0.5941 (baseline=0.5941, identical — no improvement)
-  avg_profit=+$0.08/bar (PASS >= -$0.02)
-  max_dd=7.6% (PASS <= 10%)
-  matched_ratio=1.9% (PASS >= 1.0%)
-  bars_evaluated=35, outcomes=4
 
-KEEP criteria: pair_cost <= 0.594 FAIL (0.5941 not strictly < 0.5941)
-RELAXED criteria: cost improvement > 5% FAIL (0% change)
-DISCARD criteria: pair_cost increases? NO — tied; matched_ratio < 1.0%? NO (1.9%); DD > 12%? NO (7.6%)
-Decision: DISCARD — pace=0.30 produces zero statistical change on thin dataset (4 outcomes)
-Pattern: mirrors iter 29 (pace=0.25 identical) — pace lever is inert below ~10 matched pairs
+  pair_cost=0.0000 (baseline=0.8120 — COLLAPSE, zero pairs formed)
+  avg_profit=-$0.12/bar (slightly better than baseline -$0.14, but meaningless with 0 pairs)
+  max_dd=5.78% (PASS <= 15%)
+  matched_ratio=0.00% (FAIL — threshold is >= 2.0%)
+  fill_rate=73.6% (same order of magnitude as baseline 71.9%)
+  bars_evaluated=36, outcomes=5
 
-Knobs: restored knobs_ETH_1h.json to best_knobs_ETH_1h.json (pace=0.35)
-Next experiment for ETH_1h: fill_ticks 1->2 (strategy queue item 3: if pace=0.30 DISCARDs)
+KEEP criteria:
+  pair_cost < 0.812: FAIL (0.000 — collapse, not improvement)
+  avg_profit > -$0.14/bar: PASS (misleading — zero pairs)
+DISCARD triggers:
+  matched_ratio < 2.0%: TRIGGERED (0.00% << 2.0% threshold)
 
-Rotation 5 progress: ETH_1h DISCARD. XRP_1h (onesided=2.0) still pending — next active pair.
+ROOT CAUSE: onesided=2.0 cap ($2 limit) is too tight for XRP_1h outcome window.
+With only 5 resolved outcomes in 36 bars (13.9% resolution), pair formation requires
+accumulating $3-5 of unmatched spend before a matching outcome occurs. The $2 cap
+cuts off buying before the first pair can ever form — same mechanism as iter35
+(pace=0.30 collapse from 4.2% to 0%).
+
+PATTERN: XRP_1h requires onesided >= 5.0 to maintain pair formation in sparse window.
+onesided=2.0 blacklisted for XRP_1h.
+
+Knobs: restored knobs_XRP_1h.json to best_knobs_XRP_1h.json (onesided=5.0)
+Next experiment for XRP_1h: fill_ticks 1->2 (strategy queue item 3 -- untested on XRP_1h)
+
+ROTATION 5 COMPLETE (iters 49-59):
+  BTC_15m: SKIP (frozen)
+  BTC_1h: SKIP (frozen)
+  ETH_5m: SKIP (frozen)
+  ETH_15m: SKIP (frozen)
+  ETH_1h: DISCARD (pace=0.30 identical to baseline — inert at thin data)
+  SOL_5m: SKIP (frozen)
+  SOL_15m: SKIP (frozen)
+  SOL_1h: SKIP (frozen)
+  XRP_5m: SKIP (frozen)
+  XRP_15m: SKIP (frozen)
+  XRP_1h: DISCARD (onesided=2.0 collapse — 0% matched vs 4.1% baseline)
+  KEEP rate: 0/2 = 0% for rotation 5
+
+Auditor condition met: 0 KEEPs in rotation 5 on both active pairs.
+Per auditor recommendation: if rotation 5 produces 0 KEEPs, suspend autoresearch pending
+outcome resolution engineering fix. Next dispatch will trigger AUDITOR at iters_since_auditor=11
+(from 48, now at 59 — 11 iters, threshold is 24).
+
+Next rotation (rotation 6) starts at BTC_5m.
+Advancing dispatch pair_index to 0 (BTC_5m).

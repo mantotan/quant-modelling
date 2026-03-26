@@ -42,3 +42,4 @@
 2026-03-27T15:45:00Z iter=48 pair=BTC_5m role=RESEARCHER outcome=HOLD_SKIP: rotation-5 BTC_5m gate exhausted (4x zero-pair), outcome sparsity 9.5%; auditor due next dispatch (iters_since_auditor=24); advanced rotation to BTC_15m
 2026-03-27T16:00:00Z iter=48 pair=BTC_15m role=AUDITOR outcome=10-of-12-pairs-frozen; XRP_15m-new-FREEZE(correct_side-49.2pct); 7-pairs-frozen-on-outcome-sparsity; PRIORITIZE-ETH_1h; CONTINUE-XRP_1h; structural-diagnostic-directive-issued
 2026-03-27T16:30:00Z iter=48 pair=BTC_15m role=STRATEGIST outcome=KEEP_rate=0% best_pair=ETH_1h(0.594) rotation5_plan: ETH_1h-pace=0.30+XRP_1h-onesided=2.0+diagnostic(outcome-resolution); 10/12-pairs-FROZEN; auditor-mandate-diagnostic-required
+2026-03-27T17:15:00Z iter=59 pair=XRP_1h role=researcher outcome=DISCARD max_onesided_cost=2.0->5.0 collapse(matched=0% vs 4.1%) knobs_restored=onesided=5.0 [5 frozen SKIPs: SOL_5m/15m/1h,XRP_5m/15m; rotation-5 complete: 0/2 KEEPs]
