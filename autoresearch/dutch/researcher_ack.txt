@@ -1,7 +1,7 @@
-iter=21 pair=SOL_1h timestamp=2026-03-27T08:00:00Z status=running
+iter=22 pair=XRP_5m->XRP_15m timestamp=2026-03-27T09:00:00Z status=running
 Mode: BACKTEST (replay_available)
-Action: FIXING STALE KNOBS (bar_budget 400->300 per strategy.md directive), then running magnitude_gate=0.04 BASELINE for SOL_1h
-Goal: Establish gate=0.04 baseline; prior gate=0.08 baseline (iter 9) showed 0% matched_ratio, pair_cost=0.000, correct_side=68.4%; expecting pair formation to recover at gate=0.04
-Note: strategy.md mandates bar_budget=300 BEFORE any SOL_1h experiment (confirmed KEEP iter 86 pre-RESET)
-Note: best_knobs_SOL_1h.json confirms bar_budget=300, magnitude_gate absent (pre-RESET), pace_urgency_lo=0.35
-Strategy queue item #1 for SOL_1h: Fix bar_budget=300, then BASELINE at gate=0.04
+Action: XRP_5m FROZEN per audit.md (permanent freeze — structural dead-end). Advancing pair rotation to XRP_15m (index 10).
+Running: magnitude_gate=0.04 BASELINE for XRP_15m (rotation-2 goal per strategy.md).
+knobs_XRP_15m.json: magnitude_gate=0.04, pace_urgency_lo=0.30, max_onesided_cost=2.0, bar_budget=200.
+Prior gate=0.08 BASELINE (iter 11): matched_ratio=0%, pair_cost=0.000, correct_side=53.7%, fill_rate=39.7%.
+Strategy queue item #1 for XRP_15m: magnitude_gate=0.04 BASELINE — re-establish the 0.638 baseline.
