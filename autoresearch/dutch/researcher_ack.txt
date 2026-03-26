@@ -1,6 +1,6 @@
-iter=18 pair=ETH_1h timestamp=2026-03-27T06:00:00Z status=running
+iter=19 pair=SOL_5m timestamp=2026-03-27T06:10:00Z status=running
 Mode: BACKTEST (replay_available)
-Action: Running magnitude_gate=0.04 BASELINE for ETH_1h (rotation 2, item #6)
-Goal: Establish gate=0.04 baseline performance; prior gate=0.08 baseline (iter 6) showed 0% matched_ratio
-Note: knobs_ETH_1h.json has magnitude_gate=0.04, skip=0.45, onesided=5.0, pace_urgency_lo=0.35
-Strategy queue item #1 for ETH_1h: magnitude_gate=0.04 BASELINE
+Action: Running magnitude_gate=0.04 BASELINE for SOL_5m (rotation 2, item #7)
+Goal: Establish gate=0.04 baseline performance; prior gate=0.08 baseline (iter 7) showed 0% matched_ratio
+Note: knobs_SOL_5m.json has magnitude_gate=0.04, pace_urgency_lo=0.35, conviction_buy_skip=0.45, max_onesided_cost=2.0
+Strategy queue item #1 for SOL_5m: magnitude_gate=0.04 BASELINE

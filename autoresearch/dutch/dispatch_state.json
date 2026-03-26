@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_5m",
+  "current_pair": "SOL_15m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 6,
-  "last_updated": "2026-03-27T06:00:00Z",
+  "pair_index": 7,
+  "last_updated": "2026-03-27T06:10:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T02:00:00Z",
   "last_strategist_at": 12,
   "last_auditor_at": 0,
-  "total_iterations": 18,
-  "last_exit_reason": "RESEARCHER iter=18 ETH_1h BASELINE gate=0.04: 2.0% matched_ratio (vs 0% at gate=0.08 iter 6). pair_cost=0.594 strong result near pre-RESET best 0.706. correct_side=62.1% solid. fill_rate=83.3% high. max_dd=13.8% safe. Staged pace_urgency_lo 0.35->0.30 for next ETH_1h turn. Advancing to SOL_5m rotation."
+  "total_iterations": 19,
+  "last_exit_reason": "RESEARCHER iter=19 SOL_5m BASELINE gate=0.04: 0% matched_ratio (same as gate=0.08 iter 7). Only 28 live-log outcomes (vs 407 bars) confirms extreme outcome sparsity. correct_side=56.4% down from 59.8%. max_dd=20.0% higher than prior 13.3%. total_profit=$55.26 unmatched inventory. SOL_5m zero pair formation at both gate values. Staged pace_urgency_lo 0.35->0.30 for next SOL_5m turn. Advancing to SOL_15m rotation."
 }
