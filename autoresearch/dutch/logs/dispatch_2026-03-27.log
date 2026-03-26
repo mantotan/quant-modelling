@@ -46,3 +46,4 @@
 2026-03-27T18:00:00Z iter=60 pair=BTC_5m role=RESEARCHER outcome=SKIP_DIAGNOSTIC spot-outcomes-negative fill_mechanics_confirmed_5m_freeze
 2026-03-27T18:35:00Z iter=60 pair=BTC_15m role=STRATEGIST outcome=0/2 KEEPs rotation-5; diagnostic: fill mechanics=primary bottleneck 5m pairs; rotation-6: fill_ticks 1->2 for ETH_1h+XRP_1h; pace_lo DEAD on ETH_1h; onesided floor>=5.0 XRP_1h
 2026-03-27T19:00:00Z iter=60 pair=BTC_5m role=auditor outcome=10-frozen-2-active-fill_ticks-staged-CONTINUE-ETH_1h-CONTINUE-XRP_1h
+2026-03-27T19:15:00Z iter=60 pair=BTC_5m role=STRATEGIST outcome=rotation-6-pre-run: fill_ticks=2 queued ETH_1h+XRP_1h; 10/12 frozen; KEEP=0/60 cumulative; staging instructions written; last_strategist_at corrected 0->60
