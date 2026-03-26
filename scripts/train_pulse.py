@@ -56,6 +56,14 @@ def parse_args() -> argparse.Namespace:
         choices=["lgbm", "alstm"],
         help="Model architecture (lgbm or alstm)",
     )
+    parser.add_argument(
+        "--alpha", action="store_true",
+        help="Join alpha data (funding, derivatives) before feature computation",
+    )
+    parser.add_argument("--funding-dir", default="data/raw/funding")
+    parser.add_argument(
+        "--metrics-dir", default="data/raw/metrics", help="Derivatives metrics dir",
+    )
     return parser.parse_args()
 
 
@@ -93,9 +101,25 @@ def main() -> None:
 
     # 2. Compute Sentinel features
     t0 = time.time()
-    pipeline = FeaturePipeline()
-    featured_df = pipeline.compute(bars_df)
-    logger.info("Features computed in %.1fs (%d columns)", time.time() - t0, featured_df.width)
+    if args.alpha:
+        from qm.features.cross_asset import CrossAssetPipeline
+
+        metrics_store = ParquetStore(base_dir=Path(args.metrics_dir))
+        funding_store = ParquetStore(base_dir=Path(args.funding_dir))
+        cross_pipeline = CrossAssetPipeline(
+            store, timeframe,
+            metrics_store=metrics_store,
+            alpha_stores={"funding": funding_store},
+            alpha_tolerances={"funding": "9h"},
+        )
+        featured_df = cross_pipeline.compute(asset)
+    else:
+        pipeline = FeaturePipeline()
+        featured_df = pipeline.compute(bars_df)
+    logger.info(
+        "Features computed in %.1fs (%d columns, alpha=%s)",
+        time.time() - t0, featured_df.width, args.alpha,
+    )
 
     available_cached = [c for c in CACHED_FEATURE_NAMES if c in featured_df.columns]
     missing = [c for c in CACHED_FEATURE_NAMES if c not in featured_df.columns]
