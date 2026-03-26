@@ -1,6 +1,8 @@
-iter=10 pair=XRP_5m timestamp=2026-03-26T20:47:19Z status=running
+iter=11 pair=XRP_15m timestamp=2026-03-27T00:00:00Z status=running
 Mode: BACKTEST (replay_available)
-Action: Recording BASELINE for XRP_5m (fresh post-RESET baseline)
+Action: Recording BASELINE for XRP_15m (fresh post-RESET baseline)
 Note: audit.md FREEZE pre-dates RESET; RESET intent is fresh baselines for all 12 pairs
 Knobs state: magnitude_gate=0.08, bar_budget=200, max_onesided_cost=5.0, conviction_buy_skip=0.45
-Plan: BASELINE with current knobs, then apply magnitude_gate 0.08->0.04 (universal fix confirmed by 9/9 prior baselines)
+Plan: BASELINE with current knobs (magnitude_gate=0.08), observe zero-pair collapse pattern
+Expected: matched_ratio=0% (consistent with all 10 prior baselines at gate=0.08)
+Next: reduce magnitude_gate 0.08->0.04 (universal fix confirmed by 10/10 prior baselines)

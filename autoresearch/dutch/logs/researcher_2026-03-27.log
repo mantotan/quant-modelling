@@ -22,3 +22,6 @@
 2026-03-27T14:10:00Z iter=9 pair=SOL_1h status=BASELINE param=magnitude_gate 0.08->0.04
   eval: pair_cost=0.0000 profit=-0.0622 max_dd=5.25% bars=33
   hypothesis: "All 9 pairs show magnitude_gate=0.08 causes universal pair-formation collapse (matched_ratio=0%). Reducing to 0.04 allows ticks where |cal_prob-0.5| >= 0.04 to pass the gate, recovering pair formation while still filtering noise."
+2026-03-27T00:00:00Z iter=11 pair=XRP_15m status=BASELINE param=magnitude_gate=0.08(new) ->(next: 0.04)
+  eval: pair_cost=0.0000 profit=$-0.15 max_dd=13.30% bars=136 matched_ratio=0% correct_side=53.7% fill_rate=39.7%
+  hypothesis: "magnitude_gate=0.08 collapses XRP_15m pair formation to 0% matched_ratio (11th consecutive baseline confirming universal collapse). correct_side=53.7% is near-random — low signal quality compared to ETH/BTC pairs. fill_rate=39.7% moderate. Total_profit=-$21.03 (unmatched inventory losses only). This completes baseline collection for all pairs except XRP_1h. Next: reduce magnitude_gate 0.08->0.04 to restore pair formation."
