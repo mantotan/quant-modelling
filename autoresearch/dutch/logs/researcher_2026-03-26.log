@@ -1,0 +1,3 @@
+2026-03-26T20:37:21Z iter=7 pair=SOL_5m status=BASELINE param=magnitude_gate 0.08(new)->0.04(next)
+  eval: pair_cost=0.0000 profit=$0.16/bar (total=$63.12) max_dd=13.3% bars=399 matched_ratio=0.0%
+  hypothesis: "magnitude_gate=0.08 collapses all pair formation on SOL_5m (399 bars, 0% matched). Universal across all 7 pairs tested so far. Reducing to 0.04 to restore pair formation while retaining weak-signal filtering. This is the primary knob to tune for this reset cycle — all pairs need their magnitude_gate calibrated before other experiments resume."
