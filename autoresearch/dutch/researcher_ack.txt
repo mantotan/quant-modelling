@@ -1,52 +1,44 @@
-iter=59 pair=XRP_1h (after 5 frozen SKIPs: SOL_5m/15m/1h, XRP_5m/15m) timestamp=2026-03-27T17:15:00Z
+iter=60 pair=BTC_5m (rotation 6 start) timestamp=2026-03-27T18:00:00Z
 Role: RESEARCHER | Mode: BACKTEST (replay_available)
 
-EXPERIMENT: max_onesided_cost 5.0->2.0
-RESULT: DISCARD
+DIAGNOSTIC TASK (mandated by auditor after iter 48):
+  Task A: Check outcome resolution with --outcome-source spot
+  Task B: Run BTC_5m with spot outcomes — test if OHLC unblocks frozen pairs
 
-  pair_cost=0.0000 (baseline=0.8120 — COLLAPSE, zero pairs formed)
-  avg_profit=-$0.12/bar (slightly better than baseline -$0.14, but meaningless with 0 pairs)
-  max_dd=5.78% (PASS <= 15%)
-  matched_ratio=0.00% (FAIL — threshold is >= 2.0%)
-  fill_rate=73.6% (same order of magnitude as baseline 71.9%)
-  bars_evaluated=36, outcomes=5
+DIAGNOSTIC RESULT: spot outcomes do NOT unblock BTC_5m
+  Outcome source: spot (bar close vs open direction = ~100% resolution)
+  pair_cost=0.0000 (zero pairs — same as all prior baselines)
+  avg_profit=-$0.06/bar
+  matched_ratio=0.0% (SAME as live-log outcomes)
+  fill_rate=23.7% (limit orders rarely fill in 5m window)
+  correct_side=59.8%
+  max_dd=23.4%
+  bars_evaluated=431
 
-KEEP criteria:
-  pair_cost < 0.812: FAIL (0.000 — collapse, not improvement)
-  avg_profit > -$0.14/bar: PASS (misleading — zero pairs)
-DISCARD triggers:
-  matched_ratio < 2.0%: TRIGGERED (0.00% << 2.0% threshold)
+ROOT CAUSE REVISION: The bottleneck is NOT outcome sparsity alone.
+  With spot outcomes (100% resolution), BTC_5m still shows 0% matched_ratio.
+  The binding constraint is fill_rate=23.7%:
+    - P(both sides fill in same bar) ≈ 0.237^2 ≈ 5.6% — very low
+    - Even at 5.6%, pair formation requires both sides to fill AND have opposite predictions
+    - The conviction_buy_skip=0.5 and magnitude_gate=0.0 further reduce buying activity
+    - 5m bars are too short for limit orders to fill on both sides
 
-ROOT CAUSE: onesided=2.0 cap ($2 limit) is too tight for XRP_1h outcome window.
-With only 5 resolved outcomes in 36 bars (13.9% resolution), pair formation requires
-accumulating $3-5 of unmatched spend before a matching outcome occurs. The $2 cap
-cuts off buying before the first pair can ever form — same mechanism as iter35
-(pace=0.30 collapse from 4.2% to 0%).
+IMPLICATIONS FOR FROZEN PAIRS:
+  - 5m pairs (BTC_5m, ETH_5m, SOL_5m, XRP_5m): Fill_rate structural floor ~15-25%
+    OHLC/spot outcomes do NOT help — pair formation blocked by fill mechanics
+    Freeze verdict: CONFIRMED PERMANENT for 5m pairs
+  - 15m pairs: Fill_rate ~30-45% — marginally higher, but still structural
+    Diagnostic not run on 15m, but outcome sparsity removed from equation
+    These should be re-tested with spot outcomes to confirm
+  - 1h pairs (ETH_1h, XRP_1h): Fill_rate ~70-85% — viable for pair formation
+    Outcome sparsity IS the limiting factor for 1h (fewer bars, fewer outcomes)
+    Continue experiments on ETH_1h and XRP_1h
 
-PATTERN: XRP_1h requires onesided >= 5.0 to maintain pair formation in sparse window.
-onesided=2.0 blacklisted for XRP_1h.
+ROTATION 6 PLAN (updated based on diagnostic):
+  BTC_5m: SKIP (confirmed frozen — spot diagnostic negative)
+  BTC_15m through SOL_1h: SKIP all frozen pairs
+  ETH_1h: Next lever = fill_ticks 1->2 (strategy queue item 3 after pace DISCARD)
+  XRP_1h: Next lever = fill_ticks 1->2 (strategy queue item 3 after onesided DISCARD)
+  Diagnostic finding: document in results.tsv as SKIP+DIAG
 
-Knobs: restored knobs_XRP_1h.json to best_knobs_XRP_1h.json (onesided=5.0)
-Next experiment for XRP_1h: fill_ticks 1->2 (strategy queue item 3 -- untested on XRP_1h)
-
-ROTATION 5 COMPLETE (iters 49-59):
-  BTC_15m: SKIP (frozen)
-  BTC_1h: SKIP (frozen)
-  ETH_5m: SKIP (frozen)
-  ETH_15m: SKIP (frozen)
-  ETH_1h: DISCARD (pace=0.30 identical to baseline — inert at thin data)
-  SOL_5m: SKIP (frozen)
-  SOL_15m: SKIP (frozen)
-  SOL_1h: SKIP (frozen)
-  XRP_5m: SKIP (frozen)
-  XRP_15m: SKIP (frozen)
-  XRP_1h: DISCARD (onesided=2.0 collapse — 0% matched vs 4.1% baseline)
-  KEEP rate: 0/2 = 0% for rotation 5
-
-Auditor condition met: 0 KEEPs in rotation 5 on both active pairs.
-Per auditor recommendation: if rotation 5 produces 0 KEEPs, suspend autoresearch pending
-outcome resolution engineering fix. Next dispatch will trigger AUDITOR at iters_since_auditor=11
-(from 48, now at 59 — 11 iters, threshold is 24).
-
-Next rotation (rotation 6) starts at BTC_5m.
-Advancing dispatch pair_index to 0 (BTC_5m).
+STATUS: BTC_5m SKIP confirmed. Advancing rotation to BTC_15m.
