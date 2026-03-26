@@ -1,12 +1,5 @@
-iter=12 pair=XRP_1h timestamp=2026-03-27T03:52:55Z status=BASELINE
+iter=13 pair=BTC_5m timestamp=2026-03-26T20:59:59Z status=starting
 Mode: BACKTEST (replay_available)
-Action: Recording BASELINE for XRP_1h (fresh post-RESET baseline with magnitude_gate=0.08)
-Result: avg_pair_cost=0.8546 matched_ratio=3.6% correct_side=82.6% bars=33
-Note: XRP_1h shows partial pair formation at magnitude_gate=0.08 (unlike other pairs which collapsed to 0%)
-  - matched_ratio=3.6% is thin but non-zero (unique behavior vs BTC/ETH/SOL at gate=0.08)
-  - avg_pair_cost=0.855 already below 0.98 threshold; DD=3.1% very safe
-  - correct_side=82.6% is highest signal quality in the system
-Hypothesis: XRP_1h 1h timeframe has more price movement per bar, so fewer ticks fall below gate=0.08
-Next: reduce magnitude_gate 0.08->0.04 to enable more pair formation (follow universal fix pattern)
-  BUT audit.md says onesided=2.0 is the next experiment for XRP_1h (cost improvement lever)
-  Since this is BASELINE round, next experiment will be magnitude_gate 0.08->0.04 to match other pairs
+Action: Running magnitude_gate=0.04 BASELINE for BTC_5m (rotation 2, knobs already at gate=0.04)
+Goal: Establish gate=0.04 baseline performance; prior gate=0.08 baseline showed 0% matched_ratio
+Note: knobs_BTC_5m.json already has magnitude_gate=0.04 -- no param change needed before backtest

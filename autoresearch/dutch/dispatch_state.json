@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_5m",
+  "current_pair": "BTC_15m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 0,
-  "last_updated": "2026-03-27T04:10:00Z",
-  "last_role": "strategist",
+  "pair_index": 1,
+  "last_updated": "2026-03-26T21:00:00Z",
+  "last_role": "researcher",
   "last_monitor_at": "2026-03-27T02:00:00Z",
   "last_strategist_at": 12,
   "last_auditor_at": 0,
-  "total_iterations": 12,
-  "last_exit_reason": "STRATEGIST: rotation 1 post-RESET analysis complete. All 12 pairs need gate=0.04 baselines. XRP_1h unique: 82.6% correct_side at gate=0.08. SOL_1h stale knobs flagged. strategy.md updated."
+  "total_iterations": 13,
+  "last_exit_reason": "RESEARCHER iter=13 BTC_5m BASELINE gate=0.04: 0% matched_ratio (same as gate=0.08). Only 24 live-log outcomes vs 403 bars. correct_side=64% solid. Next experiment: magnitude_gate=0.02 to probe pair formation threshold."
 }
