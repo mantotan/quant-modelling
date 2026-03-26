@@ -1,7 +1,7 @@
-iter=22 pair=XRP_5m->XRP_15m timestamp=2026-03-27T09:00:00Z status=running
+iter=23 pair=XRP_1h timestamp=2026-03-27T09:05:00Z status=running
 Mode: BACKTEST (replay_available)
-Action: XRP_5m FROZEN per audit.md (permanent freeze — structural dead-end). Advancing pair rotation to XRP_15m (index 10).
-Running: magnitude_gate=0.04 BASELINE for XRP_15m (rotation-2 goal per strategy.md).
-knobs_XRP_15m.json: magnitude_gate=0.04, pace_urgency_lo=0.30, max_onesided_cost=2.0, bar_budget=200.
-Prior gate=0.08 BASELINE (iter 11): matched_ratio=0%, pair_cost=0.000, correct_side=53.7%, fill_rate=39.7%.
-Strategy queue item #1 for XRP_15m: magnitude_gate=0.04 BASELINE — re-establish the 0.638 baseline.
+Action: Running rotation-2 BASELINE for XRP_1h (magnitude_gate=0.04).
+No freeze on XRP_1h. Rotation-2 baseline not yet recorded (iter 12 was rotation-1 baseline at gate=0.08).
+knobs: magnitude_gate=0.04, skip=0.50, max_onesided_cost=5.0, pace_urgency_lo=0.35, bar_budget=200.
+Prior gate=0.08 BASELINE (iter 12): matched_ratio=3.6%, pair_cost=0.855, correct_side=82.6%, DD=3.1%.
+Strategy queue item #1 for XRP_1h: magnitude_gate=0.04 BASELINE expected to lower pair_cost below 0.855.
