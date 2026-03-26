@@ -1,9 +1,6 @@
-iter=39 pair=ETH_5m timestamp=2026-03-27T13:15:00Z role=RESEARCHER
-Status: BACKTEST MODE — rotation 4 SKIP — ETH_5m on HOLD per strategy.md escalation
-Reason: 3 consecutive zero-pair baselines (gate=0.08 iter4, gate=0.04 iter16, gate=0.0 iter27).
-        Gate series exhausted. Outcome sparsity confirmed structural (36/414 outcomes = 8.7%).
-        Max_dd=28.7% dangerously close to 30% kill threshold from unmatched inventory.
-        strategy.md rotation-4 queue item 1: "HOLD — escalate to auditor. Both outcome sparsity AND dangerous DD risk."
-        strategy.md rotation-4 execution plan item 5: "All 6 HOLD pairs — SKIP until auditor clears escalation."
-        Applying KNOBS FIX: adding magnitude_gate=0.0 key (was absent per strategy.md note).
-        Advancing pair rotation to ETH_15m.
+iter=40 pair=ETH_15m timestamp=2026-03-27T13:30:00Z role=RESEARCHER
+Status: BACKTEST MODE — rotation 4 — ETH_15m gate=0.0 BASELINE (formal confirmation run)
+Reason: strategy.md rotation-4 priority #1: run gate=0.0 BASELINE for ETH_15m.
+        Iter 28 was a pace drift DISCARD, not a clean gate=0.0 baseline. Gate=0.0 is in knobs.
+        pace_urgency_lo=0.35 confirmed in current knobs (audit fix applied, not 0.25).
+        Running backtest now with magnitude_gate=0.0 + pace=0.35 (clean baseline conditions).

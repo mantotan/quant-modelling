@@ -96,3 +96,8 @@
 2026-03-27T13:20:00Z iter=39 pair=ETH_5m status=SKIP param=HOLD_SKIP+knobs_fix magnitude_gate=absent->0.0
   eval: pair_cost=- profit=- max_dd=- bars=-
   hypothesis: "ETH_5m HOLD per rotation-4 escalation. Gate series exhausted (gate=0.08/0.04/0.0 all zero pairs in iters 4/16/27). Outcome sparsity structural (36/414=8.7%). max_dd=28.7% from unmatched inventory near 30% kill threshold. Knobs fix applied: magnitude_gate=0.0 key added (was absent). No experiment until auditor clears escalation."
+  eval: pair_cost=- profit=$- max_dd=7.1% bars=-
+  hypothesis: "ETH_5m on HOLD per strategy.md rotation-4 escalation. 3 consecutive zero-pair baselines (gate=0.08/0.04/0.0). Outcome sparsity 36/414=8.7%. DD dangerously near 30% kill threshold. KNOBS FIX applied: added magnitude_gate=0.0 key (previously absent). Advancing to ETH_15m."
+2026-03-27T13:35:00Z iter=40 pair=ETH_15m status=BASELINE param=magnitude_gate=0.0(baseline) unchanged
+  eval: pair_cost=0.0000 profit=+$0.16 total=+$22.46 max_dd=7.1% bars=142 matched_ratio=0.0% correct_side=71.2% fill_rate=46.5% outcomes=14/142(9.9%)
+  hypothesis: "Rotation-4 gate=0.0 BASELINE for ETH_15m. Formally exhausts the gate series: gate=0.08 (iter5, 0 pairs), gate=0.04 (iter17, 0 pairs), gate=0.0 (iter40, 0 pairs). Outcome sparsity 14/142=9.9% is the structural bottleneck -- same pattern as 6 other sparsity-blocked pairs. correct_side=71.2% is the 3rd consecutive measurement confirming strong directional signal quality (highest in system). avg_profit=+$0.16/bar positive (unmatched inventory only). max_dd=7.1% safe. Gate exhaustion confirmed -- escalating ETH_15m to auditor along with BTC_5m/BTC_15m/BTC_1h/ETH_5m/SOL_5m/SOL_1h. Next: HOLD pending auditor directive on outcome-sparsity resolution approach."
