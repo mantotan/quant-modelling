@@ -1,7 +1,6 @@
-iter=23 pair=XRP_1h timestamp=2026-03-27T09:05:00Z status=running
+iter=24 pair=BTC_5m timestamp=2026-03-27T09:20:00Z status=running
 Mode: BACKTEST (replay_available)
-Action: Running rotation-2 BASELINE for XRP_1h (magnitude_gate=0.04).
-No freeze on XRP_1h. Rotation-2 baseline not yet recorded (iter 12 was rotation-1 baseline at gate=0.08).
-knobs: magnitude_gate=0.04, skip=0.50, max_onesided_cost=5.0, pace_urgency_lo=0.35, bar_budget=200.
-Prior gate=0.08 BASELINE (iter 12): matched_ratio=3.6%, pair_cost=0.855, correct_side=82.6%, DD=3.1%.
-Strategy queue item #1 for XRP_1h: magnitude_gate=0.04 BASELINE expected to lower pair_cost below 0.855.
+Action: Testing magnitude_gate=0.02 for BTC_5m — zero pairs at gate=0.04 (iter 13) and gate=0.08 (iter 1).
+Gate reduction required before any other lever can be tested (pace_urgency, onesided etc. require non-zero pair formation).
+Current knobs: magnitude_gate=0.02 (staged from iter-13 finding), pace_urgency_lo=0.35, max_onesided_cost=2.0, bar_budget=200.
+Hypothesis: gate=0.02 should allow pairs to form on BTC_5m (5m bars have smaller moves; gate=0.04 still too aggressive).
