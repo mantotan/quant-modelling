@@ -34,7 +34,7 @@
   "sell_dump_start": 0.9,
   "fill_simulator": {
     "fill_ticks": 2,
-    "chase_threshold": 0.03,
+    "chase_threshold": 0.05,
     "max_chase": 2,
     "spread_offset": 0.01,
     "cancel_distance": 0.05

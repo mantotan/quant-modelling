@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_5m",
+  "current_pair": "BTC_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 6,
-  "last_updated": "2026-03-27T20:35:00Z",
+  "pair_index": 0,
+  "last_updated": "2026-03-27T20:40:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 72,
   "last_auditor_at": 60,
-  "total_iterations": 78,
-  "last_exit_reason": "RESEARCHER rotation-7 iter 78: ETH_1h chase_threshold 0.03->0.05 KEEP -- pair_cost=0.577 improved (vs 0.594 baseline), avg_profit=+$0.18/bar strongly improved (+125% vs +$0.08 baseline), max_dd=11.2% safe. 5 frozen pairs skipped (BTC_5m/15m/1h, ETH_5m/15m). Advancing to SOL_5m for next iteration."
+  "total_iterations": 79,
+  "last_exit_reason": "RESEARCHER rotation-7 iter 79: XRP_1h chase_threshold 0.03->0.05 KEEP -- pair_cost=0.785 IMPROVED (vs 0.812 iter72 KEEP, -3.3%), avg_profit=-$0.08/bar IMPROVED (+$0.05/bar vs -$0.13 baseline), max_dd=8.9% safe. 2nd consecutive KEEP for XRP_1h (R6 fill_ticks=2 + R7 chase_threshold=0.05). 5 frozen pairs skipped (SOL_5m/15m/1h, XRP_5m/15m). Advancing to BTC_5m for rotation-8."
 }

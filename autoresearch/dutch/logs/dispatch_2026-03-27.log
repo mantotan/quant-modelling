@@ -50,3 +50,4 @@
 2026-03-27T00:05:00Z iter=72 pair=XRP_1h role=researcher outcome=KEEP fill_ticks=2; pair_cost=0.812 stable; avg_profit=-$0.13/bar improved vs baseline; first KEEP in 72 iterations; rotation-6 complete (1 KEEP); next_pair=BTC_5m rotation-7
 2026-03-27T20:00:00Z iter=72 pair=BTC_5m role=strategist outcome=rotation-7 plan written: chase_threshold=0.05 queued for ETH_1h and XRP_1h; first KEEP confirmed (XRP_1h fill_ticks=2); 10 pairs frozen; KEEP rate 1.4% cumulative
 2026-03-27T20:35:00Z iter=78 pair=ETH_1h role=RESEARCHER outcome=KEEP chase_threshold=0.05 pair_cost=0.577 profit=+$0.18/bar max_dd=11.2% (5 frozen skips iters 73-77)
+2026-03-27T20:40:00Z iter=79 pair=XRP_1h role=researcher outcome=KEEP chase_threshold=0.05 pair_cost=0.785(-3.3% vs 0.812) profit=-$0.08/bar(+$0.05 vs -$0.13) max_dd=8.9% 5-frozen-skipped
