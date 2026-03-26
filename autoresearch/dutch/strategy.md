@@ -1,386 +1,410 @@
 # Dutch Strategy
-Updated: after iteration 12 (2026-03-27T04:00:00Z) — STRATEGIST rotation 1 post-RESET analysis
+Updated: after iteration 24 (2026-03-27T10:00:00Z) — STRATEGIST rotation 2 post-baseline analysis
 
 ## Summary
 
-Post-RESET rotation 1 complete (iters 1-12). All 12 iterations are baselines with magnitude_gate=0.08.
-**KEEP rate this rotation: 0/12 = 0%** (all are BASELINE, not experiments — expected).
+Rotation 2 complete (iters 13-24). 11 baselines run + 1 DISCARD experiment on BTC_5m (gate=0.02).
+**KEEP rate this rotation: 0/12 = 0%** (11 BASELINEs + 1 DISCARD — expected for baseline rotation).
 
-**Critical finding from rotation 1:**
-- magnitude_gate=0.08 collapses pair formation to 0% matched_ratio for 11 of 12 pairs
-- XRP_1h uniquely survived gate=0.08: matched_ratio=3.6%, pair_cost=0.855, correct_side=82.6%
-- All current knobs files already set to magnitude_gate=0.04 (set from prior rotation 9 state)
-- **Rotation 2 goal: establish magnitude_gate=0.04 baselines for ALL 12 pairs** before optimization
+**Critical finding from rotation 2:**
+- Gate=0.04 restores pair formation for ETH_1h, SOL_15m, XRP_15m, XRP_1h (4 of 11 active pairs)
+- Gate=0.04 still collapses 7 pairs: BTC_5m, BTC_15m, BTC_1h, ETH_5m, ETH_15m, SOL_5m, SOL_1h
+- BTC_5m confirmed: gate=0.08, 0.04, and 0.02 all fail — gate=0.0 required (auditor directive ACTIVE)
+- SOL_15m: correct_side=45.5% at gate=0.04 — still below 50%, AUDITOR FREEZE ACTIVE
+- XRP_1h: strongest performer — pair_cost=0.812, correct_side=70.4%, avg_profit=+$0.10/bar
+- ETH_1h: gate=0.04 enabled 2% matched_ratio (recovered from collapse at gate=0.08)
 
-**Stale knobs from pre-RESET (must fix FIRST, before any experiment on affected pair):**
-- SOL_1h: knobs_SOL_1h.json shows bar_budget=400 but confirmed KEEP is 300 (iter 86 pre-RESET)
-  Researcher MUST set bar_budget=300 in knobs_SOL_1h.json before any SOL_1h experiment
-- XRP_5m: FREEZE maintained from pre-RESET auditor directive (structural dead-end)
+**Researcher compliance:** COMPLIANT. Correctly skipped XRP_5m (FROZEN), fixed bar_budget=300 for
+SOL_1h before baseline (iter 21), ran gate=0.02 experiment for BTC_5m per strategy queue.
 
-**Prior rotation 9 knowledge retained (iters 1-119 pre-RESET):**
-The prior strategy's structural conclusions carry forward completely. Skip floors, onesided floors,
-pace_urgency findings, and blacklists are all inherited. The RESET only affected the running
-experiment state — the analytical conclusions remain valid.
-
----
-
-## Phase priorities for rotation 2 (iters 13-24)
-
-**PHASE 1 (iters 13-24): magnitude_gate=0.04 baselines**
-Run one BASELINE per pair (magnitude_gate=0.04, all other params per current knobs files).
-Do NOT change any other parameter during baseline runs. Record all 12 baselines, then
-strategist will analyze and set experiment queue for rotation 3.
-
-Pair order for rotation 2: BTC_5m, BTC_15m, BTC_1h, ETH_5m, ETH_15m, ETH_1h,
-SOL_5m, SOL_15m, SOL_1h, XRP_5m (skip — FREEZE), XRP_15m, XRP_1h
-
-For SOL_1h: fix bar_budget=300 in knobs file BEFORE running baseline, then run baseline.
-For XRP_5m: skip (FREEZE maintained from auditor directive, structural dead-end confirmed).
+**Knobs state issues (must fix before experiments):**
+- BTC_1h: risk_ceil=0.20 in knobs — auditor directive says revert to 0.15. FIX BEFORE ANY EXPERIMENT.
+- SOL_15m: max_onesided_cost=5.0 in knobs — BLACKLISTED for SOL_15m. Irrelevant while frozen.
+- ETH_15m: pace_urgency_lo=0.25 in knobs — this is AHEAD of queue (0.30->0.25 is item #2).
+  Need gate=0.04 BASELINE first to confirm this is pre-staged correctly.
+- ETH_1h: pace_urgency_lo=0.30 in knobs — this is queue item #2 (0.35->0.30). Was this ever
+  baselined at 0.35? Iter 18 baseline used gate=0.04, matched_ratio=2.0%, pair_cost=0.594.
+  The knobs already at 0.30 means the baseline was likely run with 0.30 active. This is OK:
+  if the baseline showed pair_cost=0.594, further experiment tests will compare to that.
 
 ---
 
-## BTC_5m (pair_cost=N/A at gate=0.04, KEEP rate 0/1=0% post-RESET)
+## AUDITOR FREEZES (active)
 
-Gate=0.08 BASELINE: matched_ratio=0%, pair_cost=0.000 (no pairs).
-Current knobs: magnitude_gate=0.04, skip=0.50, max_onesided_cost=2.0, pace_urgency_lo=0.35.
-Prior best (pre-RESET): pair_cost=0.922, avg_profit=+$0.19/bar, correct_side=65.4%.
-
-Priority queue (after gate=0.04 baseline):
-1. magnitude_gate=0.04 BASELINE — establish new baseline with the pre-RESET best knobs.
-   This is the first and only task for BTC_5m in rotation 2.
-   Accept as BASELINE (not a KEEP/DISCARD experiment).
-2. pace_urgency_lo 0.35->0.30 — primary lever from prior rotation 9 (untested on BTC_5m).
-   XRP_15m showed 18% gain. BTC_5m matched_ratio=0.1% means collapse risk; test cautiously.
-   Accept KEEP if pair_cost improves >5% vs gate=0.04 baseline.
-3. max_onesided_cost floor confirmed at 2.0 — do NOT test 1.5 (COLLAPSE confirmed pre-RESET iter 117).
-
-Blacklists (BTC_5m): conviction_buy_skip 0.45 (D iter 33), conviction_buy_skip 0.55 (D iter 50),
-cheap_threshold 0.07, cheap_threshold 0.12, max_onesided_cost 2.0->1.5 (COLLAPSE iter 117),
-max_onesided_cost 5->3 (D iter 89), conviction_market_start (GLOBALLY BLACKLISTED).
-ONESIDED SERIES EXHAUSTED at floor=2.0. SKIP SERIES EXHAUSTED.
+- **BTC_5m**: FROZEN pending gate=0.0 baseline. Next: run gate=0.0 baseline only; do not run
+  any other experiment until gate=0.0 baseline is confirmed and reviewed.
+- **SOL_15m**: FROZEN pending auditor review (correct_side=45.5% below 50% threshold).
+  Do NOT run any experiment until auditor lifts freeze. Current BASELINE iters 8 and 20
+  both show correct_side below 50% — directional signal is negative, not just weak.
+- **XRP_5m**: FROZEN (permanent — structural dead-end confirmed across all rotations).
 
 ---
 
-## BTC_15m (pair_cost=N/A at gate=0.04, KEEP rate 0/1=0% post-RESET)
+## BTC_5m (pair_cost=0.000 at gate=0.04, KEEP rate 0% post-RESET)
 
-Gate=0.08 BASELINE: matched_ratio=0%, pair_cost=0.000 (no pairs).
-Current knobs: magnitude_gate=0.04, skip=0.50, max_onesided_cost=5.0, pace_urgency_lo=0.35.
-Prior best (pre-RESET): pair_cost=0.933, avg_profit=+$0.50/bar, correct_side=63%.
+Auditor directive: FREEZE pending gate=0.0 baseline.
+Gate history: 0.08=0 pairs (iter 1), 0.04=0 pairs (iter 13), 0.02=0 pairs (iter 24 DISCARD).
+Knobs shows: magnitude_gate=0.0 (already pre-staged by researcher).
+Prior best (pre-RESET): pair_cost=0.922 at gate=0.0.
 
-Priority queue (after gate=0.04 baseline):
-1. magnitude_gate=0.04 BASELINE — establish new baseline. Only task for rotation 2.
-2. max_onesided_cost 5.0->2.0 — highest remaining lever (untested pre-RESET). BTC_15m has
-   12% matched_ratio which is the HIGHEST in the system — lowest collapse risk of any pair.
-   ETH_5m/SOL_5m/BTC_5m all KEEP at onesided=2.0. High confidence this will KEEP.
-   Accept KEEP if pair_cost improves >2% vs gate=0.04 baseline.
-3. pace_urgency_lo 0.35->0.30 — XRP_15m 18% gain pattern. BTC_15m moderate matched_ratio (12%)
-   means low collapse risk. Test after onesided resolves.
+Priority queue for rotation 3:
+1. magnitude_gate=0.0 BASELINE — REQUIRED per auditor. Knobs already set.
+   Accept as BASELINE. This is the only BTC_5m task in rotation 3.
+   Expected: pair formation should return with gate disabled (matches pre-RESET behavior).
+   If pairs still fail at gate=0.0: escalate to auditor immediately.
+2. HOLD all other experiments until gate=0.0 baseline evaluated.
 
-Blacklists (BTC_15m): conviction_buy_skip 0.45 in ANY combination (3 tests confirm collapse),
-bar_budget 400, conviction_market_start (GLOBALLY BLACKLISTED).
-SKIP=0.45 DIRECTION DEFINITIVELY EXHAUSTED.
-
----
-
-## BTC_1h (pair_cost=N/A at gate=0.04, KEEP rate 0/1=0% post-RESET)
-
-Gate=0.08 BASELINE: matched_ratio=0%, pair_cost=0.000 (no pairs).
-Current knobs: magnitude_gate=0.04, skip=0.40 (per best pre-RESET), onesided=5.0.
-Prior best (pre-RESET): pair_cost=0.799 (33 bars), regression to 0.904 on 37 bars.
-
-Note: Dataset is thin (33-37 bars). Pre-RESET showed regression deepening — each new bar
-adding negative signal. The RESET may help by resetting the dataset window.
-BTC_1h is one of the most important re-evaluations: if magnitude_gate=0.04 restores
-pair_cost closer to 0.799, it signals dataset was the problem, not the parameters.
-
-Priority queue (after gate=0.04 baseline):
-1. magnitude_gate=0.04 BASELINE — essential to establish new cost floor on the fresh dataset.
-2. max_onesided_cost 5.0->2.0 — if baseline stabilizes near 0.799, test this lever next.
-   iter 91 (5->3) showed only 1% gain; 2.0 is the final onesided test.
-3. pace_urgency_lo 0.35->0.45 — was set in knobs pre-RESET but may not have been tested.
-   Verify in post-RESET baselines whether this was documented. If not, run the test.
-
-Blacklists (BTC_1h): risk_ceil 0.10, sell_loss_start tightening, pace_urgency_hi loosening,
-bar_budget 400, conviction_buy_skip 0.50 (D iter 64), max_onesided_cost 5->3 (D iter 91),
-conviction_market_start (GLOBALLY BLACKLISTED).
+Blacklist: gate=0.02, gate=0.04, gate=0.08 (all confirmed collapse BTC_5m).
+Inherited pre-RESET blacklist: skip 0.45/0.55, cheap_threshold 0.07/0.12,
+onesided 2.0->1.5 (COLLAPSE iter 117), conviction_market_start (GLOBAL BLACKLIST).
 
 ---
 
-## ETH_5m (pair_cost=N/A at gate=0.04, KEEP rate 0/1=0% post-RESET)
+## BTC_15m (pair_cost=0.000 at gate=0.04, KEEP rate 0% post-RESET)
 
-Gate=0.08 BASELINE: matched_ratio=0%, pair_cost=0.000; correct_side=51.6%, avg_profit=-$47.84 total.
-Current knobs: magnitude_gate=0.04, skip=0.45, max_onesided_cost=1.5, pace_urgency_lo=0.35.
-Prior best (pre-RESET): pair_cost=0.633, avg_profit=+$0.01/bar, max_dd=13.8% — ALL BENCHMARKS MET.
-Note: knobs file correct (skip=0.45, onesided=1.5 per pre-RESET KEEPs iters 65+66+92+107).
+Gate=0.04 baseline (iter 14): matched_ratio=0%, pair_cost=0.000.
+8 live-log outcomes in 136 bars confirms extreme outcome sparsity.
+correct_side=56.5% moderate signal. fill_rate=44.5%.
+Current knobs: magnitude_gate=0.04, max_onesided_cost=2.0, pace_urgency_lo=0.35, bar_budget=200.
 
-Priority queue (after gate=0.04 baseline):
-1. magnitude_gate=0.04 BASELINE — re-establish the 0.633 baseline performance.
-2. pace_urgency_lo 0.35->0.30 — after baseline confirms performance. Prior rotation 9 directive.
-   XRP_15m showed 18% gain. ETH_5m at 0.8% matched_ratio is selective; earlier urgency gate
-   may slightly expand qualifying pool. High-value test.
-3. conviction_buy_skip 0.45->0.40 — DD=13.8% provides buffer. Test after pace_urgency_lo resolves.
-   Monitor correct_side; if below 40%, abort and blacklist skip=0.40.
+Issue: Zero pair formation persists despite gate=0.04. This means the gate threshold is NOT
+the pair formation bottleneck for BTC_15m — unlike XRP_1h and ETH_1h which recovered.
+Hypothesis: BTC_15m outcome sparsity (8/136 bars with outcomes) means very few bars qualify.
 
-Blacklists (ETH_5m): conviction_buy_skip 0.60, max_onesided_cost 1.5->1.0 (COLLAPSE iter 119),
-conviction_market_start (GLOBALLY BLACKLISTED).
-ONESIDED SERIES FULLY EXHAUSTED at floor=1.5.
+Priority queue for rotation 3:
+1. magnitude_gate=0.0 BASELINE — same approach as BTC_5m. Disable gate entirely to test
+   whether any pairs form. If gate=0.0 also fails: investigate engine/dataset (outcome sparsity
+   may be preventing pair evaluation entirely).
+   Knobs: set magnitude_gate=0.0 before running.
+2. pace_urgency_lo 0.35->0.30 — only AFTER gate=0.0 baseline shows non-zero pairs.
+   XRP_15m showed 18% gain from 0.35->0.30. Medium confidence.
+3. max_onesided_cost 2.0 is already set — already applied (knobs shows 2.0, best_knobs shows 5.0).
+   Do NOT further reduce (floor at 2.0 confirmed pre-RESET for BTC-family).
 
----
-
-## ETH_15m (pair_cost=N/A at gate=0.04, KEEP rate 0/1=0% post-RESET)
-
-Gate=0.08 BASELINE: matched_ratio=0%, pair_cost=0.000; correct_side=73.2% — strong signal quality.
-Current knobs: magnitude_gate=0.04, skip=0.45, max_onesided_cost=1.5, pace_urgency_lo=0.30.
-Prior best (pre-RESET): pair_cost=0.560 best / volatile on 123-bar dataset.
-Note: knobs file shows skip=0.45 (CORRECT — pre-RESET strategist noted this was fixed).
-Pre-RESET stale file issue (skip=0.55) appears to have been corrected in current knobs file.
-correct_side=73.2% in gate=0.08 baseline is the HIGHEST 15m signal quality — strong foundation.
-
-Priority queue (after gate=0.04 baseline):
-1. magnitude_gate=0.04 BASELINE — re-establish the volatile 0.560 baseline.
-   correct_side=73.2% means this pair has strong directional signal at gate=0.08;
-   at gate=0.04 it should form many more pairs with good quality.
-2. pace_urgency_lo 0.30->0.25 — knobs already at 0.30; if gate=0.04 baseline shows
-   0.30 performing well, continue the pace series. Check if 0.25 was already running.
-3. bar_budget 200->300 — positive avg_profit at best_knobs makes capital scaling viable.
-   Test after pace series resolves.
-
-Blacklists (ETH_15m): conviction_buy_skip raising to 0.55, max_onesided_cost above 1.5,
-max_onesided_cost 1.5->1.0 (D iter 94 — collapse), conviction_market_start (GLOBALLY BLACKLISTED).
-ONESIDED SERIES EXHAUSTED at 1.5 floor.
+Blacklist: skip=0.45 (definitive 3x collapse), bar_budget 400,
+conviction_market_start (GLOBAL BLACKLIST), gate=0.04 (zero pairs confirmed).
 
 ---
 
-## ETH_1h (pair_cost=N/A at gate=0.04, KEEP rate 0/1=0% post-RESET)
+## BTC_1h (pair_cost=0.000 at gate=0.04, KEEP rate 0% post-RESET)
 
-Gate=0.08 BASELINE: matched_ratio=0%, pair_cost=0.000; correct_side=70.4% strong signal.
-Current knobs: magnitude_gate=0.04, skip=0.45, onesided=5.0, pace_urgency_lo=0.35.
-Prior best (pre-RESET): pair_cost=0.706, avg_profit=-$0.49/bar (negative — below target).
-Note: bar_budget confirmed optimum at 200 (tested 250 and 300 — all fail pre-RESET).
+Gate=0.04 baseline (iter 15): matched_ratio=0%, pair_cost=0.000.
+1 live-log outcome in 34 bars (extreme sparsity — 3% outcome resolution).
+correct_side=68.4% strong signal. fill_rate=52.9%.
+Current knobs: magnitude_gate=0.04, max_onesided_cost=2.0, pace_urgency_lo=0.45, risk_ceil=0.20.
 
-Priority queue (after gate=0.04 baseline):
-1. magnitude_gate=0.04 BASELINE — re-establish baseline cost on fresh dataset.
-2. pace_urgency_lo 0.35->0.30 — XRP_15m's 18% gain strongly suggests high value.
-   ETH_1h at 7% matched_ratio is moderate — earlier urgency timing may capture better pairs.
-   Primary lever after budget exhaustion confirmed.
-3. pace_urgency_lo 0.30->0.25 — follow series if #2 KEEPs.
+CRITICAL KNOBS FIX: risk_ceil=0.20 in knobs — auditor directive says revert to 0.15.
+FIX risk_ceil=0.15 in knobs_BTC_1h.json BEFORE any experiment.
 
-Blacklists (ETH_1h): max_onesided_cost increasing above 5 (D iter 55), conviction_buy_skip 0.40,
-risk_ceil 0.15->0.20, bar_budget 250, bar_budget 300, conviction_market_start (GLOBALLY BLACKLISTED).
-BUDGET OPTIMUM AT 200. SKIP FLOOR AT 0.45.
+Priority queue for rotation 3:
+1. FIX STALE KNOBS: risk_ceil 0.20->0.15 in knobs_BTC_1h.json immediately.
+2. magnitude_gate=0.0 BASELINE — same approach. Only 1 outcome in 34 bars means
+   outcome sparsity is extreme. Gate=0.0 may not help if outcomes don't resolve.
+   Knobs: set magnitude_gate=0.0 before running.
+3. If gate=0.0 still shows 0 pairs: this pair is outcome-sparsity limited. Flag for auditor.
+4. max_onesided_cost: knobs=2.0, best_knobs=5.0. The 2.0 was already set. Do not reduce further.
 
----
-
-## SOL_5m (pair_cost=N/A at gate=0.04, KEEP rate 0/1=0% post-RESET)
-
-Gate=0.08 BASELINE: matched_ratio=0%, pair_cost=0.000; correct_side=59.8%, total_profit=$63.12.
-Current knobs: magnitude_gate=0.04, skip=0.45, max_onesided_cost=2.0, pace_urgency_lo=0.30.
-Prior best (pre-RESET): pair_cost=0.676, avg_profit=+$0.06/bar — PROFITABLE (all benchmarks met).
-Note: Pre-RESET iter 109 showed SOL_5m can collapse (matched_ratio 0%->0% on 416 bars).
-This pair is structurally fragile. The RESET provides a fresh opportunity.
-
-Priority queue (after gate=0.04 baseline):
-1. magnitude_gate=0.04 BASELINE — CRITICAL. Prior rotation 9 showed instability.
-   Must confirm matched_ratio is non-zero at gate=0.04 with current knobs.
-   If matched_ratio returns to ~0.94%: proceed with experiments.
-   If matched_ratio remains 0%: investigate engine/dataset issue; hold all SOL_5m experiments.
-2. pace_urgency_lo verification — knobs already at 0.30. If gate=0.04 baseline shows
-   non-zero pairs: document pace_urgency_lo=0.30 as confirmed or test 0.35->0.30 formally.
-3. conviction_buy_skip 0.45->0.40 — only if baseline is stable. Collapse risk is high.
-
-Blacklists (SOL_5m): conviction_buy_skip 0.55 (D iter 41), max_onesided_cost 2.0->1.5 (COLLAPSE iter 97).
-ONESIDED SERIES EXHAUSTED at floor=2.0.
+Blacklist: risk_ceil 0.10, skip 0.50 (D iter 64), onesided 5->3 (D iter 91),
+conviction_market_start (GLOBAL BLACKLIST), gate=0.04 (zero pairs).
 
 ---
 
-## SOL_15m (pair_cost=N/A at gate=0.04, KEEP rate 0/1=0% post-RESET)
+## ETH_5m (pair_cost=0.000 at gate=0.04, KEEP rate 0% post-RESET)
 
-Gate=0.08 BASELINE: matched_ratio=0.3%, pair_cost=0.567 (anomalously low — few pairs).
-Note: SOL_15m is UNIQUE — it formed a tiny number of pairs at gate=0.08 (like XRP_1h).
-correct_side=47.7% is WEAKEST in the system (below 50%). This is concerning.
-Current knobs: magnitude_gate=0.04, skip=0.45, bar_budget=200 (NOT 300 — investigate).
-Wait: prior rotation confirmed bar_budget=300 KEEP (iter 73). If knobs shows 200, it's stale.
-Check knobs_SOL_15m.json before proceeding.
-Prior best (pre-RESET): pair_cost=0.696, avg_profit=+$0.42/bar — PROFITABLE (all benchmarks met).
+Gate=0.04 baseline (iter 16): matched_ratio=0%, pair_cost=0.000.
+27 live-log outcomes in 406 bars (6.6% outcome resolution).
+correct_side=52.0% minimal edge. max_dd=29.2% (dangerously close to 30% threshold).
+Current knobs: magnitude_gate=0.04, max_onesided_cost=1.5, pace_urgency_lo=0.30, skip=0.45.
 
-Priority queue (after gate=0.04 baseline):
-1. magnitude_gate=0.04 BASELINE — re-establish the 0.696 baseline.
-   correct_side=47.7% at gate=0.08 is alarming (below 50%); must confirm gate=0.04 restores quality.
-2. pace_urgency_lo 0.35->0.30 — primary lever after onesided + budget exhaustion.
-   SOL_15m 8.8% matched_ratio means moderate collapse risk; earlier urgency may improve fill quality.
-3. risk_ceil 0.20->0.25 — only if baseline shows stable positive avg_profit.
-   pre-RESET iter 99 KEPT risk_ceil=0.20. Further scaling possible.
+Observation: pace_urgency_lo=0.30 already set in knobs (strategy queue item #2 was 0.35->0.30).
+This was already applied pre-emptively. Baseline ran with 0.30 active.
 
-Blacklists (SOL_15m): conviction_buy_skip 0.40 (D iter 85 — collapse), conviction_buy_skip above 0.50,
-bar_budget before cost fixes, bar_budget 400 (D iter 112 — optimum at 300),
-max_onesided_cost 5.0->2.0 (COLLAPSE — BLACKLISTED entirely for SOL_15m),
-conviction_market_start (GLOBALLY BLACKLISTED).
-ONESIDED BLACKLISTED. SKIP SERIES EXHAUSTED. BUDGET OPTIMUM AT 300.
+Issue: Zero pair formation AND dangerously high max_dd (29.2%) from unmatched inventory.
+correct_side=52.0% is near-random — model has minimal edge on ETH_5m.
 
----
+Priority queue for rotation 3:
+1. magnitude_gate=0.0 BASELINE — gate reduction series exhausted at 0.04; try gate=0.0.
+   If pairs still fail: ETH_5m may be outcome-sparsity limited (27/406 outcomes = 6.6%).
+   CAUTION: max_dd=29.2% means even unmatched inventory is high-risk.
+2. If gate=0.0 gives non-zero pairs AND pair_cost < 0.85: KEEP and proceed.
+   If gate=0.0 still zero pairs: hold all experiments, flag for auditor (max_dd risk).
+3. pace_urgency_lo 0.30->0.25 — only after gate=0.0 baseline shows non-zero pairs.
 
-## SOL_1h (pair_cost=N/A at gate=0.04, KEEP rate 0/1=0% post-RESET)
-
-Gate=0.08 BASELINE: matched_ratio=0%, pair_cost=0.000; correct_side=68.4%, avg_profit=-$0.06/bar.
-CRITICAL STALE KNOBS: knobs_SOL_1h.json shows bar_budget=400 but confirmed KEEP is 300 (iter 86).
-Researcher MUST set bar_budget=300 in knobs_SOL_1h.json BEFORE running any SOL_1h experiment.
-Current knobs (after fix): magnitude_gate=0.04, skip=0.45, bar_budget=300, pace_urgency_lo=0.35.
-Prior best (pre-RESET): pair_cost=0.655, avg_profit=+$1.49/bar — PROFITABLE, strong fundamentals.
-
-Priority queue (after gate=0.04 baseline):
-1. FIX STALE KNOBS FIRST: set bar_budget=300 in knobs_SOL_1h.json.
-2. magnitude_gate=0.04 BASELINE — re-establish the 0.655 baseline with corrected knobs.
-3. bar_budget 300->400 — avg_profit=+$1.49/bar is excellent; capital scaling is high-value.
-   Run after baseline confirms stability.
-4. pace_urgency_lo 0.35->0.30 — SOL_1h 1.9% matched_ratio; earlier urgency may improve quality.
-
-Blacklists (SOL_1h): conviction_buy_skip 0.35 (COLLAPSE iter 57), skip=0.40 (D iter 74),
-risk_ceil 0.15->0.20 (D iters 100-101), conviction_market_start (GLOBALLY BLACKLISTED).
-SKIP SERIES FULLY EXHAUSTED.
+Blacklist: skip 0.60, onesided 1.5->1.0 (COLLAPSE iter 119), gate=0.04 (zero pairs),
+conviction_market_start (GLOBAL BLACKLIST).
 
 ---
 
-## XRP_5m (pair_cost=0.000 at gate=0.08, KEEP rate 0/1=0% post-RESET)
+## ETH_15m (pair_cost=0.000 at gate=0.04, KEEP rate 0% post-RESET)
 
-FROZEN — auditor directive from pre-RESET maintained. Structural dead-end:
-fill_rate=54% (structural microstructure limit), max_dd=69% (critical, far above 30% threshold).
-Even at gate=0.08 baseline: zero pairs formed, lowest fill_rate in system at 15.6%.
-Gate=0.04 would form pairs but the underlying structural issues remain:
-correct_side=57.8% is marginal, fill_rate is structurally limited.
+Gate=0.04 baseline (iter 17): matched_ratio=0%, pair_cost=0.000.
+8 live-log outcomes in 136 bars (5.9% outcome resolution). correct_side=71.0% strong signal.
+avg_profit=+$0.13/bar positive (encouraging even with zero pairs). max_dd=7.1% safe.
+Current knobs: magnitude_gate=0.04, max_onesided_cost=1.5, pace_urgency_lo=0.25, skip=0.45.
 
-Priority queue: FREEZE MAINTAINED. Do NOT run experiments.
-Skip XRP_5m in rotation 2. Auditor must formally review before any experiments resume.
+Observation: pace_urgency_lo=0.25 in knobs — this is AHEAD of queue (strategy item #2 was
+0.30->0.25). Baseline at iter 17 ran with 0.25 active. This means queue item #2 is already staged.
 
-Blacklists (XRP_5m): ALL levers blacklisted pending auditor freeze lift.
-fill_ticks 10->15 (D iter 59), conviction_market_start (GLOBALLY BLACKLISTED).
+Priority queue for rotation 3:
+1. magnitude_gate=0.0 BASELINE — zero pairs at gate=0.04 same as gate=0.08.
+   correct_side=71.0% is the 2nd highest 15m signal in system — high-value pair if pairs form.
+   Knobs: set magnitude_gate=0.0 before running.
+2. pace_urgency_lo 0.25->0.20 — knobs already at 0.25; if gate=0.0 baseline shows non-zero
+   pairs, continue the series to 0.20. Monitor collapse risk.
+3. bar_budget 200->300 — positive avg_profit signals capital scaling potential.
+   Only after pace series resolves and baseline is stable.
 
----
-
-## XRP_15m (pair_cost=N/A at gate=0.04, KEEP rate 0/1=0% post-RESET)
-
-Gate=0.08 BASELINE: matched_ratio=0%, pair_cost=0.000; correct_side=53.7%, fill_rate=39.7%.
-Current knobs: magnitude_gate=0.04, skip=0.45, max_onesided_cost=2.0, pace_urgency_lo=0.30.
-Prior best (pre-RESET): pair_cost=0.638, avg_profit=-$0.01/bar (near-profitable).
-Note: XRP_15m LANDMARK — pace_urgency_lo 0.35->0.30 gave 18% improvement (pre-RESET iter 102).
-Note: knobs shows pace_urgency_lo=0.30 (from KEEP iter 102). This is correct.
-Pre-RESET strategist noted pace_urgency_lo=0.25 may have been pre-emptively set — check iter history.
-Current knobs show 0.30 which is the confirmed KEEP value.
-
-Priority queue (after gate=0.04 baseline):
-1. magnitude_gate=0.04 BASELINE — re-establish the 0.638 baseline.
-2. pace_urgency_lo 0.30->0.25 — XRP_15m responded massively to 0.35->0.30 (18% gain).
-   Series continuation: test 0.25 next. Risk: matched_ratio=0.3% may collapse at 0.25.
-   If matched_ratio drops to 0%: floor=0.30 confirmed. Accept KEEP only if pair_cost improves >5%.
-3. bar_budget 200->250 — cautious capital scale on near-profitable pair.
-   Only test after pace series resolves.
-
-Blacklists (XRP_15m): conviction_buy_skip 0.40 (D iter 60 — collapse), bar_budget 300 (D iter 75),
-risk_ceil 0.15->0.20 (D iter 87), conviction_market_start (GLOBALLY BLACKLISTED).
-SKIP EXHAUSTED. BUDGET OPTIMUM AT 200.
+Blacklist: skip above 0.50, onesided above 1.5, onesided 1.5->1.0 (COLLAPSE iter 94),
+conviction_market_start (GLOBAL BLACKLIST), gate=0.04 (zero pairs).
 
 ---
 
-## XRP_1h (pair_cost=0.855 at gate=0.08, KEEP rate 0/1=0% post-RESET)
+## ETH_1h (pair_cost=0.594 at gate=0.04, KEEP rate 0% post-RESET)
 
-Gate=0.08 BASELINE: matched_ratio=3.6%, pair_cost=0.855, correct_side=82.6%, DD=3.1%.
-UNIQUE: only pair with non-zero pair formation at gate=0.08. 1h bars have sufficient
-price movement to clear the 0.08 gate threshold.
-correct_side=82.6% is the HIGHEST in the system — strongest directional signal.
-pair_cost=0.855 is already close to 0.85 target even at gate=0.08.
-Current knobs: magnitude_gate=0.04, skip=0.50, max_onesided_cost=5.0, flip_kill_after=4.
-Note: knobs shows max_onesided_cost=5.0 — pre-RESET strategist flagged this as needing a test.
-No results.tsv KEEP confirms onesided=2.0. Run onesided test after gate=0.04 baseline.
+Gate=0.04 baseline (iter 18): matched_ratio=2.0%, pair_cost=0.594.
+PAIR FORMATION RESTORED at gate=0.04 (vs 0% at gate=0.08, iter 6).
+correct_side=62.1% solid signal. fill_rate=83.3% excellent. max_dd=13.8% safe.
+Current knobs: magnitude_gate=0.04, max_onesided_cost=5.0, pace_urgency_lo=0.30, skip=0.45.
+
+Observation: pace_urgency_lo=0.30 in knobs (baseline ran with this). pair_cost=0.594 is
+WELL BELOW 0.85 target — closest to pre-RESET best of 0.706. This is the 2nd best pair
+in rotation 2 for pairs that have actually formed.
+
+Priority queue for rotation 3:
+1. pace_urgency_lo 0.30->0.25 — knobs already at 0.30; continue series.
+   ETH_1h at 2% matched_ratio; earlier urgency may improve pair quality further.
+   Accept KEEP if pair_cost improves >2% vs baseline 0.594.
+2. max_onesided_cost 5.0->2.0 — knobs shows 5.0. Strategy queue flagged this as needed.
+   pair_cost=0.594 already good; onesided reduction may lock in gains.
+   Test after pace_urgency series resolves.
+3. pace_urgency_lo 0.25->0.20 — follow series if item #1 KEEPs.
+
+Blacklist: onesided above 5 (D iter 55), skip 0.40, risk_ceil 0.20, bar_budget 250/300,
+pace_urgency_lo 0.35->0.45 (D iter 103 — zero effect on 1h TF — but this is XRP_1h history;
+verify ETH_1h specifics), conviction_market_start (GLOBAL BLACKLIST).
+
+---
+
+## SOL_5m (pair_cost=0.000 at gate=0.04, KEEP rate 0% post-RESET)
+
+Gate=0.04 baseline (iter 19): matched_ratio=0%, pair_cost=0.000.
+28 live-log outcomes in 407 bars (6.9% outcome resolution). correct_side=56.4% weak.
+total_profit=$55.26 (unmatched inventory, not pairs). max_dd=20.0%.
+Current knobs: magnitude_gate=0.04, max_onesided_cost=2.0, pace_urgency_lo=0.30, skip=0.45.
+
+Observation: pace_urgency_lo=0.30 already set in knobs. Baseline at iter 19 ran with 0.30 active.
+SOL_5m showed total_profit positive ($55.26) from unmatched inventory despite zero pairs.
+
+Priority queue for rotation 3:
+1. magnitude_gate=0.0 BASELINE — gate series exhausted (0.08=0, 0.04=0). Try gate=0.0.
+   Pre-RESET SOL_5m achieved pair_cost=0.676 at gate=0.0. This should restore pair formation.
+   Knobs: set magnitude_gate=0.0 before running.
+2. If gate=0.0 gives non-zero pairs: pace_urgency_lo 0.30->0.25 — continue series.
+   SOL_5m collapse risk is HIGH (pre-RESET iter 109 showed instability). Monitor matched_ratio.
+3. conviction_buy_skip 0.45->0.40 — only if baseline is stable. Collapse risk remains high.
+
+Blacklist: skip 0.55 (D iter 41), onesided 2.0->1.5 (COLLAPSE iter 97),
+conviction_market_start (GLOBAL BLACKLIST), gate=0.04 (zero pairs).
+
+---
+
+## SOL_15m (pair_cost=0.567 at gate=0.04, KEEP rate 0% post-RESET)
+
+AUDITOR FREEZE ACTIVE — correct_side=45.5% (below 50% threshold).
+Gate=0.04 baseline (iter 20): matched_ratio=0.3%, pair_cost=0.567. correct_side=45.5%.
+This is the 2nd consecutive rotation showing correct_side below 50% (iter 8: 47.7%, iter 20: 45.5%).
+The trend is WORSENING — signal quality is degrading with each gate reduction.
+Current knobs: magnitude_gate=0.04, max_onesided_cost=5.0 (BLACKLISTED), pace_urgency_lo=0.30.
+
+CRITICAL: max_onesided_cost=5.0 in knobs is BLACKLISTED for SOL_15m (COLLAPSE confirmed).
+This must be corrected when freeze lifts, but do NOT run experiments while frozen.
+
+Priority queue for rotation 3:
+1. HOLD — auditor freeze active. Do NOT run any SOL_15m experiments.
+2. When auditor reviews: if correct_side recovers above 50% on gate=0.0 test — lift freeze.
+   The strategist recommends auditor investigate whether gate reduction itself is degrading
+   correct_side by sampling lower-quality predictions (below magnitude threshold).
+3. If freeze is lifted: magnitude_gate=0.0 BASELINE first, then watch correct_side closely.
+   If correct_side still below 50% at gate=0.0: PERMANENT FREEZE recommended.
+
+Blacklist: skip 0.40 (COLLAPSE iter 85), onesided 5.0->2.0 (COLLAPSE — BLACKLISTED entirely),
+bar_budget 400 (D iter 112), conviction_market_start (GLOBAL BLACKLIST).
+NOTE: onesided=5.0 currently in knobs IS the blacklisted value — fix before any future experiment.
+
+---
+
+## SOL_1h (pair_cost=0.000 at gate=0.04, KEEP rate 0% post-RESET)
+
+Gate=0.04 baseline (iter 21): matched_ratio=0%, pair_cost=0.000. bar_budget=300 fix applied.
+1 live-log outcome in 34 bars (extreme outcome sparsity — 3%). correct_side=55.0% moderate.
+Current knobs: magnitude_gate=0.04, max_onesided_cost=5.0, pace_urgency_lo=0.35, bar_budget=300.
+
+Issue: Zero pair formation despite bar_budget fix. SOL_1h outcome sparsity is extreme (1/34 bars).
+Prior best (pre-RESET): pair_cost=0.655, avg_profit=+$1.49/bar — high-value target.
+
+Priority queue for rotation 3:
+1. magnitude_gate=0.0 BASELINE — gate series shows 0.08=0, 0.04=0. Try gate=0.0.
+   SOL_1h pre-RESET had pairs with gate=0.0. Outcome sparsity may still limit evaluation.
+   Knobs: set magnitude_gate=0.0 before running.
+2. If gate=0.0 gives non-zero pairs: pace_urgency_lo 0.35->0.30 next.
+   SOL_1h 1.9% matched_ratio pre-RESET; earlier urgency may improve quality.
+3. bar_budget 300->400 — avg_profit=+$1.49/bar pre-RESET is excellent; capital scale pending.
+   Only after baseline confirms stability.
+
+Blacklist: skip 0.35 (COLLAPSE iter 57), skip 0.40 (D iter 74), risk_ceil 0.20 (D iters 100-101),
+conviction_market_start (GLOBAL BLACKLIST).
+
+---
+
+## XRP_5m (FROZEN — permanent)
+
+FROZEN — auditor directive permanent. Structural dead-end.
+fill_rate=15.6% (structural microstructure limit), zero pairs at all tested gates.
+Correct_side=57.8% marginal. max_dd would be critical given structural limitations.
+
+Do NOT run experiments. Skip in all rotations unless auditor formally lifts freeze.
+
+---
+
+## XRP_15m (pair_cost=0.950 at gate=0.04, KEEP rate 0% post-RESET)
+
+Gate=0.04 baseline (iter 22): matched_ratio=0.72%, pair_cost=0.950.
+PAIR FORMATION RETURNED at gate=0.04 (vs 0% at gate=0.08, iter 11).
+But pair_cost=0.950 vs pre-RESET best 0.638 — significant regression.
+correct_side=50.0% (down from 53.7% at gate=0.08). 9 live-log outcomes in 138 bars (6.5%).
+Current knobs: magnitude_gate=0.04, max_onesided_cost=2.0, pace_urgency_lo=0.30, skip=0.45.
+
+Observation: pace_urgency_lo=0.30 is the confirmed KEEP from pre-RESET (LANDMARK 18% gain).
+pair_cost=0.950 is higher than expected — pre-RESET best was 0.638. This is rotation 2 baseline;
+need rotation 3 experiments to recover.
+
+Priority queue for rotation 3:
+1. pace_urgency_lo 0.30->0.25 — primary lever. XRP_15m showed 18% gain from 0.35->0.30.
+   Series continuation: test 0.25 next. Risk: matched_ratio=0.72% may collapse at 0.25.
+   Accept KEEP if pair_cost improves >5% vs baseline 0.950. Floor 0.30 if collapse occurs.
+2. bar_budget 200->250 — cautious capital scale on near-profitable pair.
+   Only after pace series resolves. prior KEEP at 200 only.
+3. magnitude_gate=0.0 — if pace_urgency tests don't reduce pair_cost below 0.85, try gate=0.0
+   to expand pair formation pool and improve cost.
+
+Blacklist: skip 0.40 (COLLAPSE iter 60), bar_budget 300 (D iter 75), risk_ceil 0.20 (D iter 87),
+conviction_market_start (GLOBAL BLACKLIST).
+
+---
+
+## XRP_1h (pair_cost=0.812 at gate=0.04, KEEP rate 0% post-RESET)
+
+Gate=0.04 baseline (iter 23): matched_ratio=4.2%, pair_cost=0.812.
+BEST PERFORMER in rotation 2. pair_cost=0.812 (gap 0.85 target = only 0.038 remaining).
+correct_side=70.4% strong signal. fill_rate=74.0% high. max_dd=8.0% safe.
+avg_profit=+$0.10/bar positive (only 2 live-log outcomes — but positive).
 Prior best (pre-RESET): pair_cost=0.674, avg_profit=+$1.08/bar — system-best avg_profit.
+Auditor directive: PRIORITIZE XRP_1h (pair_cost improving).
+Current knobs: magnitude_gate=0.04, max_onesided_cost=2.0, pace_urgency_lo=0.35, skip=0.50.
 
-Priority queue (after gate=0.04 baseline):
-1. magnitude_gate=0.04 BASELINE — expected to form MORE pairs and potentially lower pair_cost
-   below 0.855 seen at gate=0.08. This is the most anticipated baseline in the rotation.
-   Prediction: pair_cost should approach 0.674 (pre-RESET best) at gate=0.04.
-2. max_onesided_cost 5.0->2.0 — must be tested and documented. Pre-RESET strategist flagged
-   this as unconfirmed in results.tsv. DD=6% means cap effect may be minimal.
-   Accept KEEP if pair_cost improves >2% vs gate=0.04 baseline.
-3. pace_urgency_hi 0.85->0.75 — pace_urgency_lo confirmed ineffective on 1h TF. pace_urgency_hi
-   is the alternative urgency gate tuning. Untested lever with potential upside.
+Note: knobs shows max_onesided_cost=2.0 (down from 5.0 in best_knobs) — this already happened.
+Was this tested and KEPT? Results.tsv shows no KEEP for XRP_1h in rotation 2 — this was
+pre-staged. The baseline at iter 23 ran with onesided=2.0 active. pair_cost=0.812 may already
+reflect onesided=2.0 benefit.
 
-Blacklists (XRP_1h): conviction_buy_skip 0.45 (D iter 48), conviction_buy_skip 0.55 (D iter 61),
-bar_budget 300 (D iter 76), risk_ceil 0.15->0.20 (D iter 88),
-pace_urgency_lo 0.35->0.45 (D iter 103 — zero effect on 1h TF),
-conviction_market_start (GLOBALLY BLACKLISTED).
-BOTH SKIP DIRECTIONS EXHAUSTED. BUDGET OPTIMUM AT 200. PACE_URGENCY_LO INEFFECTIVE ON 1h.
+Priority queue for rotation 3:
+1. pace_urgency_lo 0.35->0.30 — primary lever from strategy queue. pair_cost=0.812 is close
+   to 0.85 target; 0.30 urgency may push it below 0.85.
+   Accept KEEP if pair_cost improves >2% (< 0.796) vs baseline 0.812.
+2. pace_urgency_lo 0.30->0.25 — follow series if item #1 KEEPs.
+3. pace_urgency_hi 0.85->0.75 — alternative urgency gate tuning if pace_lo series exhausts.
+   Untested lever with potential upside on 1h TF.
+
+Note: max_onesided_cost baseline effect needs documentation. Iter 23 effectively serves as the
+onesided=2.0 baseline. No separate experiment needed unless pair_cost regresses.
+
+Blacklist: skip 0.45/0.55, bar_budget 300, risk_ceil 0.20, pace_urgency_lo->0.45 (D iter 103),
+conviction_market_start (GLOBAL BLACKLIST).
+BOTH SKIP DIRECTIONS EXHAUSTED. BUDGET OPTIMUM AT 200. PACE_LO SERIES ACTIVE.
 
 ---
 
 ## Cross-Pair Observations
 
-**Post-RESET critical finding — magnitude_gate=0.08 is universally too aggressive:**
-- 11 of 12 pairs: 0% matched_ratio at gate=0.08 (complete pair formation collapse)
-- 1 exception: XRP_1h at 3.6% matched_ratio (1h bars have larger moves, clearing 8% gate)
-- SOL_15m: 0.3% matched_ratio at gate=0.08 (near-collapse, pair_cost=0.567 artificially low)
-- Gate=0.04 is already set in all knobs files — rotation 2 MUST run 0.04 baselines for all pairs
+**Rotation 2 critical finding — gate=0.04 is still too aggressive for most pairs:**
+- 7 of 11 active pairs: 0% matched_ratio at gate=0.04 (same collapse as gate=0.08)
+- 4 pairs recovered at gate=0.04: ETH_1h (2%), SOL_15m (0.3%), XRP_15m (0.72%), XRP_1h (4.2%)
+- Recovery pattern: 1h timeframe pairs recover first; 5m/15m pairs still collapse
+- The 5m/15m pair formation is likely gated by outcome resolution, not the magnitude gate
 
-**Signal quality at gate=0.08 (even when pairs collapse, correct_side reflects model quality):**
-- Highest: XRP_1h=82.6%, ETH_15m=73.2%, BTC_1h=66.7%, SOL_1h=68.4%, ETH_1h=70.4%
-- Moderate: BTC_15m=60.8%, SOL_1h=68.4%, BTC_5m=65.4%, XRP_5m=57.8%
-- Weakest: SOL_15m=47.7% (below 50%), ETH_5m=51.6%, XRP_15m=53.7%, SOL_5m=59.8%
-- SOL_15m at 47.7% is alarming — correct_side below 50% means model is directionally wrong
-  more often than right at gate=0.08. Gate=0.04 may restore this by sampling more pairs.
+**Outcome sparsity is the systemic bottleneck:**
+- BTC_5m: 24/403 outcomes (6%) — gate=0.02 still fails
+- BTC_15m: 8/136 outcomes (6%) — gate=0.04 fails
+- BTC_1h: 1/34 outcomes (3%) — extreme sparsity
+- ETH_5m: 27/406 outcomes (7%) — gate=0.04 fails
+- ETH_15m: 8/136 outcomes (6%) — gate=0.04 fails
+- SOL_5m: 28/407 outcomes (7%) — gate=0.04 fails
+- SOL_1h: 1/34 outcomes (3%) — extreme sparsity
+- XRP_1h: 2/34 outcomes (6%) — but pairs form because 1h moves clear gate threshold
 
-**Pre-RESET structural knowledge fully retained:**
-- pace_urgency_lo series: primary remaining lever across all 5m/15m pairs (not 1h TF)
-  XRP_15m landmark: 18% improvement at 0.30; series untested on BTC_5m, BTC_15m, ETH_1h, SOL_15m, SOL_1h
-- conviction_market_start: GLOBALLY BLACKLISTED — do not test on any pair
-- Onesided floors: ETH_5m=1.5, ETH_15m=1.5, SOL_5m=2.0, BTC_5m=2.0; SOL_15m onesided BLACKLISTED
-- Skip floors: BTC_1h=0.40, BTC_15m skip=0.45 definitively fails; ETH/SOL/XRP pairs floor=0.45; XRP_1h/BTC_5m floor=0.50
+**Implication:** The gate threshold reduction may not be the primary lever for 5m/15m pairs.
+If matched_ratio remains 0% even at gate=0.0 on BTC_5m, the issue is that no buy/sell pairs
+resolve within the same backtest window — structural dataset issue.
 
-**Rotation 2 experiment order (after gate=0.04 baselines complete):**
-Priority pairs for first experiments (highest potential given prior best_knobs proximity to targets):
-1. XRP_1h — best avg_profit system-wide, gate=0.08 already nearly at 0.85 target
-2. ETH_15m — best pair_cost in system at 0.560, pace_urgency series can improve further
-3. SOL_1h — excellent avg_profit +$1.49/bar, bar_budget=400 scale test pending
-4. ETH_5m — all benchmarks met, pace_urgency_lo=0.30 can push further below target
-5. SOL_15m — profitable, pace series next; but correct_side=47.7% must be monitored
+**Rotation 3 primary focus:**
+1. Gate=0.0 baseline for all 7 failed pairs (BTC_5m, BTC_15m, BTC_1h, ETH_5m, ETH_15m, SOL_5m, SOL_1h)
+2. XRP_1h pace_urgency series (highest immediate return potential, already near target)
+3. XRP_15m pace_urgency series (pair_cost=0.950, needs reduction)
+4. ETH_1h pace_urgency series (pair_cost=0.594, already good, continue improving)
+
+**Pre-RESET structural knowledge retained:**
+- pace_urgency_lo series: primary lever for 5m/15m/1h pairs (NOT for pairs with zero formation)
+- Onesided floors: ETH_5m=1.5, ETH_15m=1.5, SOL_5m=2.0, BTC_5m=2.0, BTC_15m=2.0
+- SOL_15m onesided: GLOBALLY BLACKLISTED for SOL_15m at any value below 5.0
+- Skip floors: BTC_1h=0.40, ETH/SOL/XRP pairs floor=0.45; BTC_5m/XRP_1h floor=0.50
+- BTC_15m skip=0.45 definitively fails (3x confirmed collapse)
 
 ---
 
-## trader_a Benchmark Comparison (post-RESET iter 12 state)
-| Pair | PairCost | Target | Gap | Status | Correct_Side | Priority |
-|------|----------|--------|-----|--------|--------------|----------|
-| BTC_5m | N/A | < 0.85 | N/A | Need gate=0.04 baseline | 65.4% | Medium |
-| BTC_15m | N/A | < 0.85 | N/A | Need gate=0.04 baseline | 60.8% | Medium |
-| BTC_1h | N/A | < 0.85 | N/A | Need gate=0.04 baseline | 66.7% | Medium |
-| ETH_5m | N/A | < 0.85 | N/A | Need gate=0.04 baseline | 51.6% | Medium |
-| ETH_15m | N/A | < 0.85 | N/A | Need gate=0.04 baseline | 73.2% | High |
-| ETH_1h | N/A | < 0.85 | N/A | Need gate=0.04 baseline | 70.4% | Medium |
-| SOL_5m | N/A | < 0.85 | N/A | Need gate=0.04 baseline | 59.8% | Medium |
-| SOL_15m | N/A | < 0.85 | N/A | Need gate=0.04 baseline | 47.7% (!) | Monitor |
-| SOL_1h | N/A | < 0.85 | N/A | Fix bar_budget first | 68.4% | High |
-| XRP_5m | 0.909 (old) | < 0.85 | +0.059 | FROZEN | 57.8% | FREEZE |
-| XRP_15m | N/A | < 0.85 | N/A | Need gate=0.04 baseline | 53.7% | Medium |
-| XRP_1h | 0.855 | < 0.85 | +0.005 | Near target even at gate=0.08! | 82.6% | Highest |
+## trader_a Benchmark Comparison (after rotation 2, iter 24)
 
-Pre-RESET best performance reference (expected to return at gate=0.04):
-| BTC_5m | 0.922 | BTC_15m | 0.933 | BTC_1h | 0.799 | ETH_5m | 0.633 |
-| ETH_15m | 0.560 | ETH_1h | 0.706 | SOL_5m | 0.676 | SOL_15m | 0.696 |
-| SOL_1h | 0.655 | XRP_5m | FROZEN | XRP_15m | 0.638 | XRP_1h | 0.674 |
+| Pair | PairCost | Target | Gap | AvgProfit | MaxDD% | Status |
+|------|----------|--------|-----|-----------|--------|--------|
+| BTC_5m | 0.000 | < 0.85 | N/A | -$0.027/bar | 23.0% | FROZEN (gate=0.0 baseline needed) |
+| BTC_15m | 0.000 | < 0.85 | N/A | -$0.218/bar | 22.1% | gate=0.0 baseline needed |
+| BTC_1h | 0.000 | < 0.85 | N/A | -$0.240/bar | 4.8% | gate=0.0 baseline needed; fix risk_ceil |
+| ETH_5m | 0.000 | < 0.85 | N/A | -$0.110/bar | 29.2% | gate=0.0 needed; DD WARNING |
+| ETH_15m | 0.000 | < 0.85 | N/A | +$0.130/bar | 7.1% | gate=0.0 baseline needed |
+| ETH_1h | 0.594 | < 0.85 | -0.256 | -$0.060/bar | 13.8% | ACTIVE — pace_urgency_lo test next |
+| SOL_5m | 0.000 | < 0.85 | N/A | +$0.136/bar | 20.0% | gate=0.0 baseline needed |
+| SOL_15m | 0.567 | < 0.85 | -0.283 | -$0.270/bar | 19.8% | FROZEN (correct_side=45.5%) |
+| SOL_1h | 0.000 | < 0.85 | N/A | -$0.160/bar | 7.3% | gate=0.0 baseline needed |
+| XRP_5m | N/A | < 0.85 | N/A | N/A | N/A | FROZEN (permanent) |
+| XRP_15m | 0.950 | < 0.85 | +0.100 | -$0.234/bar | 19.3% | pace_urgency_lo 0.30->0.25 next |
+| XRP_1h | 0.812 | < 0.85 | -0.038 | +$0.099/bar | 8.0% | PRIORITY — pace_urgency_lo 0.35->0.30 |
+
+Pre-RESET best (expected to return with gate=0.0):
+BTC_5m=0.922, BTC_15m=0.933, BTC_1h=0.799, ETH_5m=0.633, ETH_15m=0.560,
+ETH_1h=0.706, SOL_5m=0.676, SOL_15m=0.696, SOL_1h=0.655, XRP_15m=0.638, XRP_1h=0.674
 
 ---
 
 ## Blacklist (per-pair)
-- BTC_5m: skip 0.45/0.55, cheap_threshold 0.07/0.12, onesided 2.0->1.5 (COLLAPSE)
-- BTC_15m: skip=0.45 (definitive 3x collapse), bar_budget 400
-- BTC_1h: risk_ceil 0.10, skip 0.50, onesided 5->3
-- ETH_5m: skip 0.60, onesided 1.5->1.0 (COLLAPSE)
-- ETH_15m: skip above 0.50, onesided above 1.5 or below 1.5 (COLLAPSE at 1.0)
+
+- BTC_5m: gate=0.02/0.04/0.08 (collapse), skip 0.45/0.55, onesided 2.0->1.5 (COLLAPSE)
+- BTC_15m: gate=0.04 (collapse), skip=0.45 (definitive 3x collapse), bar_budget 400
+- BTC_1h: gate=0.04 (collapse), risk_ceil 0.10/0.20, skip 0.50, onesided 5->3
+- ETH_5m: gate=0.04 (collapse), skip 0.60, onesided 1.5->1.0 (COLLAPSE)
+- ETH_15m: gate=0.04 (collapse), skip above 0.50, onesided above 1.5 or below 1.5 (COLLAPSE at 1.0)
 - ETH_1h: onesided above 5, skip 0.40, risk_ceil 0.20, bar_budget 250/300
-- SOL_5m: skip 0.55, onesided 2.0->1.5 (COLLAPSE at floor=2.0)
-- SOL_15m: skip 0.40 (COLLAPSE), onesided 5.0->2.0 (COLLAPSE), bar_budget 400
-- SOL_1h: skip 0.35 (COLLAPSE), skip 0.40, risk_ceil 0.20 (tested in regression)
-- XRP_5m: ALL (FROZEN)
-- XRP_15m: skip 0.40 (collapse), bar_budget 300, risk_ceil 0.20
-- XRP_1h: skip 0.45/0.55, bar_budget 300, risk_ceil 0.20, pace_urgency_lo (ineffective on 1h)
+- SOL_5m: gate=0.04 (collapse), skip 0.55, onesided 2.0->1.5 (COLLAPSE)
+- SOL_15m: skip 0.40 (COLLAPSE), onesided ANY reduction from 5.0 (COLLAPSE), bar_budget 400
+- SOL_1h: skip 0.35 (COLLAPSE), skip 0.40, risk_ceil 0.20
+- XRP_5m: ALL (FROZEN permanent)
+- XRP_15m: skip 0.40 (COLLAPSE), bar_budget 300, risk_ceil 0.20
+- XRP_1h: skip 0.45/0.55, bar_budget 300, risk_ceil 0.20, pace_urgency_lo->0.45
 
 ## Global Blacklist
-- conviction_market_start: GLOBALLY BLACKLISTED — fails across ALL tested pairs (BTC_1h, XRP_15m, XRP_1h, all 1h/15m TFs)
-  DO NOT TEST on any remaining pair under any circumstances
-- magnitude_gate=0.08: confirmed too aggressive for 11/12 pairs (complete pair formation collapse)
-  All knobs files now set to 0.04 — do not revert to 0.08
+
+- conviction_market_start: GLOBALLY BLACKLISTED — fails across ALL tested pairs.
+  DO NOT TEST on any remaining pair under any circumstances.
+- magnitude_gate=0.08: confirmed too aggressive for 11/12 pairs.
+  Rotation 2 confirms gate=0.04 still too aggressive for 7/11 active pairs.
+  Next step: test gate=0.0 for all zero-formation pairs.
+- magnitude_gate=0.04: still collapses BTC_5m, BTC_15m, BTC_1h, ETH_5m, ETH_15m, SOL_5m, SOL_1h.
+  Do not expect improvement from gate=0.04 on these 7 pairs.
