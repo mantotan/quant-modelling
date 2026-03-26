@@ -295,6 +295,7 @@ def replay_with_config(
     min_time_pct: float = 0.0,
     max_flips_kill: int = 0,
     prob_variance_gate: float = 0.0,
+    magnitude_gate: float = 0.0,
 ) -> dict:
     """Replay precomputed bars through engine with given config.
 
@@ -302,6 +303,7 @@ def replay_with_config(
       - min_time_pct: skip all ticks before this time fraction
       - max_flips_kill: stop buying after N model flips within a bar
       - prob_variance_gate: require model prob std > this to trade
+      - magnitude_gate: skip ticks where |cal_prob - 0.5| < threshold
     """
     sim_kw = sim_kwargs or {}
     all_summaries: list[DutchBarSummary] = []
@@ -358,6 +360,12 @@ def replay_with_config(
             if prob_variance_gate > 0 and len(probs_seen) > 10:
                 prob_std = np.std(probs_seen[-20:])
                 if prob_std < prob_variance_gate:
+                    continue
+
+            # --- Experimental gate: magnitude (confidence) ---
+            if magnitude_gate > 0:
+                magnitude = abs(cal_prob - 0.5)
+                if magnitude < magnitude_gate:
                     continue
 
             # Normal engine processing
@@ -502,6 +510,7 @@ def define_experiments(base_knobs: dict) -> list[dict]:
             "min_time_pct": extra_gates.get("min_time_pct", 0.0),
             "max_flips_kill": extra_gates.get("max_flips_kill", 0),
             "prob_variance_gate": extra_gates.get("prob_variance_gate", 0.0),
+            "magnitude_gate": extra_gates.get("magnitude_gate", 0.0),
         })
 
     # === 0. BASELINE ===
@@ -618,6 +627,24 @@ def define_experiments(base_knobs: dict) -> list[dict]:
                         "sell_dump_start": dump_start,
                     })
 
+    # === 20. MAGNITUDE GATE — skip low-confidence ticks ===
+    for mag in [0.02, 0.04, 0.06, 0.08, 0.10, 0.12]:
+        exp(f"mag_{mag:.2f}", "magnitude_gate", magnitude_gate=mag)
+
+    # === 21. MAGNITUDE + CONVICTION SKIP combos ===
+    for mag in [0.04, 0.06, 0.08]:
+        for skip in [0.55, 0.60, 0.65]:
+            exp(f"mag_{mag:.2f}_skip_{skip:.2f}", "combo_mag_skip",
+                overrides={"conviction_buy_skip": skip},
+                magnitude_gate=mag)
+
+    # === 22. MAGNITUDE + ONESIDED CAP combos ===
+    for mag in [0.04, 0.06, 0.08]:
+        for cap in [3.0, 5.0]:
+            exp(f"mag_{mag:.2f}_onesided_{cap:.0f}", "combo_mag_onesided",
+                overrides={"max_onesided_cost": cap},
+                magnitude_gate=mag)
+
     return experiments
 
 
@@ -687,6 +714,7 @@ def main():
             min_time_pct=exp["min_time_pct"],
             max_flips_kill=exp["max_flips_kill"],
             prob_variance_gate=exp["prob_variance_gate"],
+            magnitude_gate=exp.get("magnitude_gate", 0.0),
         )
         metrics["name"] = exp["name"]
         metrics["category"] = exp["category"]
