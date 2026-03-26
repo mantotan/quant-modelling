@@ -1,5 +1,5 @@
-iter=2 pair=BTC_15m timestamp=2026-03-27T06:00:00Z
+iter=3 pair=BTC_1h timestamp=2026-03-27T08:24:31Z
 Role: RESEARCHER (BACKTEST MODE)
-Experiment: BASELINE — fresh baseline for BTC_15m post-RESET; magnitude_gate=0.08 in knobs; no param changed
-Hypothesis: No BASELINE row exists for BTC_15m in results.tsv. Must establish baseline before applying audit directive (onesided=2.0).
-Audit note: FREEZE BTC_15m lifted for onesided=2.0 test; but baseline must come first per researcher spec.
+Experiment: BASELINE — fresh baseline for BTC_1h post-RESET with magnitude_gate=0.08; zero pairs formed (matched_ratio=0%); gate too aggressive for BTC_1h, same collapse pattern as BTC_5m/BTC_15m
+Hypothesis: magnitude_gate=0.08 blocks all pair formation (|cal_prob-0.5|<0.08 eliminates nearly all ticks). Next: reduce to magnitude_gate=0.04 to test whether pair formation resumes while still filtering near-50/50 noise.
+Audit note: BTC_1h CONTINUE directive with pace_urgency_lo=0.45 staged — but magnitude_gate collapse must be resolved first.

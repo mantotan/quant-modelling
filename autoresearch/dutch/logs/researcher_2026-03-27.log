@@ -4,3 +4,6 @@
 2026-03-27T06:00:00Z iter=2 pair=BTC_15m status=BASELINE param=magnitude_gate=0.08(new) ->
   eval: pair_cost=0.0000 profit=-$0.07 max_dd=17.36% bars=133
   hypothesis: "No BASELINE for BTC_15m post-RESET. magnitude_gate=0.08 again collapses all pair formation (0.0% matched_ratio, 133 bars). Same pattern as BTC_5m. Audit directive (onesided=2.0) cannot be meaningfully tested with 0 pairs. Setting magnitude_gate=0.0 to disable gate and restore pair formation for next experiment."
+2026-03-27T08:24:31Z iter=3 pair=BTC_1h status=BASELINE param=magnitude_gate=0.08(new) ->(next: 0.08->0.04)
+  eval: pair_cost=0.0000 profit=$-0.2561 max_dd=4.80% bars=33
+  hypothesis: "magnitude_gate=0.08 blocks all pair formation on BTC_1h (matched_ratio=0%, same as BTC_5m and BTC_15m baselines). Next experiment: reduce gate to 0.04 to test if pair formation resumes while still filtering near-50/50 noise."
