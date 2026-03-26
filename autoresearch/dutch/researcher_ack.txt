@@ -1,8 +1,9 @@
-iter=28 pair=ETH_15m timestamp=2026-03-26T21:58:59Z status=running
+iter=29 pair=ETH_1h timestamp=2026-03-27T14:30:00Z status=running
 Mode: BACKTEST (replay_available)
-Action: magnitude_gate=0.04->0.0 + pace_urgency_lo revert 0.25->0.35 (audit fix)
-Hypothesis: gate=0.04 collapses ETH_15m pair formation (iters 5+17 both 0 pairs matched_ratio=0%).
-  Disabling gate entirely (0.0) per rotation-3 strategy queue item #1.
-  Simultaneously fixing audit-flagged knobs drift: pace_urgency_lo was 0.25 (2 steps ahead),
-  reverting to 0.35 to match best_knobs and correct baseline for future pace_urgency experiments.
-  ETH_15m correct_side=71.0% is 2nd highest in system -- high-value pair if pairs can form.
+Action: pace_urgency_lo 0.30->0.25 experiment (rotation-3 strategy queue item #1)
+Hypothesis: ETH_1h baseline (iter 18) showed pair_cost=0.594 at pace=0.30 with matched_ratio=2.0%.
+  Reducing pace_urgency_lo 0.30->0.25 increases buying urgency earlier in the bar,
+  potentially improving pair quality and reducing avg_pair_cost below baseline 0.594.
+  fill_rate=83.3% at baseline (excellent) leaves room for faster pair capture.
+  correct_side=62.1% solid signal. max_dd=13.8% safe. ETH_1h is Tier-2 active pair.
+  Strategy rotation-3 queue item #1: pace_urgency_lo 0.30->0.25 per strategist directive.
