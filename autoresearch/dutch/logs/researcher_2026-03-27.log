@@ -211,3 +211,8 @@
 2026-03-27T11:15:00Z iter=139 pair=XRP_1h status=DISCARD param=risk_t_start 0.10->0.15
   eval: pair_cost=0.7835 profit=-$0.45/bar max_dd=16.7% bars=38
   hypothesis: "Rotation 12 XRP_1h risk_budget experiment 1. XRP_1h near-breakeven at -$0.026/bar; shifting risk_t_start 0.10->0.15 to delay order sizing ramp. IMMEDIATE DISCARD: DD=16.7%>15% threshold; profit regressed -$0.026->-$0.45/bar (-1630%). NOTE: matched_ratio improved 3.9%->5.1% -- confirms later placement finds better-resolved prices, but XRP_1h cannot tolerate this timing change due to DD sensitivity. risk_t_start floor confirmed at 0.10 for XRP_1h. Restore to risk_t_start=0.10. Next: risk_t_end 0.8->0.75."
+2026-03-27T13:10:00Z iter=141 pair=XRP_1h role=researcher outcome=DISCARD risk_exponent=1.5(DD_BREACH) pair_cost=0.7852 profit=-$0.33/bar max_dd=15.2% bars=38
+  eval: pair_cost=0.7852 profit=$-0.33 max_dd=15.2% bars=38
+  hypothesis: "Flatter ramp (exponent 1.5 vs 2.0) distributes orders more linearly. Given XRP_1h IS timing-sensitive (iter139 matched improved +302026-03-27T13:10:00Z iter=141 pair=XRP_1h role=researcher outcome=DISCARD risk_exponent=1.5(DD_BREACH) pair_cost=0.7852 profit=-0.33/bar max_dd=15.2pct bars=38
+  eval: pair_cost=0.7852 profit=-0.33 max_dd=15.2pct bars=38
+  hypothesis: "Flatter ramp (exponent 1.5 vs 2.0) more linear distribution. XRP_1h timing-sensitive but softer exponent front-loads orders causing same DD rebalancing pressure as risk_t_start=0.15. risk_budget category exhausted for XRP_1h."

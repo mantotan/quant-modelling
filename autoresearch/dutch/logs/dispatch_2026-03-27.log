@@ -69,3 +69,4 @@
 2026-03-27T11:15:00Z iter=139 pair=ETH_1h+XRP_1h role=researcher outcome=rotation12 ETH_1h risk_t_start DISCARD(profit regression +$0.19->+$0.12/bar) XRP_1h risk_t_start DISCARD-DD_BREACH(DD=16.7%>15%); risk_t_start floor=0.10 both pairs; 10 frozen SKIPs; next: risk_t_end 0.8->0.75
 2026-03-27T11:35:00Z iter=139 pair=XRP_1h role=auditor outcome=FREEZE x10 CONTINUE ETH_1h+XRP_1h; risk_t_end 0.8->0.75 next for both; knobs_XRP_1h min_buy_time_pct discrepancy flagged; 0/4 KEEPs R11-R12; KEEP rate 5/26=19.2%
 2026-03-27T12:35:00Z iter=140 pair=XRP_1h role=strategist outcome=rotation12_midrun:0/3_risk_budget_KEEPs;ETH_1h_risk_t_start+end_inert;XRP_1h_risk_t_start_DD_breach;pending_XRP_1h_risk_t_end_iter141+risk_exponent_both_pairs;cumulative_KEEP=5/28+=17.9%
+2026-03-27T13:10:00Z iter=141 pair=XRP_1h role=RESEARCHER outcome=DISCARD risk_exponent=2.0->1.5 DD_BREACH(15.2pct>15pct) profit_regressed(-$0.026->-$0.33/bar) risk_budget_exhausted_XRP_1h

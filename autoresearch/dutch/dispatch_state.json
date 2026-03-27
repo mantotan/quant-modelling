@@ -1,5 +1,5 @@
 {
-  "current_pair": "XRP_1h",
+  "current_pair": "BTC_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 11,
-  "last_updated": "2026-03-27T12:35:00Z",
-  "last_role": "strategist",
+  "pair_index": 0,
+  "last_updated": "2026-03-27T13:10:00Z",
+  "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 140,
   "last_auditor_at": 139,
-  "total_iterations": 140,
-  "last_exit_reason": "STRATEGIST rotation 12 mid-run analysis (iters 128-140): 0/3 risk_budget KEEPs. ETH_1h risk_t_start(DISCARD iter133) + risk_t_end(DISCARD iter140) both inert on thin dataset. XRP_1h risk_t_start(DISCARD-DD_BREACH iter139) -- matched improved +30% but DD=16.7% breached 15%. Pending: XRP_1h risk_t_end iter141, then risk_exponent 2.0->1.5 for both pairs. Risk_budget 0/3 = 0% KEEP rate. ETH_1h deployment case confirmed strong (+$0.19/bar, pair_cost=0.577). Cumulative KEEP rate: 5/28+ = ~17.9%."
+  "total_iterations": 141,
+  "last_exit_reason": "RESEARCHER iter=141 XRP_1h DISCARD risk_exponent=2.0->1.5 (USER-DIRECTED): DD=15.2% breach (>15% threshold); avg_profit regressed -$0.026->-$0.33/bar; pair_cost unchanged 0.785. XRP_1h risk_budget category exhausted (risk_t_start DISCARD iter139 + risk_exponent DISCARD iter141; risk_t_end deferred per user override). ETH_1h also needs risk_exponent=1.5 (rotation 12 item 3, risk_t_end already DISCARDed iter140). Rotation wraps to BTC_5m; next active pairs ETH_1h (index 5) and XRP_1h (index 11) in rotation 13."
 }
