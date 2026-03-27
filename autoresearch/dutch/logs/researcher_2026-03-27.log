@@ -164,3 +164,10 @@
   eval: pair_cost=0.5771 profit=+$0.18 max_dd=11.2% bars=36
   hypothesis: "pace_urgency_hi 2.0->1.5 to reduce late-bar urgency spike and improve fill quality; expected improvement in matched_ratio or avg_profit; result was IDENTICAL to iter78 KEEP (0.5771/+$0.18/1.9%/11.2%) -- pace lever category INERT on thin 1h ETH dataset (4 outcomes in 36 bars); same pattern as iters 29/53 where pace_urgency_lo was dead; pace category EXHAUSTED for ETH_1h; next lever = spread_offset 0.01->0.005"
   frozen skips this invocation: BTC_15m(81) BTC_1h(82) ETH_5m(83) ETH_15m(84) all FROZEN ACTIVE
+2026-03-27T22:00:00Z iter=91 pair=XRP_1h status=DISCARD param=max_onesided_cost 5.0->3.5
+  eval: pair_cost=0.7852 profit=-0.26/bar max_dd=9.7% bars=37 matched=3.9%
+  hypothesis: onesided=3.5 intermediate between confirmed-stable 5.0 and confirmed-collapse 2.0;
+  expected to reduce unmatched cost accumulation while preserving pair formation above collapse threshold;
+  RESULT: no collapse (matched_ratio=3.9%>2%) but profit REGRESSED from -0.08/bar to -0.26/bar;
+  pair_cost unchanged at 0.785; onesided=3.5 tighter cap cuts profitable unmatched accumulation;
+  CONCLUSION: onesided floor confirmed at 5.0 for XRP_1h; next lever = spread_offset 0.01->0.005

@@ -1,5 +1,5 @@
 {
-  "current_pair": "XRP_15m",
+  "current_pair": "BTC_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 10,
-  "last_updated": "2026-03-27T21:30:00Z",
-  "last_role": "strategist",
+  "pair_index": 0,
+  "last_updated": "2026-03-27T22:00:00Z",
+  "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 90,
   "last_auditor_at": 90,
-  "total_iterations": 90,
-  "last_exit_reason": "STRATEGIST iter 90: analyzed rotations 7-8 (iters 73-90). 2 KEEPs in R7 (ETH_1h chase_threshold=0.05, XRP_1h chase_threshold=0.05), 1 DISCARD in R8 (ETH_1h pace_urgency_hi=1.5 inert). KEEP rate R7-R8: 66.7%. ETH_1h profit=+$0.18/bar (POSITIVE, beats benchmark). XRP_1h profit=-$0.08/bar (improving). ETH_1h pace category CLOSED. XRP_1h onesided=3.5 already staged in knobs. Next: advance to XRP_1h (index 11), run onesided=3.5 experiment (iter 91). ETH_1h next: spread_offset=0.005."
+  "total_iterations": 91,
+  "last_exit_reason": "RESEARCHER iter 91: XRP_1h max_onesided_cost=3.5 DISCARD. pair_cost=0.785 unchanged (no improvement vs iter79 0.785), avg_profit=-0.26/bar REGRESSED vs -0.08/bar. No collapse (matched_ratio=3.9%>2%). Onesided floor CONFIRMED at 5.0. Knobs restored to best_knobs. Rotation-8 complete (ETH_1h pace_hi DISCARD iter85 + XRP_1h onesided DISCARD iter91, 0 KEEPs). Advancing to rotation-9: BTC_5m (FROZEN, will skip). Next active experiments: ETH_1h spread_offset=0.005, XRP_1h spread_offset=0.005."
 }
