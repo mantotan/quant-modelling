@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 0,
-  "last_updated": "2026-03-27T00:32:00Z",
-  "last_role": "researcher",
+  "last_updated": "2026-03-27T01:00:00Z",
+  "last_role": "strategist",
   "last_monitor_at": "2026-03-27T06:30:00Z",
-  "last_strategist_at": 90,
+  "last_strategist_at": 103,
   "last_auditor_at": 90,
   "total_iterations": 103,
-  "last_exit_reason": "RESEARCHER iter 103: XRP_1h spread_offset 0.01->0.005 DISCARD. pair_cost=0.818 REGRESSED vs iter79 KEEP (0.785); avg_profit=-0.21/bar REGRESSED vs -0.08/bar; fill_rate=65.7% decreased (-3.3pp); no collapse (matched=3.9%); tighter spread hurts fill rate in wider-spread XRP market; spread_offset floor=0.01 confirmed for XRP_1h; knobs restored to spread_offset=0.01; Pre-logged 5 frozen SKIPs (iters 98-102: SOL_5m through XRP_15m). Rotation-9 XRP_1h done. Next active: BTC_5m (index 0, rotation 10 begins). Next dispatch: BTC_5m SKIP chain through ETH_15m to ETH_1h."
+  "last_exit_reason": "STRATEGIST iter 103: rotation-9 post-run analysis. ETH_1h spread_offset KEEP (iter97, +$0.01/bar marginal, now active in best_knobs). XRP_1h spread_offset DISCARD (iter103, pair_cost regressed 0.785->0.818). Rotation 10 plan: max_chase 2->3 for both ETH_1h and XRP_1h. Fill-sim parameter space nearly exhausted (2 experiments each remaining: max_chase + cancel_distance). KEEP rate iters 91-103: 1/2 active = 50%. Cumulative KEEP rate: 4/17 active = 23.5%. Spread_offset floors confirmed: ETH_1h=0.005, XRP_1h=0.01. Onesided floor confirmed at 5.0 for XRP_1h. strategy.md updated with rotation-10 priority queues."
 }
