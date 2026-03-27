@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_5m",
+  "current_pair": "BTC_15m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 0,
-  "last_updated": "2026-03-27T15:05:00Z",
+  "pair_index": 1,
+  "last_updated": "2026-03-27T15:10:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 140,
   "last_auditor_at": 139,
-  "total_iterations": 148,
-  "last_exit_reason": "RESEARCHER iter=148 XRP_1h DISCARD risk_t_end=0.75 INERT: pair_cost=0.7852 identical, profit=-$0.36/bar (+$0.02 noise), matched=3.8% unchanged, DD=15.5% still above 15%. Risk_budget category EXHAUSTED for XRP_1h (all 3 sub-params: risk_t_start DISCARD iter139, risk_exponent DISCARD iter141, risk_t_end DISCARD iter148). Both ETH_1h and XRP_1h risk_budget exhausted. Next: sell_params category for both active pairs (rotation 14). Skipped SOL_15m(7)/SOL_1h(8)/XRP_5m(9)/XRP_15m(10) as FROZEN. Rotation advanced to BTC_5m(0)."
+  "total_iterations": 149,
+  "last_exit_reason": "RESEARCHER iter=149 BTC_5m SKIP FROZEN_SKIP: AUDITOR FREEZE PERMANENT (rotation 14) -- fill mechanics structural (P=5.6%); no levers remain. Rotation advanced to BTC_15m(1). Rotation 14 plan: BTC_5m-ETH_15m all FROZEN_SKIP; ETH_1h sell_params (sell_loss_start/sell_dump_start/profit_protect_min_pairs) first unexplored category; SOL_5m-XRP_15m all FROZEN_SKIP; XRP_1h sell_params same category."
 }
