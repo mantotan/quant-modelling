@@ -77,3 +77,4 @@
 2026-03-27T16:45:00Z iter=160 pair=XRP_1h role=researcher outcome=KEEP(XRP_1h min_buy_time_pct_fix+sell_params) profit+$0.12/bar pair_cost=0.747 DD=10.3%; ETH_1h iter154 DISCARD sell_category_exhausted sell_ratio=0.00; rotation14 complete; rotation15 starts at BTC_5m
 2026-03-27T17:00:00Z iter=160 pair=BTC_5m role=strategist outcome=BOTH_PAIRS_PROFITABLE: ETH_1h +/usr/bin/bash.19/bar ALL_CATEGORIES_EXHAUSTED; XRP_1h +/usr/bin/bash.12/bar matched=5.8% ALL_CATEGORIES_EXHAUSTED; rotation_15=ALL_FROZEN_SKIP; AUDITOR_ESCALATION: deploy_signoff+structural_floor_declaration requested
 2026-03-27T17:30:00Z iter=161 pair=BTC_5m role=researcher outcome=FROZEN_SKIP rotation-15-start fill-mechanics-permanent
+2026-03-27T17:45:00Z iter=162 pair=BTC_15m role=researcher outcome=FROZEN_SKIP -- AUDITOR FREEZE MAINTAINED outcome sparsity structural (7.9%); advancing rotation to BTC_1h
