@@ -35,7 +35,7 @@
   "fill_simulator": {
     "fill_ticks": 2,
     "chase_threshold": 0.05,
-    "max_chase": 2,
+    "max_chase": 3,
     "spread_offset": 0.01,
     "cancel_distance": 0.05
   },

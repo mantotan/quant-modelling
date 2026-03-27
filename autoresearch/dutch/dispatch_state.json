@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_5m",
+  "current_pair": "BTC_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 6,
-  "last_updated": "2026-03-27T07:33:00Z",
+  "pair_index": 0,
+  "last_updated": "2026-03-27T00:36:24Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 103,
   "last_auditor_at": 90,
-  "total_iterations": 109,
-  "last_exit_reason": "RESEARCHER iter 109: ETH_1h max_chase 2->3 DISCARD. ALL metrics identical to iter97 KEEP (pair_cost=0.5771, profit=+$0.19/bar, matched=1.9%, DD=11.2%). max_chase=3 INERT on thin 36-bar dataset with 4 resolved outcomes. Extra chase attempt never triggers at 86% fill_rate. max_chase floor confirmed at 2. Next lever: cancel_distance 0.05->0.03 for ETH_1h. Logged 5 frozen SKIPs (iters 104-108: BTC_5m/BTC_15m/BTC_1h/ETH_5m/ETH_15m). Next dispatch: advance through SOL_5m..XRP_15m frozen SKIPs to XRP_1h (max_chase 2->3, rotation-10 queue item 1). KEEP rate rotation 10 so far: 0/1 = 0%."
+  "total_iterations": 115,
+  "last_exit_reason": "RESEARCHER iter 115: XRP_1h max_chase 2->3 KEEP. avg_profit=-$0.026/bar IMPROVED vs iter79 KEEP -$0.08/bar (+$0.054/bar, +67.5%). pair_cost=0.785 stable. fill_rate=74.3% (+5.3pp). matched_ratio=3.9% stable (no collapse). max_dd=10.58% safe. Extra chase attempt triggered: recovering fills after brief price moves in thin XRP_1h market. Logged 5 frozen SKIPs (iters 110-114: SOL_5m/SOL_15m/SOL_1h/XRP_5m/XRP_15m). KEEP rate rotation 10: 1/2 active experiments = 50%. Next dispatch: BTC_5m (pair_index=0), skip frozen to ETH_1h (cancel_distance 0.05->0.03, rotation-10 queue item 2)."
 }
