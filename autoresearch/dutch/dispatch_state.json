@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 0,
-  "last_updated": "2026-03-27T10:20:00Z",
-  "last_role": "researcher",
+  "last_updated": "2026-03-27T10:35:00Z",
+  "last_role": "strategist",
   "last_monitor_at": "2026-03-27T06:30:00Z",
-  "last_strategist_at": 115,
+  "last_strategist_at": 127,
   "last_auditor_at": 115,
   "total_iterations": 127,
-  "last_exit_reason": "RESEARCHER iter 122-127: rotation 11 complete. Iters 122-126: SOL_5m/SOL_15m/SOL_1h/XRP_5m/XRP_15m FROZEN_SKIP (all per audit.md directives). Iter 127: XRP_1h cancel_distance 0.05->0.03 DISCARD (COLLAPSE). matched_ratio collapsed 3.9%->1.6% (< 2.0% immediate threshold), fill_rate halved 74.3%->34.2% (-40.1pp), profit regressed -$0.026->-$0.384/bar (-1378%). cancel_distance=0.03 causes over-cancellation within XRP price noise. cancel_distance floor confirmed at 0.05 for BOTH ETH_1h (iter121) AND XRP_1h (iter127). ALL fill-sim sub-params now EXHAUSTED for both active pairs. BOTH pairs at parametric ceiling: ETH_1h profit=+$0.19/bar pair_cost=0.577, XRP_1h profit=-$0.026/bar pair_cost=0.785. Strategy mandates ESCALATE TO AUDITOR after both fill-sim exhaustions. iters_since_auditor=127-115=12 -> AUDITOR threshold (>=24) not met yet, but strategist threshold (>=12) IS met. Next dispatch: STRATEGIST (iters_since_strategist=127-115=12 >= 12)."
+  "last_exit_reason": "STRATEGIST after iter 127: fill-sim category EXHAUSTED for both ETH_1h (iter121 DISCARD) and XRP_1h (iter127 DISCARD-COLLAPSE). cancel_distance=0.03 universally collapses 1h pairs — floor=0.05 globally. cancel_distance added to global blacklist. Rotation 12 plan: RISK BUDGET category (risk_t_start, risk_t_end, risk_exponent). ETH_1h first experiment: risk_t_start 0.10->0.15. XRP_1h first experiment: risk_t_start 0.10->0.15. All other 10 pairs remain frozen. ETH_1h at +$0.19/bar BEATS trader_a benchmarks — deployment-ready pending auditor matched_ratio assessment. XRP_1h at -$0.026/bar near-breakeven — 1-2 more KEEPs needed. Cumulative KEEP rate: 5/24 = 20.8%. KEEP rate fill-sim: 5/10 = 50% (best category). Next: researcher R12."
 }
