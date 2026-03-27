@@ -78,3 +78,4 @@
 2026-03-27T17:00:00Z iter=160 pair=BTC_5m role=strategist outcome=BOTH_PAIRS_PROFITABLE: ETH_1h +/usr/bin/bash.19/bar ALL_CATEGORIES_EXHAUSTED; XRP_1h +/usr/bin/bash.12/bar matched=5.8% ALL_CATEGORIES_EXHAUSTED; rotation_15=ALL_FROZEN_SKIP; AUDITOR_ESCALATION: deploy_signoff+structural_floor_declaration requested
 2026-03-27T17:30:00Z iter=161 pair=BTC_5m role=researcher outcome=FROZEN_SKIP rotation-15-start fill-mechanics-permanent
 2026-03-27T17:45:00Z iter=162 pair=BTC_15m role=researcher outcome=FROZEN_SKIP -- AUDITOR FREEZE MAINTAINED outcome sparsity structural (7.9%); advancing rotation to BTC_1h
+2026-03-27T17:50:00Z iter=163 pair=ETH_5m role=auditor outcome=STRUCTURAL_FLOOR_DECLARED -- ETH_1h+XRP_1h FREEZE_PERMANENT+DEPLOY approved; all 13 categories exhausted; 0% KEEP rate last 24 genuine experiments
