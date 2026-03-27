@@ -62,3 +62,4 @@
 2026-03-27T07:33:00Z iter=109 pair=ETH_1h role=RESEARCHER outcome=DISCARD max_chase 2->3 inert; all metrics identical to iter97 KEEP; 5 frozen SKIPs logged (iters104-108); next=XRP_1h max_chase 2->3
 2026-03-27T00:36:24Z iter=115 pair=XRP_1h role=RESEARCHER outcome=KEEP max_chase=3 profit=-$0.026/bar(+67.5%) fill_rate=74.3%(+5.3pp) pair_cost=0.785 max_dd=10.58%
 2026-03-27T09:00:00Z iter=115 pair=ALL role=auditor outcome=CONTINUE ETH_1h+XRP_1h, FREEZE x10 maintained. cancel_distance next for both. Cumulative KEEP 5/20=25%.
+2026-03-27T09:15:00Z iter=115 pair=BTC_5m role=strategist outcome=rotation10_analysis: XRP_1h max_chase KEEP(+67.5% profit), ETH_1h max_chase DISCARD(inert). cancel_distance=0.03 queued for both pairs in R11. KEEP_rate=28.6%(6/21)
