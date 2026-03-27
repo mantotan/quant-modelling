@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 10,
-  "last_updated": "2026-03-27T21:15:00Z",
-  "last_role": "auditor",
+  "last_updated": "2026-03-27T21:30:00Z",
+  "last_role": "strategist",
   "last_monitor_at": "2026-03-27T06:30:00Z",
-  "last_strategist_at": 72,
+  "last_strategist_at": 90,
   "last_auditor_at": 90,
   "total_iterations": 90,
-  "last_exit_reason": "AUDITOR iter 90: analyzed rotations 6-8 (iters 61-90). 3 KEEPs since last audit (R6 XRP_1h fill_ticks=2, R7 ETH_1h chase_threshold=0.05, R7 XRP_1h chase_threshold=0.05). KEEP rate improved from 0% to 20% cumulative. ETH_1h profitable at +$0.18/bar (pair_cost=0.577). XRP_1h improving (-$0.08/bar, pair_cost=0.785). All 10 frozen pairs maintained. Dispatch reconciled: pair_index advanced to 10 (XRP_15m) to reflect 5 pre-logged SKIP rows (iters 86-90). Next invocation: advance to XRP_1h (index 11) for onesided=3.5 experiment (knobs pre-staged)."
+  "last_exit_reason": "STRATEGIST iter 90: analyzed rotations 7-8 (iters 73-90). 2 KEEPs in R7 (ETH_1h chase_threshold=0.05, XRP_1h chase_threshold=0.05), 1 DISCARD in R8 (ETH_1h pace_urgency_hi=1.5 inert). KEEP rate R7-R8: 66.7%. ETH_1h profit=+$0.18/bar (POSITIVE, beats benchmark). XRP_1h profit=-$0.08/bar (improving). ETH_1h pace category CLOSED. XRP_1h onesided=3.5 already staged in knobs. Next: advance to XRP_1h (index 11), run onesided=3.5 experiment (iter 91). ETH_1h next: spread_offset=0.005."
 }
