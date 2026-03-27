@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_5m",
+  "current_pair": "XRP_15m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 6,
-  "last_updated": "2026-03-27T21:05:00Z",
-  "last_role": "researcher",
+  "pair_index": 10,
+  "last_updated": "2026-03-27T21:15:00Z",
+  "last_role": "auditor",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 72,
-  "last_auditor_at": 60,
-  "total_iterations": 85,
-  "last_exit_reason": "RESEARCHER rotation-8 iter 85: ETH_1h DISCARD pace_urgency_hi 2.0->1.5 (IDENTICAL result -- lever inert on thin dataset, 4 outcomes in 36 bars; same pattern as iters 29/53/53 for pace levers; pair_cost=0.577 stable, profit=+$0.18/bar unchanged; pace category now EXHAUSTED for ETH_1h; next lever: spread_offset 0.01->0.005). Advancing to SOL_5m."
+  "last_auditor_at": 90,
+  "total_iterations": 90,
+  "last_exit_reason": "AUDITOR iter 90: analyzed rotations 6-8 (iters 61-90). 3 KEEPs since last audit (R6 XRP_1h fill_ticks=2, R7 ETH_1h chase_threshold=0.05, R7 XRP_1h chase_threshold=0.05). KEEP rate improved from 0% to 20% cumulative. ETH_1h profitable at +$0.18/bar (pair_cost=0.577). XRP_1h improving (-$0.08/bar, pair_cost=0.785). All 10 frozen pairs maintained. Dispatch reconciled: pair_index advanced to 10 (XRP_15m) to reflect 5 pre-logged SKIP rows (iters 86-90). Next invocation: advance to XRP_1h (index 11) for onesided=3.5 experiment (knobs pre-staged)."
 }
