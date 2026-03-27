@@ -1,9 +1,9 @@
-iter=110-115 pair=SOL_5m(SKIP)..XRP_1h timestamp=2026-03-27T08:00:00Z
-Rotation 10: advancing through 5 frozen SKIPs (iters 110-114: SOL_5m/SOL_15m/SOL_1h/XRP_5m/XRP_15m),
-then running XRP_1h max_chase 2->3 experiment (iter 115).
-User directive: skip frozen pairs to XRP_1h max_chase=3 experiment.
-Strategy.md rotation 10 item 12: XRP_1h max_chase 2->3.
-KEEP reference (iter 79): pair_cost=0.785, profit=-$0.08/bar, DD=8.9%, matched=4.0%
-KEEP criteria: pair_cost < 0.785 OR avg_profit > -$0.08/bar
-DISCARD if: matched_ratio < 2.0% (collapse) OR DD > 15%
+iter=116-120 pair=BTC_5m(SKIP)..ETH_1h timestamp=2026-03-27T10:00:00Z
+Rotation 11: advancing through 5 frozen SKIPs (iters 116-120: BTC_5m/BTC_15m/BTC_1h/ETH_5m/ETH_15m),
+then running ETH_1h cancel_distance 0.05->0.03 experiment (iter 121).
+User directive: skip frozen pairs, run cancel_distance=0.03 on ETH_1h first.
+Strategy.md rotation 11 item 6: ETH_1h cancel_distance 0.05->0.03.
+KEEP reference (iter 97): pair_cost=0.577, profit=+$0.19/bar, DD=11.2%, matched=1.9%
+KEEP criteria: matched_ratio > 1.9% OR avg_profit > +$0.19/bar OR pair_cost < 0.577
+DISCARD if: pair_cost > 0.65 OR DD > 13% OR matched_ratio < 1.5%
 BACKTEST MODE (sub_phase=replay_available).
