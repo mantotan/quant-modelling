@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 0,
-  "last_updated": "2026-03-27T00:36:24Z",
-  "last_role": "researcher",
+  "last_updated": "2026-03-27T09:00:00Z",
+  "last_role": "auditor",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 103,
-  "last_auditor_at": 90,
+  "last_auditor_at": 115,
   "total_iterations": 115,
-  "last_exit_reason": "RESEARCHER iter 115: XRP_1h max_chase 2->3 KEEP. avg_profit=-$0.026/bar IMPROVED vs iter79 KEEP -$0.08/bar (+$0.054/bar, +67.5%). pair_cost=0.785 stable. fill_rate=74.3% (+5.3pp). matched_ratio=3.9% stable (no collapse). max_dd=10.58% safe. Extra chase attempt triggered: recovering fills after brief price moves in thin XRP_1h market. Logged 5 frozen SKIPs (iters 110-114: SOL_5m/SOL_15m/SOL_1h/XRP_5m/XRP_15m). KEEP rate rotation 10: 1/2 active experiments = 50%. Next dispatch: BTC_5m (pair_index=0), skip frozen to ETH_1h (cancel_distance 0.05->0.03, rotation-10 queue item 2)."
+  "last_exit_reason": "AUDITOR iter 115: deep analysis complete. 10 pairs FROZEN maintained. ETH_1h CONTINUE (pair_cost=0.577, profit=+$0.19/bar, fill-sim 1 lever remaining: cancel_distance). XRP_1h CONTINUE (pair_cost=0.785, profit=-$0.026/bar improving, fill-sim 1 lever remaining: cancel_distance). Rotation 10 KEEP rate 50% (1/2). Cumulative KEEP rate 25% (5/20). Both pairs approaching parametric ceiling. cancel_distance 0.05->0.03 is the FINAL fill-sim lever for both ETH_1h and XRP_1h. If both DISCARD, escalate to STRATEGIST for non-fill-sim levers. Next dispatch: RESEARCHER, pair=BTC_5m (SKIP to ETH_1h for cancel_distance experiment)."
 }
