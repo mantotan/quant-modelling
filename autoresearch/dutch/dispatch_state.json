@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_5m",
+  "current_pair": "XRP_1h",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 0,
-  "last_updated": "2026-03-27T11:15:00Z",
-  "last_role": "researcher",
+  "pair_index": 11,
+  "last_updated": "2026-03-27T11:35:00Z",
+  "last_role": "auditor",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 127,
-  "last_auditor_at": 115,
+  "last_auditor_at": 139,
   "total_iterations": 139,
-  "last_exit_reason": "RESEARCHER rotation 12 complete (iters 128-139): ETH_1h risk_t_start 0.10->0.15 DISCARD (iter133, profit regressed +$0.19->+$0.12/bar, matched 1.9% unchanged); XRP_1h risk_t_start 0.10->0.15 DISCARD-DD_BREACH (iter139, DD=16.7%>15%, profit -$0.026->-$0.45/bar; matched improved 3.9%->5.1% but DD/profit override); risk_t_start floor confirmed at 0.10 for both ETH_1h and XRP_1h; 10 frozen SKIP rows (iters 128-132, 134-138); next experiment per strategy.md rotation 12 queue items: risk_t_end 0.8->0.75 for both ETH_1h and XRP_1h (rotation 13). Cumulative KEEP rate: 5/26 = 19.2%. KEEP rate risk_budget category: 0/2 = 0% so far."
+  "last_exit_reason": "AUDITOR rotation 12 analysis (iters 116-139): R11 0/2 KEEPs (both cancel_distance=0.03 COLLAPSE); R12 partial 0/2 KEEPs (ETH_1h risk_t_start DISCARD noise, XRP_1h risk_t_start DISCARD-DD_BREACH but matched_ratio 3.9%->5.1%); fill-sim category EXHAUSTED both pairs; risk_t_start floor=0.10 confirmed both pairs; risk_t_end 0.8->0.75 is next experiment for both ETH_1h and XRP_1h (rotation 12 item 2); KNOBS ALERT: knobs_XRP_1h.json has min_buy_time_pct=0.15 (not reset after iter139 DISCARD) -- researcher must fix before next experiment; FREEZE directives all maintained; ETH_1h deployment case strong (+$0.19/bar, pair_cost=0.577 beats trader_a). Cumulative KEEP rate: 5/26 = 19.2%."
 }
