@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_5m",
+  "current_pair": "SOL_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 0,
-  "last_updated": "2026-03-27T13:10:00Z",
+  "pair_index": 6,
+  "last_updated": "2026-03-27T13:20:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 140,
   "last_auditor_at": 139,
-  "total_iterations": 141,
-  "last_exit_reason": "RESEARCHER iter=141 XRP_1h DISCARD risk_exponent=2.0->1.5 (USER-DIRECTED): DD=15.2% breach (>15% threshold); avg_profit regressed -$0.026->-$0.33/bar; pair_cost unchanged 0.785. XRP_1h risk_budget category exhausted (risk_t_start DISCARD iter139 + risk_exponent DISCARD iter141; risk_t_end deferred per user override). ETH_1h also needs risk_exponent=1.5 (rotation 12 item 3, risk_t_end already DISCARDed iter140). Rotation wraps to BTC_5m; next active pairs ETH_1h (index 5) and XRP_1h (index 11) in rotation 13."
+  "total_iterations": 142,
+  "last_exit_reason": "RESEARCHER iter=142 ETH_1h DISCARD risk_exponent=2.0->1.5 (USER-DIRECTED override): avg_profit=+$0.22/bar (+$0.03/bar vs KEEP +$0.19/bar) within +-$0.05 noise floor; matched_ratio=1.8% regressed vs KEEP 1.9%; DD=11.7% stable; pair_cost=0.577 identical. DISCARD per noise policy ($0.03<$0.05 threshold). RISK_BUDGET CATEGORY EXHAUSTED for ETH_1h (risk_t_start DISCARD iter133 + risk_t_end DISCARD iter140 + risk_exponent DISCARD iter142 = 0/3 KEEP). ETH_1h at parametric floor: pair_cost=0.577, profit=+$0.19/bar. ESCALATE TO AUDITOR for deployment assessment. Rotation advanced from ETH_1h(5) to SOL_5m(6) per user-directed override position."
 }
