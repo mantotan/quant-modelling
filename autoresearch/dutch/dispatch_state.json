@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_5m",
+  "current_pair": "BTC_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 6,
-  "last_updated": "2026-03-27T00:21:06Z",
+  "pair_index": 0,
+  "last_updated": "2026-03-27T00:32:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 90,
   "last_auditor_at": 90,
-  "total_iterations": 97,
-  "last_exit_reason": "RESEARCHER iter 97: ETH_1h spread_offset=0.005 KEEP. pair_cost=0.577 stable (identical), avg_profit=+$0.19/bar MARGINALLY IMPROVED vs +$0.18/bar (+$0.01). matched_ratio=1.88% stable. max_dd=11.23% safe. KEEP criterion: avg_profit>+$0.18/bar MET. best_knobs_ETH_1h updated. Pre-logged 5 frozen SKIPs (iters 92-96: BTC_5m through ETH_15m). Rotation-9 ETH_1h done. Next active: XRP_1h (index 11) spread_offset=0.005. Next dispatch: SOL_5m SKIP chain through XRP_15m to XRP_1h."
+  "total_iterations": 103,
+  "last_exit_reason": "RESEARCHER iter 103: XRP_1h spread_offset 0.01->0.005 DISCARD. pair_cost=0.818 REGRESSED vs iter79 KEEP (0.785); avg_profit=-0.21/bar REGRESSED vs -0.08/bar; fill_rate=65.7% decreased (-3.3pp); no collapse (matched=3.9%); tighter spread hurts fill rate in wider-spread XRP market; spread_offset floor=0.01 confirmed for XRP_1h; knobs restored to spread_offset=0.01; Pre-logged 5 frozen SKIPs (iters 98-102: SOL_5m through XRP_15m). Rotation-9 XRP_1h done. Next active: BTC_5m (index 0, rotation 10 begins). Next dispatch: BTC_5m SKIP chain through ETH_15m to ETH_1h."
 }
