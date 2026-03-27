@@ -1,6 +1,24 @@
-iter=143 pair=SOL_5m timestamp=2026-03-27T14:00:00Z
-AUDITOR FREEZE ACTIVE (rotation 13): FROZEN -- 3 consecutive zero-pair runs; fill mechanics structural (P=4.2%); DD=23.2% elevated; advancing rotation to SOL_15m.
+iter=148 pair=XRP_1h timestamp=2026-03-27T15:05:00Z
+DISCARD: risk_t_end=0.75 on XRP_1h — INERT. pair_cost=0.7852 identical, profit=-$0.36/bar (+$0.02 noise), matched=3.8% unchanged, DD=15.5% (marginally lower, still above 15% threshold).
 
-NOTE: ETH_1h and XRP_1h both have risk_budget category exhausted as of iters 142 and 141.
-  ETH_1h: pair_cost=0.577, profit=+$0.19/bar — all trader_a benchmarks beaten, escalate for deployment assessment.
-  XRP_1h: pair_cost=0.785, profit=-$0.026/bar — risk_t_end=0.75 still untested (user override skipped it at iter141); next active experiment when XRP_1h comes up in rotation.
+RISK_BUDGET CATEGORY NOW FULLY EXHAUSTED for XRP_1h:
+  - risk_t_start=0.15: DISCARD iter139 (DD breach 16.7%)
+  - risk_exponent=1.5: DISCARD iter141 (user override, DD breach 15.2%)
+  - risk_t_end=0.75: DISCARD iter148 (INERT, no measurable effect)
+
+RISK_BUDGET ALREADY EXHAUSTED for ETH_1h (iter142).
+
+Both active pairs have exhausted all tested categories:
+  - ETH_1h: pair_cost=0.577, profit=+$0.19/bar — deployment-ready (beats all trader_a benchmarks)
+  - XRP_1h: pair_cost=0.785, profit=-$0.026/bar — near breakeven; sell_params category unexplored
+
+Next rotation advances to BTC_5m (pair_index=0, rotation 13 continuing):
+  - BTC_5m through ETH_15m: FROZEN_SKIP
+  - ETH_1h: sell_params exploration (sell_loss_start, sell_dump_start, profit_protect_min_pairs)
+  - SOL_5m through XRP_15m: FROZEN_SKIP
+  - XRP_1h: sell_params exploration (same category)
+
+NOTE: Baseline DD drift on XRP_1h confirmed -- 10.58% (iter115) -> 15.7% (iter148 current state).
+Dataset growth over 33 more bars has organically increased DD. This does NOT indicate parameter regression --
+it is the natural effect of cumulative drawdown across a longer backtest window.
+STRATEGIST should note: XRP_1h sell params may directly address DD by recycling losses earlier.

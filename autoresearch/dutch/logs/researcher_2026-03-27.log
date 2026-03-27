@@ -222,3 +222,23 @@
 2026-03-27T14:00:00Z iter=143 pair=SOL_5m status=FROZEN_SKIP param=FROZEN_SKIP -
   eval: pair_cost=- profit=- max_dd=-% bars=-
   hypothesis: "SOL_5m AUDITOR FREEZE ACTIVE (rotation 13): 3 consecutive zero-pair runs; fill mechanics structural (P=4.2%); DD=23.2% elevated. Advancing rotation to SOL_15m."
+
+2026-03-27T15:00:00Z iter=144 pair=SOL_15m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=- max_dd=-% bars=-
+  hypothesis: "AUDITOR FREEZE ACTIVE: correct_side=45.5% both measurements below 50%; directionally wrong; resume only when correct_side >50%"
+
+2026-03-27T15:00:00Z iter=145 pair=SOL_1h status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=- max_dd=-% bars=-
+  hypothesis: "AUDITOR FREEZE ACTIVE: 3 consecutive zero-pair baselines; outcome sparsity structural (8.6%)"
+
+2026-03-27T15:00:00Z iter=146 pair=XRP_5m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=- max_dd=-% bars=-
+  hypothesis: "AUDITOR FREEZE ACTIVE PERMANENT: structural fill_rate=15.6% floor; zero pairs at all tested gates"
+
+2026-03-27T15:00:00Z iter=147 pair=XRP_15m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=- max_dd=-% bars=-
+  hypothesis: "AUDITOR FREEZE ACTIVE: correct_side declined monotonically 53.7%->50.0%->49.2%; gate series exhausted"
+
+2026-03-27T15:05:00Z iter=148 pair=XRP_1h status=DISCARD param=risk_t_end=0.75(DISCARD-INERT->0.80) 0.80->0.75->0.80
+  eval: pair_cost=0.7852 profit=-$0.36/bar max_dd=15.5% bars=38
+  hypothesis: "risk_t_end=0.75 shifts ramp apex 3 min earlier. Unlike risk_t_start, does not delay early rebalancing. Hypothesis: earlier apex gives more end-of-bar rebalancing buffer potentially improving DD. Secondary: matched_ratio improvement possible (iter139 showed timing sensitivity). Result: INERT -- all metrics identical to baseline within noise. +$0.02/bar improvement within +-$0.05 noise floor. DD 15.5% vs 15.7% baseline (-0.2pp marginal). risk_t_end confirmed INERT on XRP_1h at current 38-bar dataset. Risk_budget category now FULLY EXHAUSTED for XRP_1h."

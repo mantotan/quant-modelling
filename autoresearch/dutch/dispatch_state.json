@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_15m",
+  "current_pair": "BTC_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 7,
-  "last_updated": "2026-03-27T14:00:00Z",
+  "pair_index": 0,
+  "last_updated": "2026-03-27T15:05:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 140,
   "last_auditor_at": 139,
-  "total_iterations": 143,
-  "last_exit_reason": "RESEARCHER iter=143 SOL_5m FROZEN_SKIP AUDITOR FREEZE ACTIVE (rotation 13): 3 consecutive zero-pair runs; fill mechanics structural (P=4.2%); DD=23.2% elevated. ETH_1h risk_budget EXHAUSTED (iters 133/140/142 all DISCARD). XRP_1h risk_t_end=0.75 still untested (user override at iter141 skipped it). Rotation advanced from SOL_5m(6) to SOL_15m(7)."
+  "total_iterations": 148,
+  "last_exit_reason": "RESEARCHER iter=148 XRP_1h DISCARD risk_t_end=0.75 INERT: pair_cost=0.7852 identical, profit=-$0.36/bar (+$0.02 noise), matched=3.8% unchanged, DD=15.5% still above 15%. Risk_budget category EXHAUSTED for XRP_1h (all 3 sub-params: risk_t_start DISCARD iter139, risk_exponent DISCARD iter141, risk_t_end DISCARD iter148). Both ETH_1h and XRP_1h risk_budget exhausted. Next: sell_params category for both active pairs (rotation 14). Skipped SOL_15m(7)/SOL_1h(8)/XRP_5m(9)/XRP_15m(10) as FROZEN. Rotation advanced to BTC_5m(0)."
 }
