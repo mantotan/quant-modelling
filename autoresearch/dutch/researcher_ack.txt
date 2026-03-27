@@ -1,21 +1,31 @@
-iter=149 pair=BTC_5m timestamp=2026-03-27T15:10:00Z
-AUDITOR FREEZE PERMANENT (rotation 14): fill mechanics structural barrier confirmed by diagnostic iter 60; P(both sides fill in 5m) = 5.6%; no levers remain; advancing rotation to BTC_15m.
+iter=160 pair=XRP_1h timestamp=2026-03-27T16:45:00Z
+KEEP: min_buy_time_pct discrepancy fix (0.15->0.10) + profit_protect_min_pairs=3.
+XRP_1h pair_cost 0.785->0.747, profit -$0.026->+$0.12/bar, matched 3.9%->5.8%.
+sell_ratio=0.00 on both pairs: sell category structurally inert at current pair formation rate.
 
-Previous iteration summary (iter=148 XRP_1h DISCARD):
-  risk_budget category FULLY EXHAUSTED for both active pairs:
-  - ETH_1h: risk_t_start/risk_t_end/risk_exponent all DISCARDed
-  - XRP_1h: risk_t_start/risk_t_end/risk_exponent all DISCARDed
+Rotation 14 summary:
+  - BTC_15m (iter150): FROZEN_SKIP
+  - BTC_1h (iter151): FROZEN_SKIP
+  - ETH_5m (iter152): FROZEN_SKIP
+  - ETH_15m (iter153): FROZEN_SKIP
+  - ETH_1h (iter154): DISCARD -- sell_params (profit_protect_min_pairs=5->3): sell_ratio=0.00 at all thresholds 1/2/3; sell category EXHAUSTED for ETH_1h
+  - SOL_5m (iter155): FROZEN_SKIP
+  - SOL_15m (iter156): FROZEN_SKIP
+  - SOL_1h (iter157): FROZEN_SKIP
+  - XRP_5m (iter158): FROZEN_SKIP
+  - XRP_15m (iter159): FROZEN_SKIP
+  - XRP_1h (iter160): KEEP -- min_buy_time_pct FIX + profit_protect_min_pairs=3; XRP_1h now PROFITABLE (+$0.12/bar); matched_ratio=5.8% ABOVE 5% deployment threshold
 
-Rotation 14 plan:
-  - BTC_5m (0): FROZEN_SKIP (this iter)
+Rotation 15 plan:
+  - BTC_5m (0): FROZEN_SKIP
   - BTC_15m (1): FROZEN_SKIP
   - BTC_1h (2): FROZEN_SKIP
   - ETH_5m (3): FROZEN_SKIP
   - ETH_15m (4): FROZEN_SKIP
-  - ETH_1h (5): ACTIVE — sell_params category (sell_loss_start, sell_dump_start, profit_protect_min_pairs)
+  - ETH_1h (5): ACTIVE -- sell_loss_start next (inert if sell events still 0; ESCALATE TO AUDITOR if confirmed exhausted)
   - SOL_5m (6): FROZEN_SKIP
   - SOL_15m (7): FROZEN_SKIP
   - SOL_1h (8): FROZEN_SKIP
   - XRP_5m (9): FROZEN_SKIP
   - XRP_15m (10): FROZEN_SKIP
-  - XRP_1h (11): ACTIVE — sell_params category (same)
+  - XRP_1h (11): ACTIVE -- verify new KEEP state stable; sell_loss_start if sell events emerge

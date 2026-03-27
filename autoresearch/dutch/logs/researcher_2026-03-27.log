@@ -245,3 +245,14 @@
 2026-03-27T15:10:00Z iter=149 pair=BTC_5m status=SKIP param=FROZEN_SKIP -
   eval: pair_cost=- profit=- max_dd=- bars=-
   hypothesis: "AUDITOR FREEZE PERMANENT -- fill mechanics structural (P=5.6%), no levers remain for BTC_5m; advancing rotation 14 to BTC_15m"
+2026-03-27T16:45:00Z iter=160 pair=XRP_1h status=KEEP param=min_buy_time_pct=0.10(FIX)+profit_protect_min_pairs=3 0.15/5->0.10/3
+  eval: pair_cost=0.747 profit=+$0.12/bar max_dd=10.3% bars=38 matched=5.8% sell_ratio=0.00
+  hypothesis: "Auditor-mandated min_buy_time_pct discrepancy fix: engine was reading min_buy_time_pct=0.15 as
+  the active field since iter139 DISCARD (risk_t_start was restored but min_buy_time_pct was not). Effectively
+  XRP_1h has been running with risk_t_start=0.15 since iter139 -- the same parameter that caused DD breach.
+  Fix to 0.10 immediately improved all metrics. sell_params (profit_protect_min_pairs) confirmed inert."
+2026-03-27T16:42:00Z iter=154 pair=ETH_1h status=DISCARD param=profit_protect_min_pairs=3 5->3
+  eval: pair_cost=0.577 profit=+$0.09/bar max_dd=11.2% bars=37 matched=1.8% sell_ratio=0.00
+  hypothesis: "sell_params category probe: profit_protect_min_pairs 5->3. Tested at 1/2/3 -- all
+  identical (sell_ratio=0.00). Sell logic structurally inert: sell_loss_start/sell_dump_start conditions
+  never met in current dataset. Sell category EXHAUSTED for ETH_1h."
