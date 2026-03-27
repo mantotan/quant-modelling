@@ -1,5 +1,5 @@
 {
-  "current_pair": "SOL_5m",
+  "current_pair": "BTC_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 6,
-  "last_updated": "2026-03-27T10:05:00Z",
+  "pair_index": 0,
+  "last_updated": "2026-03-27T10:20:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 115,
   "last_auditor_at": 115,
-  "total_iterations": 121,
-  "last_exit_reason": "RESEARCHER iter 121: ETH_1h cancel_distance 0.05->0.03 DISCARD. fill_rate collapsed 86%->43.6% (-42pp), profit regressed +$0.19->+$0.06/bar (-68%). cancel_distance=0.03 too aggressive for ETH_1h (3% threshold within normal ETH noise). cancel_distance floor confirmed at 0.05. ALL ETH_1h fill-sim sub-params exhausted: fill_ticks=1(floor), chase_threshold=0.05(KEEP78), spread_offset=0.005(KEEP97), max_chase=2(floor109), cancel_distance=0.05(floorR11). ETH_1h at parametric ceiling profit=+$0.19/bar pair_cost=0.577. Strategy mandates escalate to auditor after fill-sim exhaustion. Next: continue rotation 11 to XRP_1h cancel_distance=0.03 experiment (skip SOL_5m/SOL_15m/SOL_1h/XRP_5m/XRP_15m as frozen)."
+  "total_iterations": 127,
+  "last_exit_reason": "RESEARCHER iter 122-127: rotation 11 complete. Iters 122-126: SOL_5m/SOL_15m/SOL_1h/XRP_5m/XRP_15m FROZEN_SKIP (all per audit.md directives). Iter 127: XRP_1h cancel_distance 0.05->0.03 DISCARD (COLLAPSE). matched_ratio collapsed 3.9%->1.6% (< 2.0% immediate threshold), fill_rate halved 74.3%->34.2% (-40.1pp), profit regressed -$0.026->-$0.384/bar (-1378%). cancel_distance=0.03 causes over-cancellation within XRP price noise. cancel_distance floor confirmed at 0.05 for BOTH ETH_1h (iter121) AND XRP_1h (iter127). ALL fill-sim sub-params now EXHAUSTED for both active pairs. BOTH pairs at parametric ceiling: ETH_1h profit=+$0.19/bar pair_cost=0.577, XRP_1h profit=-$0.026/bar pair_cost=0.785. Strategy mandates ESCALATE TO AUDITOR after both fill-sim exhaustions. iters_since_auditor=127-115=12 -> AUDITOR threshold (>=24) not met yet, but strategist threshold (>=12) IS met. Next dispatch: STRATEGIST (iters_since_strategist=127-115=12 >= 12)."
 }

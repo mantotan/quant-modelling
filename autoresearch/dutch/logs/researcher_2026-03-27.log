@@ -192,3 +192,10 @@
   hypothesis: "cancel_distance 0.03 (from 0.05) keeps limit orders in queue until price moves only 3% adverse before cancelling; ETH_1h matched_ratio=1.9% too low; tighter cancel may rescue marginal fills that currently get cancelled at 5% before price reverts. Primary hope: matched_ratio improvement 1.9%->2.5+%."
   outcome: "DISCARD: fill_rate COLLAPSED 86%->43.6% (-42pp). cancel_distance=0.03 falls within ETH normal price noise, over-cancelling orders before they fill. Profit regressed +$0.19->+$0.06/bar (-68%). matched_ratio improvement minimal (1.9%->2.3%, +0.4pp, within noise on 6 outcomes). cancel_distance floor confirmed at 0.05 for ETH_1h. ALL fill-sim params exhausted. ETH_1h at parametric ceiling."
   skips: iters 116-120: BTC_5m/BTC_15m/BTC_1h/ETH_5m/ETH_15m all FROZEN per audit.md
+2026-03-27T10:20:00Z iter=122-126 pair=SOL_5m/SOL_15m/SOL_1h/XRP_5m/XRP_15m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=- max_dd=-% bars=-
+  hypothesis: "All 5 pairs frozen per audit.md directives. Advancing rotation to XRP_1h."
+
+2026-03-27T10:20:00Z iter=127 pair=XRP_1h status=DISCARD param=cancel_distance 0.05->0.03(DISCARD-COLLAPSE->floor=0.05)
+  eval: pair_cost=0.740 profit=-$0.384/bar max_dd=9.1% bars=37
+  hypothesis: "cancel_distance=0.03 final fill-sim lever for XRP_1h. XRP_1h fill_rate=74.3% lower than ETH_1h 86%, providing more headroom for cancel_distance tightening to recover fills. However IMMEDIATE DISCARD triggered: matched_ratio COLLAPSED 3.9%->1.6% (< 2.0% threshold), fill_rate halved 74.3%->34.2%. cancel_distance=0.03 falls within normal XRP price noise causing massive over-cancellation. Same collapse pattern as ETH_1h iter121. BOTH pairs fill-sim exhausted. ESCALATE TO AUDITOR per rotation 11 plan."
