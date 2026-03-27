@@ -159,3 +159,4 @@
 2026-03-27T20:40:00Z iter=79 pair=XRP_1h status=KEEP param=chase_threshold 0.03->0.05
   eval: pair_cost=0.785 profit=-$0.08/bar max_dd=8.9% bars=36
   hypothesis: "Wider chase window (5% vs 3% price deviation) allows limit orders to re-enter price after brief adverse moves in sparse XRP_1h market. fill-sim only parameter, should not trigger collapse mechanism. Confirmed beneficial: pair_cost improved 3.3%, profit improved +$0.05/bar. 2nd consecutive KEEP for XRP_1h."
+2026-03-27T20:45:00Z iter=80 pair=BTC_5m role=researcher outcome=SKIP (FROZEN PERMANENT rotation-8: fill mechanics structural P=5.6%; advancing to BTC_15m)

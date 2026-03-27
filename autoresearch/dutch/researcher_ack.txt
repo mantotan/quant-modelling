@@ -1,23 +1,13 @@
-iter=79 (XRP_1h chase_threshold experiment) after skips for SOL_5m->SOL_15m->SOL_1h->XRP_5m->XRP_15m
-pair=XRP_1h
-timestamp=2026-03-27T20:40:00Z
+iter=80 (BTC_5m rotation-8 start — FROZEN SKIP)
+pair=BTC_5m
+timestamp=2026-03-27T20:45:00Z
 mode=BACKTEST (replay_available)
-status=Processing rotation-7: skipping 5 frozen pairs (SOL_5m->XRP_15m), running chase_threshold=0.05 on XRP_1h (iter 79)
+status=Rotation-8 start: BTC_5m FROZEN PERMANENT (fill mechanics structural P=5.6%); advancing to BTC_15m
 
-ROTATION-7 FROZEN SKIPS (continuing from iter 78):
-  SOL_5m   FROZEN (3 consecutive zero-pair runs, fill mechanics structural P=4.2%)
-  SOL_15m  FROZEN (correct_side=45.5% both measurements < 50%)
-  SOL_1h   FROZEN (3 consecutive zero-pair baselines, outcome sparsity 8.6%)
-  XRP_5m   FROZEN PERMANENT (fill_rate=15.6% structural floor)
-  XRP_15m  FROZEN (correct_side=49.2% declining monotonically, gate exhausted)
+ROTATION-8 FROZEN SKIPS IN PROGRESS:
+  BTC_5m   FROZEN PERMANENT (fill mechanics structural P=5.6%, confirmed diagnostic iter 60)
+  [next: BTC_15m -> BTC_1h -> ETH_5m -> ETH_15m all frozen, then ETH_1h experiment]
 
-XRP_1h EXPERIMENT (iter 79):
-  Hypothesis: wider chase window (5% vs 3% price deviation) allows order re-entry after brief
-  adverse price moves in sparse XRP_1h market, potentially improving fill quality and matched_ratio
-  from 4.0%. chase_threshold is fill-sim only -- should NOT trigger the collapse mechanism (not a
-  spending constraint).
-  Change: fill_simulator.chase_threshold 0.03->0.05 in knobs_XRP_1h.json only
-  Baseline ref (iter 72 KEEP): pair_cost=0.812, profit=-$0.13/bar, DD=9.8%, matched=4.0%
-  KEEP if: pair_cost < 0.812 OR avg_profit > -$0.13/bar (ANY improvement)
-  DISCARD if: matched_ratio < 2.0% OR DD > 15%
-  CRITICAL: do NOT change fill_ticks (keep at 2), onesided, pace_urgency_lo, or magnitude_gate
+NEXT ACTIVE EXPERIMENTS (rotation 8):
+  ETH_1h   pace_urgency_hi 2.0->1.5 (next lever after chase_threshold=0.05 KEEP iter 78)
+  XRP_1h   onesided=3.5 intermediate test (next lever after chase_threshold=0.05 KEEP iter 79)
