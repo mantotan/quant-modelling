@@ -199,3 +199,15 @@
 2026-03-27T10:20:00Z iter=127 pair=XRP_1h status=DISCARD param=cancel_distance 0.05->0.03(DISCARD-COLLAPSE->floor=0.05)
   eval: pair_cost=0.740 profit=-$0.384/bar max_dd=9.1% bars=37
   hypothesis: "cancel_distance=0.03 final fill-sim lever for XRP_1h. XRP_1h fill_rate=74.3% lower than ETH_1h 86%, providing more headroom for cancel_distance tightening to recover fills. However IMMEDIATE DISCARD triggered: matched_ratio COLLAPSED 3.9%->1.6% (< 2.0% threshold), fill_rate halved 74.3%->34.2%. cancel_distance=0.03 falls within normal XRP price noise causing massive over-cancellation. Same collapse pattern as ETH_1h iter121. BOTH pairs fill-sim exhausted. ESCALATE TO AUDITOR per rotation 11 plan."
+2026-03-27T11:00:00Z iter=128-132 pair=BTC_5m..ETH_15m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=- max_dd=-% bars=-
+  hypothesis: "Rotation 12 start: 5 frozen pairs (BTC_5m PERMANENT, BTC_15m, BTC_1h, ETH_5m, ETH_15m) skipped per audit.md freeze directives. No experiments run."
+2026-03-27T11:05:00Z iter=133 pair=ETH_1h status=DISCARD param=risk_t_start 0.10->0.15
+  eval: pair_cost=0.5771 profit=$0.12/bar max_dd=11.2% bars=36
+  hypothesis: "Rotation 12 risk_budget category first experiment. ETH_1h matched_ratio=1.9% is primary gap. Orders at t=0.10 (6 min into 1h bar) face unsettled prices; shifting start to t=0.15 (9 min) concentrates sizing in better-resolved price regions. DISCARD: avg_profit regressed +$0.19->+$0.12/bar (-37%), matched unchanged 1.9%, pair_cost stable. Within noise floor (+-$0.05/bar). Restore to risk_t_start=0.10. Next: risk_t_end 0.8->0.75."
+2026-03-27T11:10:00Z iter=134-138 pair=SOL_5m..XRP_15m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=- max_dd=-% bars=-
+  hypothesis: "5 frozen pairs (SOL_5m, SOL_15m, SOL_1h, XRP_5m PERMANENT, XRP_15m) skipped per audit.md freeze directives. Advancing rotation to XRP_1h."
+2026-03-27T11:15:00Z iter=139 pair=XRP_1h status=DISCARD param=risk_t_start 0.10->0.15
+  eval: pair_cost=0.7835 profit=-$0.45/bar max_dd=16.7% bars=38
+  hypothesis: "Rotation 12 XRP_1h risk_budget experiment 1. XRP_1h near-breakeven at -$0.026/bar; shifting risk_t_start 0.10->0.15 to delay order sizing ramp. IMMEDIATE DISCARD: DD=16.7%>15% threshold; profit regressed -$0.026->-$0.45/bar (-1630%). NOTE: matched_ratio improved 3.9%->5.1% -- confirms later placement finds better-resolved prices, but XRP_1h cannot tolerate this timing change due to DD sensitivity. risk_t_start floor confirmed at 0.10 for XRP_1h. Restore to risk_t_start=0.10. Next: risk_t_end 0.8->0.75."

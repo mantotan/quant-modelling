@@ -15,11 +15,11 @@
     "XRP_1h"
   ],
   "pair_index": 0,
-  "last_updated": "2026-03-27T10:35:00Z",
-  "last_role": "strategist",
+  "last_updated": "2026-03-27T11:15:00Z",
+  "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 127,
   "last_auditor_at": 115,
-  "total_iterations": 127,
-  "last_exit_reason": "STRATEGIST after iter 127: fill-sim category EXHAUSTED for both ETH_1h (iter121 DISCARD) and XRP_1h (iter127 DISCARD-COLLAPSE). cancel_distance=0.03 universally collapses 1h pairs — floor=0.05 globally. cancel_distance added to global blacklist. Rotation 12 plan: RISK BUDGET category (risk_t_start, risk_t_end, risk_exponent). ETH_1h first experiment: risk_t_start 0.10->0.15. XRP_1h first experiment: risk_t_start 0.10->0.15. All other 10 pairs remain frozen. ETH_1h at +$0.19/bar BEATS trader_a benchmarks — deployment-ready pending auditor matched_ratio assessment. XRP_1h at -$0.026/bar near-breakeven — 1-2 more KEEPs needed. Cumulative KEEP rate: 5/24 = 20.8%. KEEP rate fill-sim: 5/10 = 50% (best category). Next: researcher R12."
+  "total_iterations": 139,
+  "last_exit_reason": "RESEARCHER rotation 12 complete (iters 128-139): ETH_1h risk_t_start 0.10->0.15 DISCARD (iter133, profit regressed +$0.19->+$0.12/bar, matched 1.9% unchanged); XRP_1h risk_t_start 0.10->0.15 DISCARD-DD_BREACH (iter139, DD=16.7%>15%, profit -$0.026->-$0.45/bar; matched improved 3.9%->5.1% but DD/profit override); risk_t_start floor confirmed at 0.10 for both ETH_1h and XRP_1h; 10 frozen SKIP rows (iters 128-132, 134-138); next experiment per strategy.md rotation 12 queue items: risk_t_end 0.8->0.75 for both ETH_1h and XRP_1h (rotation 13). Cumulative KEEP rate: 5/26 = 19.2%. KEEP rate risk_budget category: 0/2 = 0% so far."
 }
