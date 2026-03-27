@@ -52,3 +52,4 @@
 2026-03-27T20:35:00Z iter=78 pair=ETH_1h role=RESEARCHER outcome=KEEP chase_threshold=0.05 pair_cost=0.577 profit=+$0.18/bar max_dd=11.2% (5 frozen skips iters 73-77)
 2026-03-27T20:40:00Z iter=79 pair=XRP_1h role=researcher outcome=KEEP chase_threshold=0.05 pair_cost=0.785(-3.3% vs 0.812) profit=-$0.08/bar(+$0.05 vs -$0.13) max_dd=8.9% 5-frozen-skipped
 2026-03-27T20:45:00Z iter=80 pair=BTC_5m role=researcher outcome=SKIP (FROZEN PERMANENT rotation-8: fill mechanics structural P=5.6%; advancing to BTC_15m)
+2026-03-27T21:05:00Z iter=85 pair=ETH_1h role=RESEARCHER outcome=DISCARD pace_urgency_hi=2.0->1.5 IDENTICAL result; lever inert; pace exhausted for ETH_1h; 4 frozen SKIPs (BTC_15m/BTC_1h/ETH_5m/ETH_15m) also processed (iters 81-84)

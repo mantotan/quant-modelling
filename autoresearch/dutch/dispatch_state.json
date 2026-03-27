@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_15m",
+  "current_pair": "SOL_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 1,
-  "last_updated": "2026-03-27T20:45:00Z",
+  "pair_index": 6,
+  "last_updated": "2026-03-27T21:05:00Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 72,
   "last_auditor_at": 60,
-  "total_iterations": 80,
-  "last_exit_reason": "RESEARCHER rotation-8 iter 80: BTC_5m FROZEN SKIP (fill mechanics structural P=5.6%, confirmed diagnostic iter 60). Advancing to BTC_15m."
+  "total_iterations": 85,
+  "last_exit_reason": "RESEARCHER rotation-8 iter 85: ETH_1h DISCARD pace_urgency_hi 2.0->1.5 (IDENTICAL result -- lever inert on thin dataset, 4 outcomes in 36 bars; same pattern as iters 29/53/53 for pace levers; pair_cost=0.577 stable, profit=+$0.18/bar unchanged; pace category now EXHAUSTED for ETH_1h; next lever: spread_offset 0.01->0.005). Advancing to SOL_5m."
 }
