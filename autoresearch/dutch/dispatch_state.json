@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_5m",
+  "current_pair": "BTC_15m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 0,
-  "last_updated": "2026-03-27T17:00:00Z",
-  "last_role": "strategist",
+  "pair_index": 1,
+  "last_updated": "2026-03-27T17:30:00Z",
+  "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 160,
   "last_auditor_at": 139,
-  "total_iterations": 160,
-  "last_exit_reason": "STRATEGIST iter=160: Both pairs profitable -- ETH_1h +$0.19/bar pair_cost=0.577 (ALL CATEGORIES EXHAUSTED, DEPLOY), XRP_1h +$0.12/bar pair_cost=0.747 matched=5.8% (ALL CATEGORIES EXHAUSTED, DEPLOY). Rotation 15 all FROZEN_SKIP. Auditor escalation issued: formal deployment sign-off + structural floor declaration requested within 3 iters."
+  "total_iterations": 161,
+  "last_exit_reason": "RESEARCHER iter=161: BTC_5m FROZEN_SKIP (rotation 15) -- AUDITOR FREEZE PERMANENT fill mechanics structural (P=5.6%); advancing rotation to BTC_15m"
 }

@@ -256,3 +256,6 @@
   hypothesis: "sell_params category probe: profit_protect_min_pairs 5->3. Tested at 1/2/3 -- all
   identical (sell_ratio=0.00). Sell logic structurally inert: sell_loss_start/sell_dump_start conditions
   never met in current dataset. Sell category EXHAUSTED for ETH_1h."
+2026-03-27T17:30:00Z iter=161 pair=BTC_5m status=SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=- max_dd=-
+  hypothesis: "Rotation 15 start: BTC_5m AUDITOR FREEZE PERMANENT -- fill mechanics structural (P=5.6%); all 12 pairs FROZEN_SKIP this rotation per strategy.md rotation 15 plan; both ETH_1h and XRP_1h profitable and all categories exhausted; awaiting AUDITOR deployment sign-off"
