@@ -1,5 +1,5 @@
 {
-  "current_pair": "BTC_5m",
+  "current_pair": "SOL_5m",
   "pair_rotation": [
     "BTC_5m",
     "BTC_15m",
@@ -14,12 +14,12 @@
     "XRP_15m",
     "XRP_1h"
   ],
-  "pair_index": 0,
-  "last_updated": "2026-03-27T22:00:00Z",
+  "pair_index": 6,
+  "last_updated": "2026-03-27T00:21:06Z",
   "last_role": "researcher",
   "last_monitor_at": "2026-03-27T06:30:00Z",
   "last_strategist_at": 90,
   "last_auditor_at": 90,
-  "total_iterations": 91,
-  "last_exit_reason": "RESEARCHER iter 91: XRP_1h max_onesided_cost=3.5 DISCARD. pair_cost=0.785 unchanged (no improvement vs iter79 0.785), avg_profit=-0.26/bar REGRESSED vs -0.08/bar. No collapse (matched_ratio=3.9%>2%). Onesided floor CONFIRMED at 5.0. Knobs restored to best_knobs. Rotation-8 complete (ETH_1h pace_hi DISCARD iter85 + XRP_1h onesided DISCARD iter91, 0 KEEPs). Advancing to rotation-9: BTC_5m (FROZEN, will skip). Next active experiments: ETH_1h spread_offset=0.005, XRP_1h spread_offset=0.005."
+  "total_iterations": 97,
+  "last_exit_reason": "RESEARCHER iter 97: ETH_1h spread_offset=0.005 KEEP. pair_cost=0.577 stable (identical), avg_profit=+$0.19/bar MARGINALLY IMPROVED vs +$0.18/bar (+$0.01). matched_ratio=1.88% stable. max_dd=11.23% safe. KEEP criterion: avg_profit>+$0.18/bar MET. best_knobs_ETH_1h updated. Pre-logged 5 frozen SKIPs (iters 92-96: BTC_5m through ETH_15m). Rotation-9 ETH_1h done. Next active: XRP_1h (index 11) spread_offset=0.005. Next dispatch: SOL_5m SKIP chain through XRP_15m to XRP_1h."
 }

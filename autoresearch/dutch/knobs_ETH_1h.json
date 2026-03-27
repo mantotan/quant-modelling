@@ -36,7 +36,7 @@
     "fill_ticks": 1,
     "chase_threshold": 0.05,
     "max_chase": 2,
-    "spread_offset": 0.01,
+    "spread_offset": 0.005,
     "cancel_distance": 0.05
   },
   "_readonly": [

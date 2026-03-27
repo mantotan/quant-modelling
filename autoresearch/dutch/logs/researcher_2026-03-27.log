@@ -171,3 +171,9 @@
   RESULT: no collapse (matched_ratio=3.9%>2%) but profit REGRESSED from -0.08/bar to -0.26/bar;
   pair_cost unchanged at 0.785; onesided=3.5 tighter cap cuts profitable unmatched accumulation;
   CONCLUSION: onesided floor confirmed at 5.0 for XRP_1h; next lever = spread_offset 0.01->0.005
+2026-03-27T00:21:06Z iter=92-96 pair=BTC_5m..ETH_15m status=SKIP param=FROZEN_SKIP (rotation-9 pre-log)
+  eval: all pairs frozen per audit directives — fill mechanics / outcome sparsity / correct_side structural barriers
+  hypothesis: "Rotation-9 start: BTC_5m/BTC_15m/BTC_1h/ETH_5m/ETH_15m all frozen per audit. Pre-logging 5 frozen SKIPs and advancing to ETH_1h (first active pair in rotation-9)."
+2026-03-27T00:21:06Z iter=97 pair=ETH_1h status=KEEP param=spread_offset=0.005 0.01->0.005
+  eval: pair_cost=0.5771 profit=+$0.19/bar max_dd=11.23% bars=36
+  hypothesis: "Tighter limit placement (spread_offset 0.01->0.005) marginally reduces the bid-ask component of pair cost. Result: avg_profit +$0.19/bar vs KEEP reference +$0.18/bar (+5.6% improvement). pair_cost stable at 0.5771 (no deterioration). KEEP criterion met: avg_profit > +$0.18/bar. Improvement is marginal (4-5 resolved outcomes). best_knobs_ETH_1h updated with spread_offset=0.005. Next lever: max_chase 2->3 per rotation-9 queue item 2."

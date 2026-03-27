@@ -1,6 +1,5 @@
-iter=91 pair=XRP_1h timestamp=2026-03-27T22:00:00Z
-Experiment: max_onesided_cost=5.0->3.5 (pre-staged in knobs_XRP_1h.json)
-Status: Running backtest for KEEP/DISCARD evaluation
-KEEP reference (iter 79): pair_cost=0.785, profit=-$0.08/bar, DD=8.9%, matched=4.0%
-KEEP criteria: pair_cost < 0.785 OR avg_profit > -$0.08/bar
-IMMEDIATE DISCARD if: matched_ratio < 2.0% (collapse mechanism)
+iter=92-96 pair=BTC_5m..ETH_15m (FROZEN SKIPs rotation-9) + iter=97 ETH_1h spread_offset=0.005 experiment timestamp=2026-03-27T00:20:19Z
+Rotation-9 start: pre-logging 5 frozen pairs (iters 92-96), then running ETH_1h spread_offset 0.01->0.005 experiment (iter 97)
+KEEP reference (iter 78): pair_cost=0.577, profit=+$0.18/bar, DD=11.2%, matched=1.9%
+KEEP criteria: pair_cost < 0.577 OR avg_profit > +$0.18/bar
+DISCARD if: pair_cost > 0.65 OR DD > 12% OR matched_ratio < 1.5%
