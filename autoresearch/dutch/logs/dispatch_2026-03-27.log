@@ -71,3 +71,4 @@
 2026-03-27T12:35:00Z iter=140 pair=XRP_1h role=strategist outcome=rotation12_midrun:0/3_risk_budget_KEEPs;ETH_1h_risk_t_start+end_inert;XRP_1h_risk_t_start_DD_breach;pending_XRP_1h_risk_t_end_iter141+risk_exponent_both_pairs;cumulative_KEEP=5/28+=17.9%
 2026-03-27T13:10:00Z iter=141 pair=XRP_1h role=RESEARCHER outcome=DISCARD risk_exponent=2.0->1.5 DD_BREACH(15.2pct>15pct) profit_regressed(-$0.026->-$0.33/bar) risk_budget_exhausted_XRP_1h
 2026-03-27T13:20:00Z iter=142 pair=ETH_1h role=RESEARCHER outcome=DISCARD risk_exponent=1.5(noise,+$0.03/bar<$0.05 threshold) risk_budget_EXHAUSTED ETH_1h escalate_to_auditor advancing_to_SOL_5m(idx6)
+2026-03-27T14:00:00Z iter=143 pair=SOL_15m role=researcher outcome=FROZEN_SKIP SOL_5m frozen (fill mechanics structural); rotation advanced to SOL_15m; ETH_1h and XRP_1h risk_budget both exhausted

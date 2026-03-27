@@ -1,17 +1,6 @@
-iter=142 pair=ETH_1h timestamp=2026-03-27T13:15:00Z
-USER OVERRIDE: skip to ETH_1h risk_exponent=1.5 (last unexplored risk_budget lever).
-  Strategy.md rotation 12 item 3 for ETH_1h: risk_exponent 2.0->1.5 (PENDING confirmed).
-  Previous iter140 ETH_1h risk_t_end=0.75 DISCARD -- knobs restored to risk_t_end=0.80.
-  Current knobs_ETH_1h.json == best_knobs_ETH_1h.json (both at risk_exponent=2.0).
+iter=143 pair=SOL_5m timestamp=2026-03-27T14:00:00Z
+AUDITOR FREEZE ACTIVE (rotation 13): FROZEN -- 3 consecutive zero-pair runs; fill mechanics structural (P=4.2%); DD=23.2% elevated; advancing rotation to SOL_15m.
 
-EXPERIMENT:
-  iter=142: ETH_1h risk_exponent 2.0->1.5 (rotation 12 item 3)
-    Baseline KEEP ref: pair_cost=0.577, profit=+$0.19/bar, DD=11.2%, matched=1.9% (iter97)
-    KEEP criteria: pair_cost < 0.577 OR avg_profit > +$0.19/bar OR matched_ratio > 1.9%
-    DISCARD if: pair_cost > 0.65 OR DD > 13% OR matched_ratio < 1.5%
-    Noise floor: improvement must be > $0.05/bar (+$0.24/bar minimum for confident KEEP)
-    Hypothesis: Flatter ramp (exponent 1.5 ~= sqrt) distributes orders more uniformly across
-    bar rather than concentrating near the apex (t=0.80). On ETH_1h's thin dataset (~5 resolved
-    outcomes/36 bars), timing parameters have been INERT (risk_t_start, risk_t_end both DISCARD
-    within noise). Risk_exponent similarly expected INERT but run as procedural completeness.
-    If DISCARD: risk_budget category EXHAUSTED for ETH_1h. Escalate to auditor re deployment.
+NOTE: ETH_1h and XRP_1h both have risk_budget category exhausted as of iters 142 and 141.
+  ETH_1h: pair_cost=0.577, profit=+$0.19/bar — all trader_a benchmarks beaten, escalate for deployment assessment.
+  XRP_1h: pair_cost=0.785, profit=-$0.026/bar — risk_t_end=0.75 still untested (user override skipped it at iter141); next active experiment when XRP_1h comes up in rotation.

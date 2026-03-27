@@ -219,3 +219,6 @@
 2026-03-27T13:15:00Z iter=142 pair=ETH_1h status=DISCARD param=risk_exponent=1.5(->2.0 restored)
   eval: pair_cost=0.5771 profit=+$0.22/bar max_dd=11.7% bars=37 matched=1.8% fill=86.5%
   hypothesis: "Flatter ramp (exponent 1.5 ~= sqrt) distributes orders more uniformly across bar. Both prior timing levers (risk_t_start iter133, risk_t_end iter140) were INERT on ETH_1h thin dataset. Risk_exponent expected procedurally INERT. Result: +$0.22/bar marginally higher than KEEP +$0.19/bar (+$0.03/bar) but within +-$0.05/bar noise floor -- DISCARD per noise policy. RISK_BUDGET CATEGORY EXHAUSTED for ETH_1h (0/3 KEEP: risk_t_start + risk_t_end + risk_exponent all DISCARD). ETH_1h at parametric floor. ESCALATE TO AUDITOR for deployment assessment."
+2026-03-27T14:00:00Z iter=143 pair=SOL_5m status=FROZEN_SKIP param=FROZEN_SKIP -
+  eval: pair_cost=- profit=- max_dd=-% bars=-
+  hypothesis: "SOL_5m AUDITOR FREEZE ACTIVE (rotation 13): 3 consecutive zero-pair runs; fill mechanics structural (P=4.2%); DD=23.2% elevated. Advancing rotation to SOL_15m."
