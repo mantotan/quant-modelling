@@ -1692,7 +1692,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                 state.last_model_time = 0.0  # require fresh prediction
                 # Dutch: finalize previous bar
                 if dutch_mode and state.dutch_engine and state.current_bar_id != 0:
-                    _finalize_dutch_bar(state)
+                    await _finalize_dutch_bar(state)
 
                 # Set up new bar
                 if dutch_mode and state.dutch_engine:
