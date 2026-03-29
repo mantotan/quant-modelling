@@ -66,11 +66,15 @@ class PolymarketClient:
                 api_passphrase=passphrase,
             )
 
+        sig_type_raw = os.environ.get("POLYMARKET_SIGNATURE_TYPE", "")
+        sig_type = int(sig_type_raw) if sig_type_raw else None
+
         self._client = ClobClient(
             host=CLOB_HOST,
             chain_id=CHAIN_ID,
             key=private_key or None,
             creds=creds,
+            signature_type=sig_type,
             funder=funder or None,
         )
         self._last_request_time = 0.0
