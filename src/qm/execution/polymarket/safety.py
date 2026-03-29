@@ -126,8 +126,9 @@ class LiveSafetyGuard:
             self._cooldown_remaining -= 1
 
     def record_bar_end(self, pair: str) -> None:
-        """Reset per-pair exposure on bar completion."""
+        """Reset per-pair exposure and open orders on bar completion."""
         self._pair_exposure.pop(pair, None)
+        self._open_orders = 0  # All orders cancelled at bar end
 
     def reset_daily(self) -> None:
         """Reset daily counters (call at midnight UTC)."""
@@ -184,6 +185,7 @@ class LiveSafetyGuard:
             self._cooldown_remaining = state.get("cooldown_remaining", 0)
             self._killed = state.get("killed", False)
             self._kill_reason = state.get("kill_reason", "")
+            self._open_orders = 0  # Always reset on startup — stale count blocks trading
             if self._killed:
                 logger.warning("SAFETY: restored KILLED state: %s", self._kill_reason)
             else:
