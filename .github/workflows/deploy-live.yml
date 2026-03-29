@@ -1,0 +1,64 @@
+name: Deploy Live Trading
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag (latest or sha-xxxxx)'
+        default: 'latest'
+      asset:
+        description: 'Asset (ETH, SOL, XRP)'
+        default: 'ETH'
+      timeframes:
+        description: 'Timeframes (5m, 5m,15m, etc.)'
+        default: '5m'
+      order_size:
+        description: 'Max USD per order'
+        default: '2.0'
+      max_daily_loss:
+        description: 'Daily loss kill switch USD'
+        default: '50.0'
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, qm-live]
+    concurrency: deploy-live
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup secrets
+        run: |
+          mkdir -p ~/qm-live/secrets
+          echo "${{ secrets.ENV_LIVE }}" > ~/qm-live/secrets/env.txt
+          chmod 600 ~/qm-live/secrets/env.txt
+
+      - name: Copy deployment files
+        run: |
+          cp .docker/docker-compose.live.yml ~/qm-live/
+
+      - name: Pull image
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker pull ghcr.io/${{ github.repository }}/qm-live:${{ inputs.image_tag }}
+
+      - name: Stop current containers
+        run: |
+          cd ~/qm-live
+          docker compose -f docker-compose.live.yml down --timeout 45 || true
+
+      - name: Start new containers
+        run: |
+          cd ~/qm-live
+          GITHUB_REPO=${{ github.repository }} \
+          IMAGE_TAG=${{ inputs.image_tag }} \
+          ASSET=${{ inputs.asset }} \
+          TIMEFRAMES=${{ inputs.timeframes }} \
+          ORDER_SIZE=${{ inputs.order_size }} \
+          MAX_DAILY_LOSS=${{ inputs.max_daily_loss }} \
+          docker compose -f docker-compose.live.yml up -d
+
+      - name: Verify deployment
+        run: |
+          sleep 15
+          cd ~/qm-live
+          docker compose -f docker-compose.live.yml ps
+          docker compose -f docker-compose.live.yml logs --tail 30

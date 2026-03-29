@@ -1,0 +1,23 @@
+FROM python:3.11-slim AS builder
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN pip install uv && uv sync --frozen --no-dev
+
+FROM python:3.11-slim
+WORKDIR /app
+COPY --from=builder /app/.venv /app/.venv
+COPY src/ src/
+COPY scripts/monitor_pulse.py scripts/
+
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app/src"
+ENV PYTHONUNBUFFERED=1
+
+# Health check: tolerates missing safety file on first boot
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD python -c "import json,pathlib; p=pathlib.Path('/app/data/divergence_live/safety_state.json'); (not p.exists()) or (not json.loads(p.read_text()).get('killed'))" || exit 1
+
+STOPSIGNAL SIGTERM
+
+ENTRYPOINT ["python", "-u", "scripts/monitor_pulse.py"]
+CMD ["--dutch", "--divergence", "--live", "--asset", "ETH", "--timeframes", "5m", "--live-order-size", "2.0"]

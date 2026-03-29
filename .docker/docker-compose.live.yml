@@ -1,0 +1,40 @@
+services:
+  div-live:
+    image: ghcr.io/${GITHUB_REPO:-local}/qm-live:${IMAGE_TAG:-latest}
+    container_name: qm_div_live
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-~/qm-live/secrets/env.txt}
+    command:
+      - "--dutch"
+      - "--divergence"
+      - "--live"
+      - "--asset"
+      - "${ASSET:-ETH}"
+      - "--timeframes"
+      - "${TIMEFRAMES:-5m}"
+      - "--live-order-size"
+      - "${ORDER_SIZE:-2.0}"
+      - "--live-max-daily-loss"
+      - "${MAX_DAILY_LOSS:-50.0}"
+      - "--dutch-tick-log"
+    volumes:
+      - live_data:/app/data/divergence_live
+      - ${MODELS_DIR:-~/qm-live/models/pulse_v2}:/app/data/models/pulse_v2:ro
+      - ${KNOBS_DIR:-~/qm-live/knobs}:/app/autoresearch/dutch:ro
+    mem_limit: 512m
+    stop_grace_period: 45s
+    networks:
+      - qm-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+volumes:
+  live_data:
+
+networks:
+  qm-network:
+    driver: bridge

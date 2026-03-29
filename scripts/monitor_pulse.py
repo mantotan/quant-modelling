@@ -123,6 +123,18 @@ class TFState:
     })
     dutch_pending_resolutions: list = field(default_factory=list)
     dutch_bar_condition_id: str = ""
+    # Divergence strategy (runs alongside Dutch)
+    divergence_engine: Any = None
+    divergence_sim: LimitOrderSimulator | None = None
+    divergence_logger: DutchSummaryLogger | None = None
+    divergence_session: dict = field(default_factory=lambda: {
+        "wins": 0, "losses": 0, "total_pnl": 0.0, "bars": 0,
+    })
+    divergence_pending_resolutions: list = field(default_factory=list)
+    # Live trading (Divergence on real CLOB)
+    divergence_live_router: Any = None
+    live_safety: Any = None
+    live_trade_logger: Any = None
     scanner: MarketScanner | None = None
     ws_feeds: dict = field(default_factory=dict)
     pm_markets: dict = field(default_factory=dict)
@@ -191,6 +203,39 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--magnitude-gate", type=float, default=0.0,
         help="Skip ticks where |cal_prob - 0.5| < threshold (default: 0 = disabled)",
+    )
+    p.add_argument(
+        "--divergence", action="store_true",
+        help="Enable Divergence strategy alongside Dutch (model-vs-market edge trading)",
+    )
+    p.add_argument(
+        "--div-min-edge", type=float, default=0.03,
+        help="Minimum model-vs-market edge for Divergence (default: 0.03)",
+    )
+    p.add_argument(
+        "--div-kelly", type=float, default=0.25,
+        help="Kelly fraction for Divergence sizing (default: 0.25)",
+    )
+    p.add_argument(
+        "--div-order-size", type=float, default=5.0,
+        help="Per-order size for Divergence (default: 5.0)",
+    )
+    # Live trading
+    p.add_argument(
+        "--live", action="store_true",
+        help="Enable LIVE Divergence trading on Polymarket CLOB (real money)",
+    )
+    p.add_argument(
+        "--live-order-size", type=float, default=2.0,
+        help="Max USD per order in live mode (default: 2.0)",
+    )
+    p.add_argument(
+        "--live-max-daily-loss", type=float, default=50.0,
+        help="Kill switch: stop live if daily loss exceeds this (default: 50)",
+    )
+    p.add_argument(
+        "--dry-run", action="store_true",
+        help="Live mode but orders not submitted to CLOB (dry-run verification)",
     )
     # --dutch-max-hedge-ask removed in V6 (no hedge tier)
     return p.parse_args()
@@ -845,7 +890,7 @@ def _save_dutch_state(state_file: Path, session: dict, pending: list) -> None:
 # -- Helper functions for per-TF processing --------------------------
 
 
-def _finalize_dutch_bar(state: TFState) -> None:
+async def _finalize_dutch_bar(state: TFState) -> None:
     """Cancel orders, resolve bar, queue for resolution polling."""
     if not state.dutch_engine or not state.dutch_sim:
         return
@@ -878,6 +923,33 @@ def _finalize_dutch_bar(state: TFState) -> None:
     state.dutch_engine.reset()
     state.dutch_sim.reset()
 
+    # Divergence bar finalization (parallel to Dutch)
+    if state.divergence_engine and state.divergence_sim:
+        div_cancelled = state.divergence_sim.cancel_all()
+        for order in div_cancelled:
+            state.divergence_engine.on_order_cancelled(order)
+        div_summary = state.divergence_engine.resolve("")
+        div_summary.fill_stats = {
+            "orders_placed": state.divergence_sim.stats.placed,
+            "orders_filled": state.divergence_sim.stats.filled,
+        }
+        if state.dutch_bar_condition_id:
+            state.divergence_pending_resolutions.append({
+                "condition_id": state.dutch_bar_condition_id,
+                "summary": div_summary,
+                "bar_id": state.current_bar_id,
+            })
+        state.divergence_engine.reset()
+        state.divergence_sim.reset()
+
+        # Cancel live CLOB orders at bar end
+        if state.divergence_live_router:
+            await state.divergence_live_router.cancel_all()
+            if state.live_safety:
+                state.live_safety.record_bar_end(state.tf_label)
+                safety_path = Path(f"data/divergence_live/safety_{state.tf_label}.json")
+                state.live_safety.save_state(safety_path)
+
 
 def _setup_new_bar(
     state: TFState,
@@ -900,6 +972,15 @@ def _setup_new_bar(
         window_start=w_s,
         window_end=w_e,
     )
+    if state.divergence_engine:
+        state.divergence_engine.set_bar_info(
+            bar_id=bar_id,
+            condition_id=cid,
+            window_start=w_s,
+            window_end=w_e,
+        )
+    if state.divergence_live_router and pm_market:
+        state.divergence_live_router.set_market(pm_market)
 
 
 def _run_inference(
@@ -968,6 +1049,81 @@ def _dutch_tick(
             "snap": state.dutch_engine.snapshot(),
             "pending_orders": len(state.dutch_sim.pending_orders),
         })
+
+
+async def _divergence_tick(
+    state: TFState, elapsed_pct: float, book_up, book_dn,
+) -> None:
+    """Run Divergence engine on_tick + simulator fills + live CLOB routing."""
+    from qm.strategy.dutch.tick_processor import process_tick
+
+    if not state.divergence_engine or not state.divergence_sim:
+        return
+    if state.last_model_time <= 0:
+        return
+
+    orders, fills = process_tick(
+        elapsed_pct, state.cal_prob, book_up, book_dn,
+        state.divergence_engine, state.divergence_sim,
+    )
+
+    # Live: route same orders to real CLOB (in addition to paper)
+    if state.divergence_live_router and orders:
+        import re as _re
+
+        for order in orders:
+            if order.action != "BUY":
+                continue  # Only route buys to CLOB (sells handled by paper)
+            allowed, reason = state.live_safety.can_trade(
+                state.tf_label, order.dollars,
+            )
+            if not allowed:
+                if state.live_trade_logger:
+                    state.live_trade_logger.log_safety_event(
+                        bar_id=state.current_bar_id,
+                        event="blocked",
+                        details=reason,
+                    )
+                continue
+
+            t0 = time.perf_counter()
+            order_id = await state.divergence_live_router.place(order)
+            latency_ms = (time.perf_counter() - t0) * 1000
+
+            if order_id and state.live_trade_logger:
+                buy_book = book_up if order.side == "UP" else book_dn
+                # Parse edge from reason string (e.g. "divergence_up_edge=0.150")
+                edge_match = _re.search(r"edge=([\d.]+)", order.reason or "")
+                edge_val = float(edge_match.group(1)) if edge_match else 0.0
+                state.live_trade_logger.log_order_placed(
+                    bar_id=state.current_bar_id,
+                    clob_order_id=order_id,
+                    side=order.side,
+                    action=order.action,
+                    limit_price=order.limit_price,
+                    shares=order.shares,
+                    dollars=order.dollars,
+                    edge=edge_val,
+                    cal_prob=state.cal_prob,
+                    book_bid=getattr(buy_book, "best_bid", 0),
+                    book_ask=getattr(buy_book, "best_ask", 0),
+                    book_depth=sum(getattr(buy_book, "asks", {}).values()),
+                    time_pct=elapsed_pct,
+                    api_latency_ms=latency_ms,
+                )
+            if order_id:
+                state.live_safety.record_fill(state.tf_label, order.dollars)
+
+        # Check for CLOB fills
+        live_fills = await state.divergence_live_router.check_fills()
+        for fill in live_fills:
+            if state.live_trade_logger:
+                state.live_trade_logger.log_order_filled(
+                    bar_id=state.current_bar_id,
+                    clob_order_id="",  # tracked internally by router
+                    fill_price=fill.fill_price,
+                    filled_shares=fill.filled_shares,
+                )
 
 
 def _record_tick(
@@ -1089,6 +1245,27 @@ async def _check_resolutions(
                     state.tf_label, item["bar_id"], outcome, profit,
                     summary.inventory.get("matched", 0), pair_cost,
                 )
+                # Piggyback: resolve matching Divergence bar with same outcome
+                for div_item in state.divergence_pending_resolutions[:]:
+                    if div_item["bar_id"] == item["bar_id"]:
+                        div_summary = div_item["summary"]
+                        div_summary.compute_pnl(outcome)
+                        if state.divergence_logger:
+                            state.divergence_logger.log_bar(div_summary)
+                        div_profit = div_summary.pnl.get("profit", 0)
+                        state.divergence_session["total_pnl"] += div_profit
+                        state.divergence_session["bars"] += 1
+                        if div_profit >= 0:
+                            state.divergence_session["wins"] += 1
+                        else:
+                            state.divergence_session["losses"] += 1
+                        state.divergence_pending_resolutions.remove(div_item)
+                        logger.info(
+                            "Diverg %s bar %d resolved %s: PnL=$%.2f (cost=$%.2f)",
+                            state.tf_label, item["bar_id"], outcome, div_profit,
+                            div_summary.cost.get("total", 0),
+                        )
+                        break
                 # Record outcome to resolution cache for backtest parity
                 try:
                     res_dir = Path("data/raw/polymarket_ticks/resolutions")
@@ -1261,6 +1438,67 @@ async def main_loop(args: argparse.Namespace) -> None:
             )
             state.dutch_engine.set_event_callback(state.dutch_logger.log_event)
             state.dutch_state_file = Path(f"data/dutch_paper/state_{asset_label}_{tf_label}.json")
+
+            # Divergence engine (alongside Dutch)
+            if getattr(args, "divergence", False):
+                from qm.strategy.engines.divergence import DivergenceConfig, DivergenceEngine
+
+                div_config = DivergenceConfig(
+                    bar_budget=args.dutch_budget,
+                    bar_seconds=BAR_SECONDS[tf],
+                    min_edge=getattr(args, "div_min_edge", 0.03),
+                    kelly_fraction=getattr(args, "div_kelly", 0.25),
+                    order_size=getattr(args, "div_order_size", 5.0),
+                )
+                state.divergence_engine = DivergenceEngine(div_config)
+                state.divergence_sim = LimitOrderSimulator(**sim_kwargs) if sim_kwargs else LimitOrderSimulator()
+                state.divergence_logger = DutchSummaryLogger(
+                    base_dir=Path("data/divergence_paper"),
+                    asset=asset_label,
+                    timeframe=tf_label,
+                )
+                logger.info(
+                    "Divergence %s enabled: min_edge=%.2f, kelly=%.2f, order=$%.0f",
+                    tf_label, div_config.min_edge, div_config.kelly_fraction,
+                    div_config.order_size,
+                )
+
+                # Live trading router (real CLOB orders)
+                if getattr(args, "live", False):
+                    from qm.execution.polymarket.client import PolymarketClient
+                    from qm.execution.polymarket.divergence_router import DivergenceLiveRouter
+                    from qm.execution.polymarket.safety import LiveSafetyConfig, LiveSafetyGuard
+                    from qm.execution.polymarket.trade_logger import TradeLogger
+
+                    if not hasattr(args, "_pm_client"):
+                        args._pm_client = PolymarketClient.from_env()
+                        logger.info("Polymarket CLOB client initialized (L2 auth)")
+
+                    state.divergence_live_router = DivergenceLiveRouter(
+                        args._pm_client,
+                        dry_run=getattr(args, "dry_run", False),
+                    )
+                    state.live_safety = LiveSafetyGuard(LiveSafetyConfig(
+                        max_order_usd=getattr(args, "live_order_size", 2.0),
+                        max_daily_loss_usd=getattr(args, "live_max_daily_loss", 50.0),
+                    ))
+                    state.live_trade_logger = TradeLogger(
+                        base_dir=Path("data/divergence_live"),
+                        asset=asset_label,
+                        timeframe=tf_label,
+                    )
+                    # Load persisted safety state
+                    safety_path = Path(f"data/divergence_live/safety_{asset_label}_{tf_label}.json")
+                    state.live_safety.load_state(safety_path)
+
+                    mode = "DRY-RUN" if getattr(args, "dry_run", False) else "LIVE"
+                    logger.info(
+                        "%s %s: order=$%.0f, daily_loss_cap=$%.0f",
+                        mode, tf_label,
+                        getattr(args, "live_order_size", 2.0),
+                        getattr(args, "live_max_daily_loss", 50.0),
+                    )
+
             if state.dutch_state_file.exists():
                 try:
                     with open(state.dutch_state_file) as f:
@@ -1352,6 +1590,40 @@ async def main_loop(args: argparse.Namespace) -> None:
     MODEL_INTERVAL = 1.0
     display_tf_idx = 0  # cycle through TFs for display
 
+    # -- Live trading startup: cancel stale orders + signal handler --
+    if getattr(args, "live", False):
+        for tf, state in tf_states.items():
+            if state.divergence_live_router:
+                cancelled = await state.divergence_live_router.cancel_all_open_orders()
+                if cancelled:
+                    logger.info("Startup: cancelled %d stale CLOB orders (%s)", cancelled, state.tf_label)
+
+        # Graceful shutdown: cancel all CLOB orders on SIGTERM/SIGINT
+        import signal
+
+        async def _live_shutdown(sig_name: str) -> None:
+            logger.info("Received %s — cancelling all live CLOB orders...", sig_name)
+            for _tf, _st in tf_states.items():
+                if _st.divergence_live_router:
+                    _cancelled = await _st.divergence_live_router.cancel_all()
+                    logger.info("Cancelled %d live orders on %s", len(_cancelled), _st.tf_label)
+                if _st.live_safety:
+                    _safety_path = Path(f"data/divergence_live/safety_{_st.tf_label}.json")
+                    _st.live_safety.save_state(_safety_path)
+                if _st.live_trade_logger:
+                    _st.live_trade_logger.close()
+            running_flag[0] = False
+
+        loop = asyncio.get_event_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            try:
+                loop.add_signal_handler(
+                    sig,
+                    lambda s=sig: asyncio.ensure_future(_live_shutdown(s.name)),
+                )
+            except NotImplementedError:
+                pass  # Windows doesn't support add_signal_handler
+
     logger.info("Starting main loop (%s, %d TFs)... waiting for ticks",
                 "event-driven" if dutch_mode else f"{POLL_INTERVAL*1000:.0f}ms polling",
                 len(timeframes))
@@ -1402,7 +1674,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                         # Handle bar boundary (new bar detected)
                         if bar_id_from_market != state.current_bar_id and state.current_bar_id != 0:
                             state.last_model_time = 0.0  # require fresh prediction
-                            _finalize_dutch_bar(state)
+                            await _finalize_dutch_bar(state)
                             _setup_new_bar(state, bar_id_from_market, pm_mkt)
                             state.current_bar_id = bar_id_from_market
                         elif state.current_bar_id == 0:
@@ -1516,6 +1788,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                     if book_up and book_dn:
                         _dutch_tick(state, elapsed_pct, book_up, book_dn, args,
                                     state.current_bar_id)
+                        await _divergence_tick(state, elapsed_pct, book_up, book_dn)
 
                         # Record tick to Parquet (same book objects engine saw)
                         if tick_queue is not None:
@@ -1591,6 +1864,17 @@ async def main_loop(args: argparse.Namespace) -> None:
             last_state_save = now_disp
             for state in tf_states.values():
                 _save_tf_state(state)
+
+            # Daily safety reset at midnight UTC
+            from datetime import UTC, datetime
+            now_utc = datetime.now(UTC)
+            for state in tf_states.values():
+                if state.live_safety and now_utc.hour == 0 and now_utc.minute < 6:
+                    if not getattr(state, "_daily_reset_done", False):
+                        state.live_safety.reset_daily()
+                        state._daily_reset_done = True
+                elif hasattr(state, "_daily_reset_done"):
+                    state._daily_reset_done = False
 
         # -- Yield to WSS tasks -----------------------------------
         # Dutch: 50ms sleep — WSS runs during this, sets book_updated.
