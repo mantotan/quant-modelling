@@ -5,12 +5,6 @@ on:
       image_tag:
         description: 'Image tag (latest or sha-xxxxx)'
         default: 'latest'
-      asset:
-        description: 'Asset (ETH, SOL, XRP)'
-        default: 'ETH'
-      timeframes:
-        description: 'Timeframes (5m, 5m,15m, etc.)'
-        default: '5m'
       order_size:
         description: 'Max USD per order'
         default: '2.0'
@@ -22,43 +16,67 @@ jobs:
   deploy:
     runs-on: [self-hosted, qm-live]
     concurrency: deploy-live
+    env:
+      DEPLOY_DIR: /home/dockerapps/qm-live
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup secrets
         run: |
-          mkdir -p ~/qm-live/secrets
-          echo "${{ secrets.ENV_LIVE }}" > ~/qm-live/secrets/env.txt
-          chmod 600 ~/qm-live/secrets/env.txt
+          mkdir -p $DEPLOY_DIR/secrets
+          echo "${{ secrets.ENV_LIVE }}" > $DEPLOY_DIR/secrets/env.txt
+          chmod 600 $DEPLOY_DIR/secrets/env.txt
 
       - name: Copy deployment files
         run: |
-          cp .docker/docker-compose.live.yml ~/qm-live/
+          cp .docker/docker-compose.live.yml $DEPLOY_DIR/
+
+      - name: Copy model files (first deploy only)
+        run: |
+          if [ ! -d "$DEPLOY_DIR/models/pulse_v2" ]; then
+            echo "First deploy: models need to be copied manually"
+            echo "Run: scp -r data/models/pulse_v2 dockerapps@server:~/qm-live/models/"
+            exit 1
+          fi
+
+      - name: Copy knobs
+        run: |
+          mkdir -p $DEPLOY_DIR/knobs
+          cp autoresearch/dutch/knobs_*.json $DEPLOY_DIR/knobs/
+
+      - name: Login to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Pull image
         run: |
-          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           docker pull ghcr.io/${{ github.repository }}/qm-live:${{ inputs.image_tag }}
 
       - name: Stop current containers
         run: |
-          cd ~/qm-live
+          cd $DEPLOY_DIR
           docker compose -f docker-compose.live.yml down --timeout 45 || true
 
       - name: Start new containers
         run: |
-          cd ~/qm-live
+          cd $DEPLOY_DIR
           GITHUB_REPO=${{ github.repository }} \
           IMAGE_TAG=${{ inputs.image_tag }} \
-          ASSET=${{ inputs.asset }} \
-          TIMEFRAMES=${{ inputs.timeframes }} \
           ORDER_SIZE=${{ inputs.order_size }} \
           MAX_DAILY_LOSS=${{ inputs.max_daily_loss }} \
+          ENV_FILE=./secrets/env.txt \
+          MODELS_DIR=./models/pulse_v2 \
+          KNOBS_DIR=./knobs \
           docker compose -f docker-compose.live.yml up -d
 
       - name: Verify deployment
         run: |
-          sleep 15
-          cd ~/qm-live
+          sleep 20
+          cd $DEPLOY_DIR
           docker compose -f docker-compose.live.yml ps
-          docker compose -f docker-compose.live.yml logs --tail 30
+          echo "---ETH logs---"
+          docker logs qm_div_live_eth --tail 15 2>&1 || true
+          echo "---SOL logs---"
+          docker logs qm_div_live_sol --tail 15 2>&1 || true
+          echo "---XRP logs---"
+          docker logs qm_div_live_xrp --tail 15 2>&1 || true
