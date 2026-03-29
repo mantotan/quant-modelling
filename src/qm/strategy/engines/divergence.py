@@ -119,7 +119,7 @@ class DivergenceEngine:
                 self._inventory.net_shares_up if sell_side == "UP"
                 else self._inventory.net_shares_dn
             )
-            if sell_shares > 0 and sell_bid > 0.01:
+            if sell_shares > 0 and sell_bid > 0.02:  # Guard against penny sells
                 sell_order = DutchOrder(
                     side=sell_side,
                     limit_price=sell_bid,
@@ -166,16 +166,25 @@ class DivergenceEngine:
                 return orders
 
         limit_price = min(bid_price + self._config.spread_offset, ask_price - 0.01)
-        limit_price = max(limit_price, 0.01)
+        limit_price = max(limit_price, self._config.min_buy_price)
+        # Strict post-only guard: must be below ask (CLOB rejects otherwise)
+        if limit_price >= ask_price:
+            limit_price = ask_price - 0.01
+        if limit_price < self._config.min_buy_price:
+            return orders
+
         shares = bet_usd / limit_price if limit_price > 0 else 0
         if shares <= 0:
             return orders
 
         # Polymarket minimums: $1 notional AND 5 shares
+        if shares < 5.0:
+            shares = 5.0  # Bump to minimum
+            actual_usd = shares * limit_price
+            if actual_usd > self._config.order_size * 3:
+                return orders  # Don't exceed 3x cap
         actual_usd = shares * limit_price
         if actual_usd < self._config.min_order_usd:
-            return orders
-        if shares < 5.0:
             return orders
 
         buy_order = DutchOrder(

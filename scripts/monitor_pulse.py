@@ -135,6 +135,7 @@ class TFState:
     divergence_live_router: Any = None
     live_safety: Any = None
     live_trade_logger: Any = None
+    _live_bar_buys: dict = field(default_factory=dict)  # {side: shares bought on CLOB}
     scanner: MarketScanner | None = None
     ws_feeds: dict = field(default_factory=dict)
     pm_markets: dict = field(default_factory=dict)
@@ -944,11 +945,15 @@ async def _finalize_dutch_bar(state: TFState) -> None:
 
         # Cancel live CLOB orders at bar end
         if state.divergence_live_router:
-            await state.divergence_live_router.cancel_all()
+            cancelled = await state.divergence_live_router.cancel_all()
             if state.live_safety:
+                for _ in cancelled:
+                    state.live_safety.record_order_done()
                 state.live_safety.record_bar_end(state.tf_label)
                 safety_path = Path(f"data/divergence_live/safety_{state.tf_label}.json")
                 state.live_safety.save_state(safety_path)
+            # Reset live bar position tracking
+            state._live_bar_buys = {}
 
 
 def _setup_new_bar(
@@ -1067,13 +1072,25 @@ async def _divergence_tick(
         state.divergence_engine, state.divergence_sim,
     )
 
-    # Live: route same orders to real CLOB (in addition to paper)
+    # Live: route orders to real CLOB (both BUY and SELL)
     if state.divergence_live_router and orders:
         import re as _re
+        from dataclasses import replace as _replace
 
         for order in orders:
-            if order.action != "BUY":
-                continue  # Only route buys to CLOB (sells handled by paper)
+            # For SELL: cap to shares we actually bought on CLOB this bar
+            if order.action == "SELL":
+                available = getattr(state, "_live_bar_buys", {}).get(order.side, 0)
+                if available <= 0:
+                    continue
+                sell_shares = min(order.shares, available)
+                order = _replace(
+                    order,
+                    shares=round(sell_shares, 4),
+                    dollars=round(sell_shares * order.limit_price, 4),
+                )
+
+            # Safety check
             allowed, reason = state.live_safety.can_trade(
                 state.tf_label, order.dollars,
             )
@@ -1091,8 +1108,7 @@ async def _divergence_tick(
             latency_ms = (time.perf_counter() - t0) * 1000
 
             if order_id and state.live_trade_logger:
-                buy_book = book_up if order.side == "UP" else book_dn
-                # Parse edge from reason string (e.g. "divergence_up_edge=0.150")
+                relevant_book = book_up if order.side == "UP" else book_dn
                 edge_match = _re.search(r"edge=([\d.]+)", order.reason or "")
                 edge_val = float(edge_match.group(1)) if edge_match else 0.0
                 state.live_trade_logger.log_order_placed(
@@ -1105,22 +1121,38 @@ async def _divergence_tick(
                     dollars=order.dollars,
                     edge=edge_val,
                     cal_prob=state.cal_prob,
-                    book_bid=getattr(buy_book, "best_bid", 0),
-                    book_ask=getattr(buy_book, "best_ask", 0),
-                    book_depth=sum(getattr(buy_book, "asks", {}).values()),
+                    book_bid=getattr(relevant_book, "best_bid", 0),
+                    book_ask=getattr(relevant_book, "best_ask", 0),
+                    book_depth=sum(getattr(relevant_book, "asks", {}).values()),
                     time_pct=elapsed_pct,
                     api_latency_ms=latency_ms,
                 )
             if order_id:
                 state.live_safety.record_fill(state.tf_label, order.dollars)
 
-        # Check for CLOB fills
+        # Check for CLOB fills — track position but don't feed to paper engine
         live_fills = await state.divergence_live_router.check_fills()
         for fill in live_fills:
+            # Track live CLOB position (separate from paper engine inventory)
+            live_buys = getattr(state, "_live_bar_buys", {})
+            if fill.order.action == "BUY":
+                live_buys[fill.order.side] = (
+                    live_buys.get(fill.order.side, 0) + fill.filled_shares
+                )
+            elif fill.order.action == "SELL":
+                live_buys[fill.order.side] = max(0,
+                    live_buys.get(fill.order.side, 0) - fill.filled_shares
+                )
+            state._live_bar_buys = live_buys
+
+            # Decrement safety open orders
+            if state.live_safety:
+                state.live_safety.record_order_done()
+
             if state.live_trade_logger:
                 state.live_trade_logger.log_order_filled(
                     bar_id=state.current_bar_id,
-                    clob_order_id="",  # tracked internally by router
+                    clob_order_id="",
                     fill_price=fill.fill_price,
                     filled_shares=fill.filled_shares,
                 )
@@ -1265,6 +1297,13 @@ async def _check_resolutions(
                             state.tf_label, item["bar_id"], outcome, div_profit,
                             div_summary.cost.get("total", 0),
                         )
+                        # Record PnL to safety guard (circuit breaker)
+                        if state.live_safety:
+                            state.live_safety.record_pnl(div_profit)
+                            safety_path = Path(
+                                f"data/divergence_live/safety_{state.tf_label}.json",
+                            )
+                            state.live_safety.save_state(safety_path)
                         break
                 # Record outcome to resolution cache for backtest parity
                 try:

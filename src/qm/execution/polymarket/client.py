@@ -104,6 +104,11 @@ class PolymarketClient:
                 self._rate_limit()
                 return fn(*args, **kwargs)
             except Exception as e:
+                # Don't retry client errors (4xx) — they're not transient
+                status_code = getattr(e, "status_code", None)
+                if status_code is not None and 400 <= status_code < 500:
+                    logger.warning("Client error (no retry): %s", e)
+                    raise
                 if attempt == _MAX_RETRIES - 1:
                     logger.error(
                         "Request failed after %d attempts: %s",

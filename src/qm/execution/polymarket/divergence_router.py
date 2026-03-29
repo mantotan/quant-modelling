@@ -150,7 +150,7 @@ class DivergenceLiveRouter:
                 continue
 
             # Skip recently checked (throttle API calls)
-            if now - tracked.last_checked < 5.0:
+            if now - tracked.last_checked < 2.0:
                 continue
             tracked.last_checked = now
 
