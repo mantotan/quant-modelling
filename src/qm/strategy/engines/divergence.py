@@ -171,9 +171,11 @@ class DivergenceEngine:
         if shares <= 0:
             return orders
 
-        # Hard floor: actual order value must meet Polymarket $1 minimum
+        # Polymarket minimums: $1 notional AND 5 shares
         actual_usd = shares * limit_price
         if actual_usd < self._config.min_order_usd:
+            return orders
+        if shares < 5.0:
             return orders
 
         buy_order = DutchOrder(
