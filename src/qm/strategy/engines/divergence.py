@@ -32,9 +32,9 @@ class DivergenceConfig:
     min_buy_price: float = 0.02        # skip penny fills (unrealistic depth at $0.01)
 
     exit_when_edge_gone: bool = True    # sell when edge < 0
-    max_orders_per_bar: int = 20
-    min_time_between_orders: float = 0.03
-    max_loss_pct: float = 0.25
+    max_orders_per_bar: int = 5         # max 5 orders per bar (was 20)
+    min_time_between_orders: float = 0.05  # wider spacing (was 0.03)
+    max_loss_pct: float = 0.05         # max 5% of budget at risk per bar (was 25%)
 
 
 class DivergenceEngine:

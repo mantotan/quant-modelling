@@ -1481,6 +1481,8 @@ async def main_loop(args: argparse.Namespace) -> None:
                     state.live_safety = LiveSafetyGuard(LiveSafetyConfig(
                         max_order_usd=getattr(args, "live_order_size", 2.0),
                         max_daily_loss_usd=getattr(args, "live_max_daily_loss", 50.0),
+                        max_concurrent_orders=5,      # max 5 resting orders per asset
+                        max_position_per_pair=10.0,    # max $10 exposure per asset per bar
                     ))
                     state.live_trade_logger = TradeLogger(
                         base_dir=Path("data/divergence_live"),
