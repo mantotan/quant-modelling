@@ -1471,7 +1471,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                     from qm.execution.polymarket.trade_logger import TradeLogger
 
                     if not hasattr(args, "_pm_client"):
-                        args._pm_client = PolymarketClient.from_env()
+                        args._pm_client = PolymarketClient()
                         logger.info("Polymarket CLOB client initialized (L2 auth)")
 
                     state.divergence_live_router = DivergenceLiveRouter(
@@ -1599,7 +1599,6 @@ async def main_loop(args: argparse.Namespace) -> None:
                     logger.info("Startup: cancelled %d stale CLOB orders (%s)", cancelled, state.tf_label)
 
         # Graceful shutdown: cancel all CLOB orders on SIGTERM/SIGINT
-        import signal
 
         async def _live_shutdown(sig_name: str) -> None:
             logger.info("Received %s — cancelling all live CLOB orders...", sig_name)
