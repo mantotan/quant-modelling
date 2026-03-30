@@ -34,6 +34,7 @@ services:
       - live_data_eth:/app/data/divergence_live
       - ${MODELS_DIR:-./models/pulse_v2}:/app/data/models/pulse_v2:ro
       - ${KNOBS_DIR:-./knobs}:/app/autoresearch/dutch:ro
+      - ${OHLCV_DIR:-./ohlcv}:/app/data/raw/ohlcv:ro
 
   div-live-sol:
     <<: *live-base
@@ -55,6 +56,7 @@ services:
       - live_data_sol:/app/data/divergence_live
       - ${MODELS_DIR:-./models/pulse_v2}:/app/data/models/pulse_v2:ro
       - ${KNOBS_DIR:-./knobs}:/app/autoresearch/dutch:ro
+      - ${OHLCV_DIR:-./ohlcv}:/app/data/raw/ohlcv:ro
 
   div-live-xrp:
     <<: *live-base
@@ -76,6 +78,7 @@ services:
       - live_data_xrp:/app/data/divergence_live
       - ${MODELS_DIR:-./models/pulse_v2}:/app/data/models/pulse_v2:ro
       - ${KNOBS_DIR:-./knobs}:/app/autoresearch/dutch:ro
+      - ${OHLCV_DIR:-./ohlcv}:/app/data/raw/ohlcv:ro
 
 volumes:
   live_data_eth:
