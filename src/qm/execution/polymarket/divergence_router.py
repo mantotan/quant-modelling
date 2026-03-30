@@ -53,6 +53,7 @@ class DivergenceLiveRouter:
         self._cancel_timeout = cancel_timeout
         self._pending: dict[str, _TrackedOrder] = {}
         self._current_market: object | None = None  # PolymarketMarket
+        self._failed_count: int = 0  # Background failures, drain in check_fills
         self._order_counter: int = 0
         self._stats = {"placed": 0, "filled": 0, "cancelled": 0, "failed": 0}
 
@@ -111,7 +112,7 @@ class DivergenceLiveRouter:
         tracked.clob_order_id = placeholder_id
         tracked.status = "submitting"
         self._pending[placeholder_id] = tracked
-        self._stats["placed"] += 1
+        # Don't increment stats["placed"] yet — wait for confirmation
 
         asyncio.get_event_loop().run_in_executor(
             None, self._submit_order_sync, tracked, token_id, clob_side, placeholder_id,
@@ -151,11 +152,21 @@ class DivergenceLiveRouter:
             tracked.status = "failed"
             self._pending.pop(placeholder_id, None)
             self._stats["failed"] += 1
+            self._failed_count += 1  # Track failures for safety decrement
             logger.warning(
                 "LIVE order failed: %s %s @ $%.4f: %s",
                 clob_side, tracked.dutch_order.side,
                 tracked.dutch_order.limit_price, e,
             )
+
+    def drain_failures(self) -> int:
+        """Return and reset count of background order failures.
+
+        Caller should decrement safety open_orders by this count.
+        """
+        count = self._failed_count
+        self._failed_count = 0
+        return count
 
     async def check_fills(self) -> list[DutchFill]:
         """Poll CLOB for fill updates on pending orders.
@@ -176,6 +187,15 @@ class DivergenceLiveRouter:
                 fills.append(fill)
                 del self._pending[order_id]
                 self._stats["filled"] += 1
+                continue
+
+            # Skip orders still being submitted to CLOB (background thread)
+            if tracked.status == "submitting":
+                continue
+
+            # Skip failed orders (background thread marked them)
+            if tracked.status == "failed":
+                del self._pending[order_id]
                 continue
 
             # Skip recently checked (throttle API calls)

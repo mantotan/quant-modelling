@@ -1129,8 +1129,16 @@ async def _divergence_tick(
                     time_pct=elapsed_pct,
                     api_latency_ms=latency_ms,
                 )
-            # Safety record_fill deferred to check_fills (after CLOB confirms)
-            # Don't increment here — order is still "submitting" in background
+            # Track order intent for safety (open_orders count)
+            # Actual pair_exposure tracked on fill confirmation in check_fills
+            if order_id and state.live_safety:
+                state.live_safety._open_orders += 1
+
+        # Decrement safety for background order failures
+        if state.live_safety:
+            failed = state.divergence_live_router.drain_failures()
+            for _ in range(failed):
+                state.live_safety._open_orders = max(0, state.live_safety._open_orders - 1)
 
         # Check for CLOB fills — track position but don't feed to paper engine
         live_fills = await state.divergence_live_router.check_fills()
@@ -1147,8 +1155,14 @@ async def _divergence_tick(
                 )
             state._live_bar_buys = live_buys
 
-            # Decrement safety open orders
+            # Update safety on fill: track exposure + decrement open orders
             if state.live_safety:
+                fill_cost = fill.filled_shares * fill.fill_price
+                # Add pair exposure and volume (but NOT open_orders — already counted on placement)
+                state.live_safety._pair_exposure[state.tf_label] = (
+                    state.live_safety._pair_exposure.get(state.tf_label, 0) + fill_cost
+                )
+                state.live_safety._daily_volume += fill_cost
                 state.live_safety.record_order_done()
 
             if state.live_trade_logger:
