@@ -1075,6 +1075,13 @@ async def _divergence_tick(
     )
 
     # Live: route orders to real CLOB (both BUY and SELL)
+    has_router = state.divergence_live_router is not None
+    if orders:
+        logger.info(
+            "DIV TICK: %d orders, router=%s, actions=[%s]",
+            len(orders), has_router,
+            ",".join(f"{o.action}_{o.side}" for o in orders[:3]),
+        )
     if state.divergence_live_router and orders:
         import re as _re
         from dataclasses import replace as _replace
@@ -1084,6 +1091,7 @@ async def _divergence_tick(
             if order.action == "SELL":
                 available = getattr(state, "_live_bar_buys", {}).get(order.side, 0)
                 if available <= 0:
+                    logger.info("DIV LIVE: SELL %s blocked (no live buys to sell)", order.side)
                     continue
                 sell_shares = min(order.shares, available)
                 order = _replace(
@@ -1096,6 +1104,7 @@ async def _divergence_tick(
             allowed, reason = state.live_safety.can_trade(
                 state.tf_label, order.dollars,
             )
+            logger.info("DIV LIVE: %s %s $%.2f allowed=%s reason=%s", order.action, order.side, order.dollars, allowed, reason)
             if not allowed:
                 if state.live_trade_logger:
                     state.live_trade_logger.log_safety_event(
@@ -1498,12 +1507,16 @@ async def main_loop(args: argparse.Namespace) -> None:
             if getattr(args, "divergence", False):
                 from qm.strategy.engines.divergence import DivergenceConfig, DivergenceEngine
 
+                # Use live_order_size for divergence if in live mode
+                effective_order_size = getattr(args, "div_order_size", 5.0)
+                if getattr(args, "live", False):
+                    effective_order_size = getattr(args, "live_order_size", 2.0)
                 div_config = DivergenceConfig(
                     bar_budget=args.dutch_budget,
                     bar_seconds=BAR_SECONDS[tf],
                     min_edge=getattr(args, "div_min_edge", 0.03),
                     kelly_fraction=getattr(args, "div_kelly", 0.25),
-                    order_size=getattr(args, "div_order_size", 5.0),
+                    order_size=effective_order_size,
                 )
                 state.divergence_engine = DivergenceEngine(div_config)
                 state.divergence_sim = LimitOrderSimulator(**sim_kwargs) if sim_kwargs else LimitOrderSimulator()
@@ -1534,7 +1547,7 @@ async def main_loop(args: argparse.Namespace) -> None:
                         dry_run=getattr(args, "dry_run", False),
                     )
                     state.live_safety = LiveSafetyGuard(LiveSafetyConfig(
-                        max_order_usd=getattr(args, "live_order_size", 2.0),
+                        max_order_usd=getattr(args, "live_order_size", 2.0) * 3,  # 3x headroom for 5-share bump
                         max_daily_loss_usd=getattr(args, "live_max_daily_loss", 50.0),
                         max_concurrent_orders=5,      # max 5 resting orders per asset
                         max_position_per_pair=10.0,    # max $10 exposure per asset per bar
