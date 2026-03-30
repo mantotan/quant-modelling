@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 from qm.strategy.dutch.engine import DutchOrder
 
@@ -41,6 +42,7 @@ class _PendingOrder:
     consecutive_ticks_at_limit: int = 0
     would_fill_count: int = 0
     chase_count: int = 0
+    eligible_at: datetime | None = None  # None = immediately eligible
 
 
 @dataclass
@@ -83,6 +85,7 @@ class LimitOrderSimulator:
         cancel_distance: float = 0.05,
         sweep_threshold: float = 0.01,  # V4: unused, kept for backward compat
         resting_cancel_distance: float = 0.10,  # V7.4: wider for resting
+        placement_delay_ms: float = 0.0,  # CLOB API round-trip simulation
     ) -> None:
         self._fill_ticks = fill_ticks
         self._chase_threshold = chase_threshold
@@ -91,12 +94,18 @@ class LimitOrderSimulator:
         self._cancel_distance = cancel_distance
         self._sweep_threshold = sweep_threshold
         self._resting_cancel_distance = resting_cancel_distance
+        self._placement_delay = timedelta(milliseconds=placement_delay_ms)
         self._pending: list[_PendingOrder] = []
         self._stats = SimulatorStats()
 
     def place(self, order: DutchOrder) -> None:
         """Add a limit order to the pending queue."""
-        self._pending.append(_PendingOrder(order=order))
+        eligible_at = (
+            order.placed_at + self._placement_delay
+            if self._placement_delay.total_seconds() > 0
+            else None
+        )
+        self._pending.append(_PendingOrder(order=order, eligible_at=eligible_at))
         self._stats.placed += 1
 
     def on_tick(
@@ -104,6 +113,7 @@ class LimitOrderSimulator:
         time_pct: float,
         book_up,
         book_dn,
+        now: datetime | None = None,
     ) -> list[DutchFill]:
         """Process pending orders: chase pass then fill-check pass.
 
@@ -113,6 +123,9 @@ class LimitOrderSimulator:
         # --- Chase pass: check if market moved away (BUY orders only) ---
         for po in self._pending:
             if po.state not in ("PENDING", "CROSSING"):
+                continue
+            # Skip orders still in-flight to CLOB
+            if po.eligible_at is not None and now is not None and now < po.eligible_at:
                 continue
             # V5: skip chase for sell orders (they sit on ask side)
             if getattr(po.order, "action", "BUY") == "SELL":
@@ -149,6 +162,9 @@ class LimitOrderSimulator:
                 po.chase_count += 1
                 po.state = "PENDING"
                 po.consecutive_ticks_at_limit = 0
+                # Chase resubmits to CLOB — fresh latency window
+                if self._placement_delay.total_seconds() > 0 and now is not None:
+                    po.eligible_at = now + self._placement_delay
                 self._stats.chased += 1
                 self._stats.chase_cancelled += 1
             else:
@@ -170,6 +186,11 @@ class LimitOrderSimulator:
 
         for po in self._pending:
             if po.state in ("FILLED", "CANCELLED"):
+                continue
+
+            # Skip orders still in-flight to CLOB
+            if po.eligible_at is not None and now is not None and now < po.eligible_at:
+                remaining.append(po)
                 continue
 
             book = book_up if po.order.side == "UP" else book_dn

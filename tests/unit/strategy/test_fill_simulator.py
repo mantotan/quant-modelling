@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -286,3 +286,69 @@ class TestV4Realism:
         book_dn = make_book(0.44, 0.48)
         sim.on_tick(0.50, make_book(0.47, 0.49), book_dn)
         assert sim.stats.chased == 0  # no chase — would be downward
+
+
+class TestPlacementLatency:
+    """Tests for CLOB API latency simulation."""
+
+    def test_no_fill_during_latency_window(self):
+        """Order should not fill while still in-flight to CLOB."""
+        sim = LimitOrderSimulator(placement_delay_ms=200)
+        order = make_order(limit_price=0.49)
+        sim.place(order)
+        book_up = make_book(0.48, 0.49)  # ask == limit → would normally fill
+        book_dn = make_book(0.50, 0.52)
+        # 100ms after placement — still in-flight
+        now = order.placed_at + timedelta(milliseconds=100)
+        fills = sim.on_tick(0.50, book_up, book_dn, now=now)
+        assert len(fills) == 0
+
+    def test_fill_after_latency_window(self):
+        """Order should fill once latency window has passed."""
+        sim = LimitOrderSimulator(placement_delay_ms=200)
+        order = make_order(limit_price=0.49)
+        sim.place(order)
+        book_up = make_book(0.48, 0.49)  # ask == limit
+        book_dn = make_book(0.50, 0.52)
+        # 201ms after placement — eligible
+        now = order.placed_at + timedelta(milliseconds=201)
+        fills = sim.on_tick(0.50, book_up, book_dn, now=now)
+        assert len(fills) == 1
+        assert fills[0].fill_price == 0.49
+
+    def test_chase_resets_latency_window(self):
+        """Chased order gets a fresh latency delay."""
+        sim = LimitOrderSimulator(
+            placement_delay_ms=200,
+            chase_threshold=0.03, max_chase=2, spread_offset=0.01,
+        )
+        order = make_order(side="UP", limit_price=0.40)
+        sim.place(order)
+        book_dn = make_book(0.50, 0.52)
+
+        # After delay expires, trigger chase (bid=0.44 → new_limit=0.45)
+        t1 = order.placed_at + timedelta(milliseconds=300)
+        book_up_chase = make_book(0.44, 0.48)
+        sim.on_tick(0.50, book_up_chase, book_dn, now=t1)
+        assert sim.stats.chased == 1
+
+        # Immediately after chase: ask crosses new limit but still in-flight
+        t2 = t1 + timedelta(milliseconds=50)
+        book_up_fill = make_book(0.44, 0.45)  # ask == new limit
+        fills = sim.on_tick(0.51, book_up_fill, book_dn, now=t2)
+        assert len(fills) == 0  # still in latency window
+
+        # After chase latency expires: should fill
+        t3 = t1 + timedelta(milliseconds=250)
+        fills = sim.on_tick(0.52, book_up_fill, book_dn, now=t3)
+        assert len(fills) == 1
+
+    def test_zero_delay_backward_compat(self):
+        """Default placement_delay_ms=0 with now=None behaves as before."""
+        sim = LimitOrderSimulator()  # default: delay=0
+        sim.place(make_order(limit_price=0.49))
+        book_up = make_book(0.48, 0.49)  # ask == limit
+        book_dn = make_book(0.50, 0.52)
+        # No now parameter — same-tick fill
+        fills = sim.on_tick(0.50, book_up, book_dn)
+        assert len(fills) == 1

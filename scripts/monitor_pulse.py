@@ -1034,6 +1034,7 @@ def _dutch_tick(
             orders, fills = process_tick(
                 elapsed_pct, state.cal_prob, book_up, book_dn,
                 state.dutch_engine, state.dutch_sim,
+                now=datetime.now(UTC),
             )
     else:
         orders, fills = [], []
@@ -1070,6 +1071,7 @@ async def _divergence_tick(
     orders, fills = process_tick(
         elapsed_pct, state.cal_prob, book_up, book_dn,
         state.divergence_engine, state.divergence_sim,
+        now=datetime.now(UTC),
     )
 
     # Live: route orders to real CLOB (both BUY and SELL)
@@ -1127,8 +1129,8 @@ async def _divergence_tick(
                     time_pct=elapsed_pct,
                     api_latency_ms=latency_ms,
                 )
-            if order_id:
-                state.live_safety.record_fill(state.tf_label, order.dollars)
+            # Safety record_fill deferred to check_fills (after CLOB confirms)
+            # Don't increment here — order is still "submitting" in background
 
         # Check for CLOB fills — track position but don't feed to paper engine
         live_fills = await state.divergence_live_router.check_fills()

@@ -6,7 +6,12 @@ use the exact same code paths for inference and order processing.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 from qm.core.types import PartialBar
 from qm.features.live_cache import CrossAssetLiveFeatureCache
@@ -49,6 +54,7 @@ def process_tick(
     book_dn,
     engine,
     sim,
+    now: datetime | None = None,
 ) -> tuple[list, list]:
     """Run engine + simulator for one tick.
 
@@ -64,7 +70,7 @@ def process_tick(
     for order in orders:
         sim.place(order)
 
-    fills = sim.on_tick(time_pct, book_up, book_dn)
+    fills = sim.on_tick(time_pct, book_up, book_dn, now=now)
     for fill in fills:
         engine.on_fill(fill.order, fill.fill_price, fill.filled_shares)
 
