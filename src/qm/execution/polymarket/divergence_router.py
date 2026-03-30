@@ -64,9 +64,10 @@ class DivergenceLiveRouter:
         self._current_market = market
 
     async def place(self, order: DutchOrder) -> str | None:
-        """Submit limit order to CLOB. Returns order_id or None on failure.
+        """Submit limit order to CLOB. Non-blocking for live orders.
 
-        Non-blocking: submits the order and returns immediately.
+        Dry-run: returns immediately with fake order_id.
+        Live: fires CLOB API call as background task, returns placeholder ID.
         Call check_fills() on subsequent ticks to detect fills.
         """
         if not self._current_market:
@@ -102,31 +103,59 @@ class DivergenceLiveRouter:
             )
             return tracked.clob_order_id
 
+        # Fire-and-forget: submit to CLOB in background, don't block tick loop
+        import asyncio
+
+        self._order_counter += 1
+        placeholder_id = f"pending-{self._order_counter}"
+        tracked.clob_order_id = placeholder_id
+        tracked.status = "submitting"
+        self._pending[placeholder_id] = tracked
+        self._stats["placed"] += 1
+
+        asyncio.get_event_loop().run_in_executor(
+            None, self._submit_order_sync, tracked, token_id, clob_side, placeholder_id,
+        )
+
+        logger.info(
+            "LIVE order (async): %s %s %.1fsh @ $%.4f",
+            clob_side, order.side, order.shares, order.limit_price,
+        )
+        return placeholder_id
+
+    def _submit_order_sync(
+        self, tracked: _TrackedOrder, token_id: str, clob_side: str, placeholder_id: str,
+    ) -> None:
+        """Submit order to CLOB synchronously (runs in thread pool)."""
         try:
             result = self._client.create_and_post_order(
                 token_id=token_id,
-                price=order.limit_price,
-                size=order.shares,
+                price=tracked.dutch_order.limit_price,
+                size=tracked.dutch_order.shares,
                 side=clob_side,
                 post_only=True,
             )
             order_id = result.get("orderID", result.get("id", ""))
+            # Update tracked order with real CLOB order_id
             tracked.clob_order_id = order_id
             tracked.status = "placed"
+            # Move from placeholder to real ID in pending dict
+            self._pending.pop(placeholder_id, None)
             self._pending[order_id] = tracked
-            self._stats["placed"] += 1
             logger.info(
-                "LIVE order: %s %s %.1fsh @ $%.4f → %s",
-                clob_side, order.side, order.shares, order.limit_price,
+                "LIVE order confirmed: %s %s → %s",
+                clob_side, tracked.dutch_order.side,
                 order_id[:16] if order_id else "no-id",
             )
-            return order_id
         except Exception as e:
             tracked.status = "failed"
+            self._pending.pop(placeholder_id, None)
             self._stats["failed"] += 1
-            logger.warning("LIVE order failed: %s %s @ $%.4f: %s",
-                           clob_side, order.side, order.limit_price, e)
-            return None
+            logger.warning(
+                "LIVE order failed: %s %s @ $%.4f: %s",
+                clob_side, tracked.dutch_order.side,
+                tracked.dutch_order.limit_price, e,
+            )
 
     async def check_fills(self) -> list[DutchFill]:
         """Poll CLOB for fill updates on pending orders.
