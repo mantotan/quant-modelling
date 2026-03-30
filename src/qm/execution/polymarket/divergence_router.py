@@ -183,6 +183,9 @@ class DivergenceLiveRouter:
                     order=tracked.dutch_order,
                     fill_price=tracked.dutch_order.limit_price,
                     filled_shares=tracked.filled_size,
+                    fill_time_pct=0.0,
+                    fill_ticks=1,
+                    partial=False,
                 )
                 fills.append(fill)
                 del self._pending[order_id]
@@ -249,6 +252,9 @@ class DivergenceLiveRouter:
                             order=tracked.dutch_order,
                             fill_price=tracked.dutch_order.limit_price,
                             filled_shares=new_fill,
+                            fill_time_pct=0.0,
+                            fill_ticks=1,
+                            partial=True,
                         )
                         fills.append(fill)
                         logger.info(
