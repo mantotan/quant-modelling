@@ -72,8 +72,10 @@ to make it auditable and crash-resistant.
   accumulation paper trading (`--dutch --asset {BTC,ETH,SOL,XRP}`).
 - **Risk gating**: Fractional-Kelly position sizing, daily-loss kill switch,
   per-asset correlation cap, `MIN_ORDER_USD` enforcement.
-- **Deployment**: Docker image via GHCR + GitHub Actions self-hosted runner
-  (`deploy/trade.service` for systemd, `docker-compose.live.yml` for compose).
+- **Deployment**: Historically ran in a Docker container supervised by systemd on a
+  Hetzner box. The deploy plumbing has been removed from the repo since the project is
+  no longer in active operation; the training / backtest / paper-trading paths above
+  remain fully functional.
 
 ## Conventions
 

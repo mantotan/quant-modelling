@@ -140,9 +140,7 @@ flowchart LR
 ├── autoresearch/                 Autonomous research loop state + outputs
 ├── .claude/agents/               Multi-agent definitions (sentinel-*, dutch-*)
 ├── docs/                         Extended design docs (PULSE_MODEL_PLAN, etc.)
-├── deploy/                       systemd service definition
-├── .docker/                      Production Dockerfile + docker-compose
-├── .github/workflows/            CI (test + build-live)
+├── .github/workflows/            CI (test + Docker image build/push to GHCR)
 ├── PLAN.md                       Implementation plan / scratchpad
 └── ARCHITECTURE.md               Deeper architecture write-up
 ```
@@ -218,8 +216,11 @@ Then:
 uv run python scripts/trade.py --mode live --asset BTC --bankroll 5000
 ```
 
-For the production deploy path (Docker, GHCR, systemd) see `.docker/docker-compose.live.yml`
-and `deploy/trade.service`.
+The historical production deploy ran the same `monitor_pulse.py` entry point inside a
+Docker container supervised by systemd on a Hetzner box. The deploy plumbing
+(`Dockerfile.live`, `docker-compose.live.yml`, GitHub Actions workflow, systemd unit) has
+been removed from the repo since the project is no longer in active operation; the model
+training / backtesting / paper-trading pipeline above remains fully runnable.
 
 ### Common commands
 
