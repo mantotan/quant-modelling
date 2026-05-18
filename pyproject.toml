@@ -1,7 +1,13 @@
 [project]
 name = "qm"
 version = "0.1.0"
-description = "ML/Quant system for crypto Polymarket prediction"
+description = "Quant ML pipeline trading crypto-binary prediction markets on Polymarket. LightGBM bar + intra-bar models with treelite-compiled inference, walk-forward CPCV + isotonic time-aware calibration, fractional-Kelly risk, multi-agent autonomous research loop."
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Hermanto Tan", email = "manto.tan@gmail.com"},
+]
+keywords = ["quant", "ml", "polymarket", "lightgbm", "prediction-markets", "crypto", "trading", "autonomous-research", "kelly", "walk-forward"]
 requires-python = ">=3.11"
 dependencies = [
     # Core

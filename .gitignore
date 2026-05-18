@@ -88,5 +88,10 @@ coverage.xml
 prometheus_data/
 grafana_data/
 
-# Runtime state (not code)
+# Runtime state (not code) — autonomous research loop produces these at runtime
 autoresearch/reconciliation_state.json
+autoresearch/build_progress.json
+autoresearch/dispatch_state.json
+autoresearch/phase.json
+autoresearch/researcher_ack.txt
+autoresearch/last_run.log
