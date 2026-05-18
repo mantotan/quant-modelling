@@ -1,6 +1,6 @@
 # QM — Quant ML for Polymarket Crypto Binaries
 
-ML pipeline that trades crypto-binary prediction markets on
+ML pipeline that traded crypto-binary prediction markets on
 [Polymarket](https://polymarket.com). Two complementary LightGBM models —
 **Sentinel** (predicts the next bar from completed bars) and **Pulse**
 (predicts the current bar from a t=0.80 snapshot) — produce calibrated
@@ -9,9 +9,14 @@ probabilities for 12 independent markets in parallel (BTC / ETH / SOL / XRP
 Kelly with per-asset correlation limits and a daily-loss kill switch.
 
 Wrapped around the model layer is a **multi-agent autonomous research loop**
-that designs experiments, runs HPO, audits results, and updates configs
-without supervision — driving 150+ research iterations to HPO exhaustion
-across all 12 models.
+of 13 agent definitions (8 sentinel + 5 dutch) that designs experiments,
+runs HPO, audits results, and updates configs without supervision — driving
+150+ research iterations to structural-floor exhaustion across all 12 models.
+
+> **Status (2026-05): the project is paused.** The training, backtest,
+> autonomous-research, and paper-trading paths remain fully runnable;
+> the live-deploy plumbing was removed when the project wound down. This
+> repo is public for portfolio / reference purposes.
 
 ---
 
@@ -35,18 +40,20 @@ across all 12 models.
   Calibration Error < 0.05. Acceptance criteria are tracked in
   [`ARCHITECTURE.md`](ARCHITECTURE.md) and enforced before any model goes live.
 
-- **Multi-agent autonomous research loop.** Seven specialized agents
-  (`sentinel-dispatch`, `sentinel-researcher`, `sentinel-strategist`,
-  `sentinel-auditor`, `sentinel-analyst`, `sentinel-builder`,
-  `sentinel-reconciler`) plus a parallel `dutch-*` loop. State is flat files
-  in `autoresearch/` (`knobs.json`, `results.tsv`, `strategy.md`, `audit.md`,
+- **Multi-agent autonomous research loop.** 13 agent definitions — 8 sentinel
+  (`dispatch`, `researcher`, `strategist`, `auditor`, `analyst`, `builder`,
+  `reconciler`, `reconciliation-dispatch`) plus 5 dutch agents tuning the
+  Dutch accumulation strategy in parallel. State is flat files in
+  `autoresearch/` (`knobs.json`, `results.tsv`, `strategy.md`, `audit.md`,
   `phase.json`) — no message bus, no shared process, deliberately
   crash-resistant and auditable. 150+ iterations until structural floors
   confirmed across all 12 models.
 
-- **Production live trading.** Multi-asset (ETH + SOL + XRP at 5m, $2/order)
-  with daily-loss kill switch, `MIN_ORDER_USD` enforcement, paper-vs-live
-  reconciliation cycle that auto-opens fixes when divergence is real.
+- **Ran on live capital before pausing.** Multi-asset (ETH + SOL + XRP at 5m,
+  $2/order) with daily-loss kill switch, `MIN_ORDER_USD` enforcement, and a
+  paper-vs-live reconciliation cycle that auto-opened fixes when divergence
+  was real. Live deployment has since been wound down; the engineering
+  artifacts are preserved here as a portfolio reference.
 
 - **Polyglot with Rust fast path.** Python for everything outside the
   hot path; `crates/qm-fast/` Rust crate planned for sub-millisecond
@@ -97,7 +104,7 @@ flowchart LR
 ### Tech stack
 
 - **Language**: Python 3.11+ (cross-platform — Windows dev + Ubuntu prod)
-- **Data**: Polars, DuckDB, Hive-partitioned Parquet, TimescaleDB (with Alembic migrations)
+- **Data**: Polars, DuckDB, Hive-partitioned Parquet, TimescaleDB (schemas in `src/qm/data/storage/schemas.py`)
 - **ML**: LightGBM, Optuna, scikit-learn, treelite (compiled inference), optional PyTorch / TabNet via the `gpu` extra
 - **Calibration**: scipy (isotonic regression)
 - **Validation**: Walk-forward, purge + embargo, CPCV with PBO, Deflated Sharpe
@@ -251,7 +258,9 @@ training / backtesting / paper-trading pipeline above remains fully runnable.
 
 ## Status
 
-Active research + production system, public for portfolio / reference
+**Paused as of 2026-05.** The training, backtest, autonomous-research,
+and paper-trading paths remain fully runnable; the live-deploy plumbing was
+removed when the project wound down. Public for portfolio / reference
 purposes. Not packaged as a library, not maintained for external users, no
 support promised. **Trading is risky; this code can lose money. Read the
 [LICENSE](LICENSE) before using.**
