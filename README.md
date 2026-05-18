@@ -140,7 +140,6 @@ flowchart LR
 ├── autoresearch/                 Autonomous research loop state + outputs
 ├── .claude/agents/               Multi-agent definitions (sentinel-*, dutch-*)
 ├── docs/                         Extended design docs (PULSE_MODEL_PLAN, etc.)
-├── .github/workflows/            CI (test + Docker image build/push to GHCR)
 ├── PLAN.md                       Implementation plan / scratchpad
 └── ARCHITECTURE.md               Deeper architecture write-up
 ```
@@ -241,10 +240,12 @@ training / backtesting / paper-trading pipeline above remains fully runnable.
 
 ## Tests
 
-- **Python:** unit + integration + benchmark suites under `tests/` (~67 test files,
-  227 + tests passing). Strict mypy + ruff in CI.
-- **CI gate:** every push runs `pytest tests/unit` then builds + pushes the
-  Docker image to GHCR. See `.github/workflows/`.
+- **67 test files / 227+ tests** across `tests/unit`, `tests/integration`, and
+  `tests/benchmark`. Strict `mypy` + `ruff` were enforced during development.
+- Run locally via `uv run pytest tests/unit -v` (or the other targets in
+  [Common commands](#common-commands)). Continuous integration was removed
+  alongside the live-deploy plumbing when the project paused; the local
+  test suite remains the source of truth.
 
 ---
 
